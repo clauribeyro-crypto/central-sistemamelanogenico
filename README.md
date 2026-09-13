@@ -146,10 +146,18 @@ manual, mas tem um plano pago bem barato e é focado em Python/Django).
    `central-sistemamelanogenico` (autorize o Railway a acessar o GitHub se
    pedir).
 3. **Adicione o banco de dados**: no mesmo projeto, clique em **+ New →
-   Database → PostgreSQL**. O Railway cria a variável `DATABASE_URL`
-   sozinho e já disponibiliza para o serviço da aplicação.
-4. **Configure as variáveis de ambiente** do serviço da aplicação (aba
-   *Variables*):
+   Database → PostgreSQL**. Isso cria um serviço Postgres separado, com sua
+   própria variável `DATABASE_URL` — mas ela **não** aparece sozinha no
+   serviço da aplicação. É o próximo passo que resolve isso.
+4. **Configure as variáveis de ambiente** do serviço da **aplicação** (não do
+   Postgres — aba *Variables* do serviço que roda o Django):
+   - `DATABASE_URL` → clique em **+ New Variable → Add Reference** e escolha
+     a variável `DATABASE_URL` do serviço Postgres. **Este passo é o que
+     mais gente esquece** — sem ele, o sistema roda em SQLite dentro do
+     container e perde todos os dados a cada deploy. (Se você adicionou o
+     Postgres pela mesma tela do serviço da aplicação, ou clicou em
+     "Connect" entre os dois serviços, o Railway pode já ter feito isso
+     sozinho — confira se a variável aparece antes de adicionar de novo.)
    - `DJANGO_SECRET_KEY` → uma senha longa e aleatória só sua (pode gerar em
      https://djecrety.ir/)
    - `DJANGO_DEBUG` → `False`
@@ -158,6 +166,10 @@ manual, mas tem um plano pago bem barato e é focado em Python/Django).
      do primeiro deploy; edite a variável de novo se mudar)
    - `DJANGO_CSRF_TRUSTED_ORIGINS` → o mesmo domínio, mas com `https://` na
      frente, ex.: `https://meusistema.up.railway.app`
+
+   > A partir de agora, se `DATABASE_URL` não estiver configurada
+   > corretamente, o próprio sistema recusa subir (em vez de usar SQLite
+   > escondido) e mostra exatamente essa instrução no log de deploy.
 5. O Railway já detecta o `Procfile` e faz o deploy automaticamente. Ele
    roda as migrações, coleta os arquivos estáticos e sobe o `gunicorn`
    sozinho a cada push no GitHub.
@@ -168,6 +180,13 @@ manual, mas tem um plano pago bem barato e é focado em Python/Django).
    python manage.py configurar_organizacao "Nome da sua clínica"
    ```
 7. Pronto — acesse a URL do Railway no navegador e use o sistema online.
+
+> **Perdendo usuários/dados a cada deploy?** É o sintoma exato de estar
+> rodando em SQLite dentro do container em vez do Postgres — normalmente
+> porque a `DATABASE_URL` não foi referenciada no serviço da aplicação
+> (passo 4 acima). Depois de corrigir a variável, rode o passo 6
+> novamente — os dados criados enquanto rodava em SQLite já se perderam,
+> mas a partir daí passam a persistir de verdade.
 
 > **Deploy travando com "gunicorn: command not found"?** Já corrigimos isso
 > no `Procfile`/`nixpacks.toml` (usamos `python -m gunicorn` em vez de

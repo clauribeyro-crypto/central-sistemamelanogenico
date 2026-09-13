@@ -115,10 +115,25 @@ WSGI_APPLICATION = "clinica.wsgi.application"
 #
 # Local/desenvolvimento: SQLite (arquivo único, zero configuração).
 # Produção: defina a variável de ambiente DATABASE_URL (a maioria das
-# hospedagens já provisiona isso automaticamente ao criar um banco Postgres),
-# ex.: postgres://usuario:senha@host:5432/nome_do_banco
+# hospedagens já provisiona isso automaticamente ao criar um banco Postgres,
+# mas é preciso REFERENCIAR essa variável no serviço da aplicação — criar o
+# banco sozinho não basta), ex.: postgres://usuario:senha@host:5432/nome
 
 import dj_database_url
+
+if not DEBUG and "DATABASE_URL" not in os.environ:
+    # Em produção, cair para SQLite silenciosamente é o pior cenário possível:
+    # o disco do container é descartado a cada deploy e todos os dados (
+    # usuários, pacientes, leads...) somem sem aviso. Preferimos recusar subir
+    # a fingir que está tudo bem.
+    raise RuntimeError(
+        "DJANGO_DEBUG=False mas a variável de ambiente DATABASE_URL não foi "
+        "encontrada. Sem ela, o sistema usaria SQLite dentro do container e "
+        "perderia todos os dados a cada novo deploy. Configure DATABASE_URL "
+        "apontando para o Postgres (no Railway: aba Variables do serviço da "
+        "aplicação → adicione uma referência à variável DATABASE_URL do "
+        "serviço Postgres) antes de subir novamente."
+    )
 
 DATABASES = {
     "default": dj_database_url.config(
