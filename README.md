@@ -169,6 +169,13 @@ manual, mas tem um plano pago bem barato e é focado em Python/Django).
    ```
 7. Pronto — acesse a URL do Railway no navegador e use o sistema online.
 
+> **Deploy travando com "gunicorn: command not found"?** Já corrigimos isso
+> no `Procfile`/`nixpacks.toml` (usamos `python -m gunicorn` em vez de
+> `gunicorn` puro, que depende do `PATH` do ambiente de build). Se aparecer
+> de novo, no Railway vá em **Settings → Deploy** e confirme que não há um
+> "Start Command" customizado sobrescrevendo o do `Procfile` — se houver,
+> apague para o Railway usar o nosso.
+
 ### Depois: colocar no seu próprio domínio
 
 1. No Railway, vá em **Settings → Domains → Custom Domain** e digite seu
