@@ -34,6 +34,24 @@ ALLOWED_HOSTS = [
     h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h
 ]
 
+# Domínios (com https://) autorizados a enviar formulários (proteção CSRF).
+# Em produção, defina DJANGO_CSRF_TRUSTED_ORIGINS separado por vírgulas,
+# ex.: https://minhaclinica.com.br,https://meuapp.up.railway.app
+CSRF_TRUSTED_ORIGINS = [
+    o for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o
+]
+
+# A maioria das hospedagens (Railway, Render...) termina o HTTPS num proxy e
+# repassa a requisição por HTTP internamente, sinalizando o protocolo original
+# neste cabeçalho. Sem isso, o Django acha que a conexão nunca é segura.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+if not DEBUG:
+    # Em produção (atrás de HTTPS), força conexão segura e cookies seguros.
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 
 # Application definition
 
@@ -63,6 +81,7 @@ LOGOUT_REDIRECT_URL = "login"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -93,12 +112,19 @@ WSGI_APPLICATION = "clinica.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+#
+# Local/desenvolvimento: SQLite (arquivo único, zero configuração).
+# Produção: defina a variável de ambiente DATABASE_URL (a maioria das
+# hospedagens já provisiona isso automaticamente ao criar um banco Postgres),
+# ex.: postgres://usuario:senha@host:5432/nome_do_banco
+
+import dj_database_url
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+    )
 }
 
 
@@ -137,6 +163,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Arquivos enviados pelos usuários (fotos de prova social, etc.)
 MEDIA_URL = "media/"

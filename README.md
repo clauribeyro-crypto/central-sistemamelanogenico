@@ -14,9 +14,10 @@ origens de lead, tabela de preços...) e telas próprias para o dia a dia
 
 - Um único framework cobre ORM, autenticação, formulários, admin e
   segurança — pouca peça extra para manter.
-- **SQLite** é um arquivo único, sem servidor de banco para administrar.
-  Trocar para PostgreSQL depois é só mudar `DATABASES` em
-  `clinica/settings.py`.
+- **SQLite** localmente (arquivo único, zero configuração) e **PostgreSQL**
+  em produção — o projeto já lê a variável de ambiente `DATABASE_URL` e troca
+  de banco sozinho, sem precisar mexer em código (veja "Colocar o sistema
+  online" mais abaixo).
 - Sem build de frontend: os templates são HTML+CSS simples renderizados
   pelo próprio Django.
 - **WhatsApp assistido**: o sistema guarda os modelos de mensagem de cada
@@ -60,17 +61,22 @@ Como as peças se conectam:
 - Agenda semanal visual (08h–18h, intervalo configurável), com cores por
   tipo de consulta, bloqueios de horário e filtro por profissional.
 - Painel "O que preciso fazer hoje": novos leads, leads por etapa, cadências
-  para retomar, consultas do dia e tarefas atrasadas.
-- Relatório financeiro por período.
+  para retomar, consultas do dia, tarefas atrasadas e alertas de
+  acompanhamento.
+- Relatório financeiro por período e página de Indicadores (leads por
+  status/origem, consultas por status, motivos de perda).
+- **Programas de Acompanhamento** configuráveis (3/6/9 meses vêm cadastrados,
+  mas nada é fixo no código) e **Ficha da Paciente** com jornada visual,
+  checklist de consultas/kits, financeiro do programa e alertas automáticos
+  (consulta a agendar, kit a enviar, término se aproximando).
 
 ### O que fica para as próximas etapas
 
-- Módulo de Programas de Acompanhamento (3/6/9 meses) e conversão formal do
-  lead em "paciente ativa" com jornada do programa.
-- Ficha completa da paciente: anamnese, modulação em fases, evolução
-  fotográfica, feedbacks.
-- Indicadores/conversões (funil, origem que mais converte, etc.) além dos
-  contadores do painel do dia.
+- Ficha de Anamnese completa, Modulação em fases (com histórico de versões),
+  evolução fotográfica e Feedbacks da paciente — módulo grande por si só, as
+  abas já existem na Ficha da Paciente mas mostram "em construção".
+- Indicadores de conversão (lead → consulta → venda, origem que mais
+  converte) — hoje os indicadores são só contagens.
 - Tela de administração para uma organização se auto-cadastrar (hoje isso é
   feito pelo comando `configurar_organizacao`, veja abaixo).
 
@@ -119,12 +125,82 @@ Depois acesse:
 - `http://127.0.0.1:8000/admin/` — cadastros de apoio (profissionais, tipos
   de consulta, origens, mensagens-modelo, pacientes, prontuários...).
 
+## Colocar o sistema online (e depois no seu domínio)
+
+O projeto já está pronto para produção: usa `gunicorn` (servidor de verdade,
+em vez do `runserver` de desenvolvimento), serve os arquivos estáticos
+sozinho (`whitenoise`) e troca de SQLite para PostgreSQL automaticamente
+quando a variável `DATABASE_URL` existir. Falta só escolher uma hospedagem.
+
+**Recomendação: [Railway](https://railway.app/)** — plano gratuito para
+testar, depois cobra por uso (tende a ficar uns US$ 5–10/mês para um sistema
+pequeno como este), deploy direto do GitHub, HTTPS e domínio próprio de
+graça. Alternativas com o mesmo tipo de fluxo: [Render](https://render.com/)
+e [PythonAnywhere](https://www.pythonanywhere.com/) (esse último é mais
+manual, mas tem um plano pago bem barato e é focado em Python/Django).
+
+### Passo a passo (Railway)
+
+1. **Crie a conta** em railway.app (dá para entrar com a conta do GitHub).
+2. **New Project → Deploy from GitHub repo** e escolha o repositório
+   `central-sistemamelanogenico` (autorize o Railway a acessar o GitHub se
+   pedir).
+3. **Adicione o banco de dados**: no mesmo projeto, clique em **+ New →
+   Database → PostgreSQL**. O Railway cria a variável `DATABASE_URL`
+   sozinho e já disponibiliza para o serviço da aplicação.
+4. **Configure as variáveis de ambiente** do serviço da aplicação (aba
+   *Variables*):
+   - `DJANGO_SECRET_KEY` → uma senha longa e aleatória só sua (pode gerar em
+     https://djecrety.ir/)
+   - `DJANGO_DEBUG` → `False`
+   - `DJANGO_ALLOWED_HOSTS` → o domínio que o Railway vai gerar, por exemplo
+     `meusistema.up.railway.app` (aparece na aba *Settings → Domains* depois
+     do primeiro deploy; edite a variável de novo se mudar)
+   - `DJANGO_CSRF_TRUSTED_ORIGINS` → o mesmo domínio, mas com `https://` na
+     frente, ex.: `https://meusistema.up.railway.app`
+5. O Railway já detecta o `Procfile` e faz o deploy automaticamente. Ele
+   roda as migrações, coleta os arquivos estáticos e sobe o `gunicorn`
+   sozinho a cada push no GitHub.
+6. Abra a URL gerada, rode o setup inicial pelo **Shell** do próprio Railway
+   (aba do serviço → *Shell* ou *Settings → Deploy → Run command*):
+   ```bash
+   python manage.py createsuperuser
+   python manage.py configurar_organizacao "Nome da sua clínica"
+   ```
+7. Pronto — acesse a URL do Railway no navegador e use o sistema online.
+
+### Depois: colocar no seu próprio domínio
+
+1. No Railway, vá em **Settings → Domains → Custom Domain** e digite seu
+   domínio (ex.: `sistema.suaclinica.com.br`).
+2. O Railway mostra um registro **CNAME** para você criar.
+3. No painel do seu domínio (Registro.br, GoDaddy, Hostgator, etc.), abra a
+   área de **DNS** e crie esse registro CNAME apontando para o valor que o
+   Railway deu.
+4. Espere a propagação (de minutos a algumas horas) — o Railway emite o
+   certificado HTTPS sozinho assim que detectar o domínio configurado.
+5. Atualize `DJANGO_ALLOWED_HOSTS` e `DJANGO_CSRF_TRUSTED_ORIGINS` incluindo
+   também o novo domínio (pode manter os dois, separados por vírgula).
+
+### Atenção antes de usar com pacientes de verdade
+
+- **Fotos de prova social** (`ProvaSocial`) ficam salvas no disco do
+  servidor. Na maioria das hospedagens (incluindo o plano gratuito do
+  Railway) esse disco **não é permanente** — um redeploy pode apagar as
+  fotos já enviadas. Se for usar esse recurso de verdade, me avise para
+  configurarmos um armazenamento externo (ex.: Cloudflare R2 ou AWS S3,
+  ambos com camada gratuita).
+- Depois do primeiro deploy, troque a senha do superusuário e crie usuários
+  de verdade para a equipe pelo `/admin/` (Contas → Usuários), vinculando
+  cada um à organização certa.
+- Faça backup do banco periodicamente (o Railway tem backup automático do
+  Postgres nos planos pagos; confirme no painel).
+
 ## Próximos passos sugeridos
 
 - Autenticação/permissões por perfil (recepção, profissional, financeiro)
   usando grupos do Django.
 - Tela de auto-cadastro de novas organizações (hoje é via linha de comando).
 - Exportação do relatório financeiro em PDF/CSV.
-- Migrar para PostgreSQL e configurar variáveis de ambiente
-  (`DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`) antes de
-  colocar em produção.
+- Armazenamento externo (S3/R2) para fotos de prova social sobreviverem a
+  redeploys em produção.
