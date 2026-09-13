@@ -48,6 +48,14 @@ class Pagamento(ModeloDaOrganizacao):
     servico = models.ForeignKey(
         Servico, on_delete=models.SET_NULL, blank=True, null=True
     )
+    acompanhamento = models.ForeignKey(
+        "programas.Acompanhamento",
+        on_delete=models.SET_NULL,
+        related_name="pagamentos",
+        blank=True,
+        null=True,
+        help_text="Programa de acompanhamento ao qual este pagamento pertence, se houver.",
+    )
 
     valor = models.DecimalField(max_digits=10, decimal_places=2)
     forma_pagamento = models.CharField(

@@ -161,6 +161,41 @@
             width: 100%; padding: .5rem; border: 1px solid #ddd5ee; border-radius: 8px; box-sizing: border-box;
         }
 
+        .jornada { display: flex; align-items: flex-start; overflow-x: auto; padding: .5rem 0 .25rem; }
+        .jornada-etapa { display: flex; flex-direction: column; align-items: center; min-width: 84px; text-align: center; }
+        .jornada-etapa .circulo {
+            width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-weight: 700; font-size: .8rem; background: #ede8f5; color: #9c93ad;
+            flex-shrink: 0;
+        }
+        .jornada-etapa.concluida .circulo { background: var(--accent); color: #fff; }
+        .jornada-etapa.atual .circulo { background: #fff; border: 2px solid var(--accent); color: var(--accent); }
+        .jornada-etapa .rotulo { font-size: .72rem; color: var(--text-muted); margin-top: .35rem; max-width: 90px; }
+        .jornada-etapa.atual .rotulo { color: var(--accent-soft-text); font-weight: 600; }
+        .jornada-linha { flex: 1; height: 2px; background: #e5ddf3; margin-top: 15px; min-width: 16px; }
+        .jornada-linha.concluida { background: var(--accent); }
+
+        .tabs { display: flex; gap: 1.25rem; border-bottom: 1px solid #ece6f5; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .tabs a {
+            padding: .5rem .1rem; color: var(--text-muted); text-decoration: none; font-size: .9rem;
+            border-bottom: 2px solid transparent;
+        }
+        .tabs a.ativo { color: var(--accent-soft-text); border-bottom-color: var(--accent); font-weight: 600; }
+
+        .checklist { list-style: none; margin: 0; padding: 0; }
+        .checklist li { display: flex; align-items: center; gap: .5rem; padding: .3rem 0; font-size: .9rem; }
+        .checklist .caixa {
+            width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid #cabfe3; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: .75rem; color: #fff;
+        }
+        .checklist li.feito .caixa { background: var(--accent); border-color: var(--accent); }
+        .checklist li.feito { color: var(--text-muted); text-decoration: line-through; }
+
+        .alerta-item {
+            background: #fdf1d9; color: #8a5a10; padding: .5rem .75rem; border-radius: 8px;
+            font-size: .85rem; margin-bottom: .5rem;
+        }
+
         @media (max-width: 800px) {
             .grid-2-1, .grid-2col { grid-template-columns: 1fr; }
             .shell { flex-direction: column; }
@@ -185,13 +220,13 @@
             <nav>
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'home' %}ativo{% endif %}" href="{% url 'core:home' %}"><span class="icone">🗓️</span> O que fazer hoje</a>
                 <a class="{% if request.resolver_match.app_name == 'leads' %}ativo{% endif %}" href="{% url 'leads:kanban' %}"><span class="icone">👥</span> CRM de leads</a>
-                <a href="/admin/pacientes/paciente/"><span class="icone">📄</span> Pacientes</a>
+                <a class="{% if request.resolver_match.app_name == 'pacientes' %}ativo{% endif %}" href="{% url 'pacientes:lista' %}"><span class="icone">📄</span> Ficha da paciente</a>
                 <a class="{% if request.resolver_match.app_name == 'agenda' %}ativo{% endif %}" href="{% url 'agenda:semana' %}"><span class="icone">📅</span> Agenda</a>
                 <a href="/admin/prontuarios/atendimento/"><span class="icone">📋</span> Prontuários</a>
                 <a class="{% if request.resolver_match.app_name == 'financeiro' %}ativo{% endif %}" href="{% url 'financeiro:relatorio' %}"><span class="icone">💰</span> Financeiro</a>
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'indicadores' %}ativo{% endif %}" href="{% url 'core:indicadores' %}"><span class="icone">📊</span> Indicadores</a>
                 <a href="{% url 'core:em_breve' modulo='Produtos e Estoque' %}"><span class="icone">📦</span> Produtos &amp; Estoque</a>
-                <a href="{% url 'core:em_breve' modulo='Programas de Acompanhamento' %}"><span class="icone">🗂️</span> Programas</a>
+                <a href="/admin/programas/programa/"><span class="icone">🗂️</span> Programas</a>
                 <a href="/admin/"><span class="icone">⚙️</span> Administração</a>
             </nav>
             <div class="rodape">

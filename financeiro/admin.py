@@ -20,5 +20,5 @@ class PagamentoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     )
     list_filter = ("status", "forma_pagamento")
     search_fields = ("paciente__nome",)
-    autocomplete_fields = ("paciente", "consulta", "servico")
+    autocomplete_fields = ("paciente", "consulta", "servico", "acompanhamento")
     date_hierarchy = "data_vencimento"

@@ -16,7 +16,7 @@ class PacienteAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
             "fields": ("nome", "cpf", "data_nascimento", "sexo", "ativo"),
         }),
         ("Contato", {
-            "fields": ("telefone", "email", "endereco"),
+            "fields": ("telefone", "email", "endereco", "cidade", "profissao"),
         }),
         ("Histórico", {
             "fields": ("historico_saude", "observacoes"),

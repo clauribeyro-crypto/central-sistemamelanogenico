@@ -67,7 +67,7 @@
                                 <div class="nome">{{ p.paciente }}</div>
                                 <div class="meta">vence {{ p.data_vencimento|date:"d/m" }}</div>
                             </div>
-                            <span class="badge">R$ {{ p.valor }}</span>
+                            <span class="badge">R$ {{ p.valor|floatformat:2 }}</span>
                         </li>
                     {% endfor %}
                 </ul>
@@ -76,6 +76,18 @@
             {% endif %}
         </div>
     </div>
+
+    {% if alertas_acompanhamentos %}
+        <div class="card">
+            <h2>Alertas de acompanhamento</h2>
+            {% for item in alertas_acompanhamentos %}
+                <div class="alerta-item">
+                    ⚠️ <a href="{% url 'pacientes:ficha' item.acompanhamento.paciente.pk %}">{{ item.acompanhamento.paciente }}</a>
+                    — {{ item.texto }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
 
     {% if atrasados %}
         <div class="card">

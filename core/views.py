@@ -9,6 +9,7 @@ from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento
 from leads.models import Lead
+from programas.models import Acompanhamento
 
 BADGE_POR_ETAPA = {
     Lead.Etapa.NOVO: "1º contato",
@@ -73,6 +74,13 @@ def home(request):
         key=lambda item: item["lead"].entrou_em,
     )
 
+    alertas_acompanhamentos = []
+    for acomp in Acompanhamento.objects.filter(
+        organizacao=org, status__in=Acompanhamento.STATUS_ATIVOS
+    ).select_related("paciente"):
+        for alerta in acomp.alertas():
+            alertas_acompanhamentos.append({"acompanhamento": acomp, "texto": alerta})
+
     contexto = {
         "novos_hoje": leads_ativos.filter(etapa=Lead.Etapa.NOVO, entrou_em__date=hoje).count(),
         "contato_1": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_1).count(),
@@ -82,6 +90,7 @@ def home(request):
         "retomar_hoje": leads_pausados_hoje.count(),
         "atrasados": [lead for lead in leads_ativos if lead.esta_atrasado],
         "fila": fila[:12],
+        "alertas_acompanhamentos": alertas_acompanhamentos[:10],
         "consultas_hoje": Consulta.objects.filter(
             organizacao=org, data_hora__gte=inicio_hoje, data_hora__lt=fim_hoje
         ).exclude(status=Consulta.Status.CANCELADA).select_related(

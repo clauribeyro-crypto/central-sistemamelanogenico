@@ -20,6 +20,29 @@ TIPOS_CONSULTA_PADRAO = [
     ("Reunião interna", "#6B7280"),
 ]
 
+HORARIO_SUPORTE_PADRAO = "Segunda a sexta-feira, das 09:00 às 18:00"
+
+PROGRAMAS_PADRAO = [
+    dict(
+        nome="Programa de 3 meses", duracao_meses=3, valor=5000, valor_a_vista=4500,
+        parcelamento_max=12, qtd_consultas=2, qtd_modulacoes=1, qtd_kits=1,
+        produtos_incluidos="1 kit: 1 produto para o dia + 1 produto para a noite",
+        horario_suporte=HORARIO_SUPORTE_PADRAO,
+    ),
+    dict(
+        nome="Programa de 6 meses", duracao_meses=6, valor=7000, valor_a_vista=6500,
+        parcelamento_max=12, qtd_consultas=3, qtd_modulacoes=1, qtd_kits=2,
+        produtos_incluidos="2 kits: 2 produtos para o dia + 2 produtos para a noite",
+        horario_suporte=HORARIO_SUPORTE_PADRAO,
+    ),
+    dict(
+        nome="Programa de 9 meses", duracao_meses=9, valor=12000, valor_a_vista=11000,
+        parcelamento_max=12, qtd_consultas=4, qtd_modulacoes=2, qtd_kits=4,
+        produtos_incluidos="4 kits: 4 produtos para o dia + 4 produtos para a noite",
+        horario_suporte=HORARIO_SUPORTE_PADRAO,
+    ),
+]
+
 
 class Command(BaseCommand):
     help = (
@@ -67,6 +90,7 @@ class Command(BaseCommand):
         from agenda.models import TipoConsulta
         from leads.models import MensagemModelo, MotivoPerda, Origem
         from leads.views import MENSAGENS_PADRAO
+        from programas.models import Programa
 
         for nome in ORIGENS_PADRAO:
             Origem.objects.create(organizacao=organizacao, nome=nome)
@@ -80,7 +104,10 @@ class Command(BaseCommand):
         for etapa, texto in MENSAGENS_PADRAO.items():
             MensagemModelo.objects.create(organizacao=organizacao, etapa=etapa, texto=texto)
 
+        for dados in PROGRAMAS_PADRAO:
+            Programa.objects.create(organizacao=organizacao, **dados)
+
         self.stdout.write(self.style.SUCCESS(
-            "Origens, motivos de perda, tipos de consulta e mensagens-modelo padrão criados "
-            "(edite tudo em /admin/ quando quiser)."
+            "Origens, motivos de perda, tipos de consulta, mensagens-modelo e programas de "
+            "acompanhamento (3/6/9 meses) padrão criados (edite tudo em /admin/ quando quiser)."
         ))

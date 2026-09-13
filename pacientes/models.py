@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 from contas.models import ModeloDaOrganizacao
 
@@ -20,6 +21,8 @@ class Paciente(ModeloDaOrganizacao):
     telefone = models.CharField("telefone/WhatsApp", max_length=20, blank=True)
     email = models.EmailField("e-mail", blank=True)
     endereco = models.CharField("endereço", max_length=255, blank=True)
+    cidade = models.CharField(max_length=100, blank=True, help_text="Ex.: Belo Horizonte, MG")
+    profissao = models.CharField(max_length=100, blank=True)
 
     historico_saude = models.TextField(
         "histórico de saúde",
@@ -46,3 +49,20 @@ class Paciente(ModeloDaOrganizacao):
 
     def __str__(self):
         return self.nome
+
+    @property
+    def idade(self):
+        if not self.data_nascimento:
+            return None
+        hoje = timezone.localdate()
+        anos = hoje.year - self.data_nascimento.year
+        if (hoje.month, hoje.day) < (self.data_nascimento.month, self.data_nascimento.day):
+            anos -= 1
+        return anos
+
+    @property
+    def acompanhamento_atual(self):
+        from programas.models import Acompanhamento
+        return self.acompanhamentos.filter(
+            status__in=Acompanhamento.STATUS_ATIVOS
+        ).order_by("-data_inicio").first()

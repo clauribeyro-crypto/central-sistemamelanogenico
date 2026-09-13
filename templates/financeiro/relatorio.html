@@ -17,11 +17,11 @@
 
     <div class="grid">
         <div class="card stat">
-            <div class="num">R$ {{ total_pago }}</div>
+            <div class="num">R$ {{ total_pago|floatformat:2 }}</div>
             <div>Total recebido no período</div>
         </div>
         <div class="card stat">
-            <div class="num">R$ {{ total_pendente }}</div>
+            <div class="num">R$ {{ total_pendente|floatformat:2 }}</div>
             <div>Total pendente no período</div>
         </div>
     </div>
@@ -35,7 +35,7 @@
                 {% for item in por_forma_pagamento %}
                     <tr>
                         <td>{{ item.forma_pagamento }}</td>
-                        <td>R$ {{ item.total }}</td>
+                        <td>R$ {{ item.total|floatformat:2 }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -54,7 +54,7 @@
                 {% for item in por_profissional %}
                     <tr>
                         <td>{{ item.consulta__profissional__nome }}</td>
-                        <td>R$ {{ item.total }}</td>
+                        <td>R$ {{ item.total|floatformat:2 }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
@@ -75,7 +75,7 @@
                 <tr>
                     <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
                     <td>{{ p.paciente }}</td>
-                    <td>R$ {{ p.valor }}</td>
+                    <td>R$ {{ p.valor|floatformat:2 }}</td>
                     <td>{{ p.get_forma_pagamento_display }}</td>
                     <td>{{ p.get_status_display }}</td>
                 </tr>
