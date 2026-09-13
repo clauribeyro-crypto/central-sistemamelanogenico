@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib import admin
 
 from contas.admin import OrganizacaoAdminMixin
@@ -5,8 +6,16 @@ from contas.admin import OrganizacaoAdminMixin
 from .models import Consulta, HorarioBloqueado, TipoConsulta
 
 
+class TipoConsultaAdminForm(forms.ModelForm):
+    class Meta:
+        model = TipoConsulta
+        fields = "__all__"
+        widgets = {"cor": forms.TextInput(attrs={"type": "color"})}
+
+
 @admin.register(TipoConsulta)
 class TipoConsultaAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
+    form = TipoConsultaAdminForm
     list_display = ("nome", "cor", "duracao_padrao_minutos", "ordem", "ativo")
     list_editable = ("ordem", "ativo")
     ordering = ("ordem", "nome")

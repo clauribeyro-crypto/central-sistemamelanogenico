@@ -10,12 +10,12 @@ MOTIVOS_PERDA_PADRAO = [
 ]
 
 TIPOS_CONSULTA_PADRAO = [
-    ("Consulta inicial", "#7C3AED"),
-    ("Consulta de diagnóstico", "#2563EB"),
-    ("Retorno", "#16A34A"),
-    ("Reavaliação", "#CA8A04"),
-    ("Consulta final", "#EA580C"),
-    ("Reunião interna", "#6B7280"),
+    ("Consulta inicial", "#8B5FBF"),
+    ("Consulta de diagnóstico", "#C2679A"),
+    ("Retorno", "#4C9A7C"),
+    ("Reavaliação", "#D1994A"),
+    ("Consulta final", "#C2694A"),
+    ("Reunião interna", "#8A8594"),
 ]
 
 PROGRAMAS_PADRAO = [
