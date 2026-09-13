@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ modulo }} · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>{{ modulo }}</h1>
+    <div class="card">
+        <p>Esta área ainda está em construção e faz parte das próximas etapas do sistema.</p>
+        <p><a href="{% url 'core:home' %}">← Voltar para o painel do dia</a></p>
+    </div>
+{% endblock %}

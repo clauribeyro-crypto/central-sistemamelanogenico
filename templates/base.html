@@ -4,53 +4,249 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Sistema da Clínica{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
     <style>
-        :root { color-scheme: light; }
+        :root {
+            color-scheme: light;
+            --bg: #f7f4fb;
+            --sidebar-bg: #ffffff;
+            --sidebar-border: #ece6f5;
+            --card-bg: #ffffff;
+            --accent: #7c5cbf;
+            --accent-soft: #efe8fb;
+            --accent-soft-text: #5b3a94;
+            --text: #2b2635;
+            --text-muted: #766f85;
+            --danger: #b3435c;
+            --danger-soft: #fbe7ec;
+        }
+        * { box-sizing: border-box; }
         body {
             font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-            margin: 0; background: #f4f6f8; color: #1c1f24;
+            margin: 0; background: var(--bg); color: var(--text);
         }
-        header {
-            background: #1f4b5f; color: #fff; padding: 1rem 1.5rem;
-            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+        h1, h2 {
+            font-family: "Playfair Display", Georgia, serif; font-weight: 600;
+            color: var(--text); margin-top: 0;
         }
-        header a { color: #fff; text-decoration: none; }
-        header .brand { font-weight: 600; font-size: 1.1rem; }
-        nav a { margin-left: 1rem; opacity: .9; }
-        nav a:hover { opacity: 1; text-decoration: underline; }
-        main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+        h1 { font-size: 1.7rem; }
+        h2 { font-size: 1.15rem; }
+        a { color: var(--accent); }
+
+        .shell { display: flex; min-height: 100vh; }
+
+        .sidebar {
+            width: 240px; flex-shrink: 0; background: var(--sidebar-bg);
+            border-right: 1px solid var(--sidebar-border); padding: 1.5rem 1rem;
+            display: flex; flex-direction: column; gap: 1.5rem;
+        }
+        .sidebar .brand { padding: 0 .5rem; }
+        .sidebar .brand .nome {
+            font-family: "Playfair Display", Georgia, serif; font-weight: 700; font-size: 1.2rem;
+        }
+        .sidebar .brand .sub { font-size: .78rem; color: var(--text-muted); }
+        .sidebar nav { display: flex; flex-direction: column; gap: .15rem; }
+        .sidebar nav a {
+            display: flex; align-items: center; gap: .6rem; padding: .55rem .7rem;
+            border-radius: 8px; color: var(--text); text-decoration: none; font-size: .9rem;
+        }
+        .sidebar nav a:hover { background: var(--bg); }
+        .sidebar nav a.ativo { background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 600; }
+        .sidebar nav a .icone { font-size: 1.05rem; width: 1.3rem; text-align: center; }
+        .sidebar .rodape { margin-top: auto; font-size: .82rem; color: var(--text-muted); padding: 0 .5rem; }
+        .sidebar .rodape a { color: var(--text-muted); }
+
+        main { flex: 1; padding: 2rem; max-width: 1200px; }
+
         .card {
-            background: #fff; border-radius: 8px; padding: 1rem 1.25rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.25rem;
+            background: var(--card-bg); border-radius: 14px; padding: 1.1rem 1.3rem;
+            box-shadow: 0 1px 3px rgba(43,38,53,.06); margin-bottom: 1.25rem;
         }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-        .stat { text-align: center; }
-        .stat .num { font-size: 2rem; font-weight: 700; color: #1f4b5f; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; align-items: start; }
+        .grid-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .stat { text-align: left; }
+        .stat .num { font-family: "Playfair Display", Georgia, serif; font-size: 2.1rem; font-weight: 700; color: var(--text); line-height: 1; }
+        .stat .rotulo { font-size: .82rem; color: var(--text-muted); margin-top: .35rem; }
+
         table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #e5e7eb; }
-        th { color: #555; font-weight: 600; font-size: .85rem; text-transform: uppercase; }
+        th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #efeaf6; }
+        th { color: var(--text-muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .02em; }
+
         form.filtro { display: flex; gap: .75rem; flex-wrap: wrap; align-items: end; margin-bottom: 1rem; }
-        form.filtro label { display: block; font-size: .8rem; color: #555; }
-        form.filtro input, form.filtro button {
-            padding: .4rem .6rem; border-radius: 4px; border: 1px solid #ccc;
+        form.filtro label { display: block; font-size: .8rem; color: var(--text-muted); }
+        form.filtro input, form.filtro select, form.filtro button {
+            padding: .45rem .6rem; border-radius: 8px; border: 1px solid #ddd5ee;
         }
-        form.filtro button { background: #1f4b5f; color: #fff; border: none; cursor: pointer; }
+        form.filtro button { background: var(--accent); color: #fff; border: none; cursor: pointer; }
+
+        .btn {
+            display: inline-block; padding: .5rem 1rem; border-radius: 8px; border: none;
+            background: var(--accent); color: #fff; cursor: pointer; text-decoration: none;
+            font-size: .9rem;
+        }
+        .btn:hover { background: #6a4aa8; }
+        .btn-secondary { background: var(--accent-soft); color: var(--accent-soft-text); }
+        .btn-secondary:hover { background: #e3d9f7; }
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #9c3550; }
+        .btn-sm { padding: .3rem .6rem; font-size: .8rem; }
+
+        .messages { list-style: none; padding: 0; margin: 0 0 1rem; }
+        .messages li { padding: .6rem 1rem; border-radius: 8px; margin-bottom: .5rem; font-size: .9rem; }
+        .messages .success { background: #e2f6ea; color: #1e6b3d; }
+        .messages .info { background: var(--accent-soft); color: var(--accent-soft-text); }
+        .messages .warning { background: #fdf1d9; color: #8a5a10; }
+        .messages .error { background: var(--danger-soft); color: #8f2e45; }
+
+        .kanban { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: .5rem; }
+        .kanban-col { background: #f4f0fa; border-radius: 12px; padding: .75rem; min-width: 230px; flex: 1; }
+        .kanban-col h3 {
+            font-size: .8rem; text-transform: uppercase; color: var(--text-muted); margin: 0 0 .5rem;
+            display: flex; justify-content: space-between; letter-spacing: .02em;
+        }
+        .lead-card {
+            background: #fff; border-radius: 10px; padding: .6rem .75rem; margin-bottom: .5rem;
+            box-shadow: 0 1px 2px rgba(43,38,53,.07); display: block; color: inherit; text-decoration: none;
+        }
+        .lead-card:hover { box-shadow: 0 2px 8px rgba(43,38,53,.14); }
+        .lead-card .nome { font-weight: 600; }
+        .lead-card .meta { font-size: .8rem; color: var(--text-muted); }
+
+        .badge {
+            display: inline-block; padding: .2rem .6rem; border-radius: 999px;
+            font-size: .75rem; background: var(--accent-soft); color: var(--accent-soft-text);
+        }
+        .filtros-status { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .filtros-status a {
+            padding: .4rem .8rem; border-radius: 999px; background: #f4f0fa; color: var(--text);
+            text-decoration: none; font-size: .85rem;
+        }
+        .filtros-status a.ativo { background: var(--accent); color: #fff; }
+
+        .fila { list-style: none; margin: 0; padding: 0; }
+        .fila li {
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+            padding: .7rem 0; border-bottom: 1px solid #f1ecf9;
+        }
+        .fila li:last-child { border-bottom: none; }
+        .fila a.linha { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex: 1; text-decoration: none; color: inherit; }
+        .fila .nome { font-weight: 600; }
+        .fila .meta { font-size: .8rem; color: var(--text-muted); }
+        .fila .seta { color: var(--text-muted); }
+
+        .legenda { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: .85rem; }
+        .legenda span.ponto { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .3rem; }
+        table.agenda-semana { table-layout: fixed; }
+        table.agenda-semana th, table.agenda-semana td { vertical-align: top; }
+        table.agenda-semana td.hoje { background: #f4effc; }
+        .bloco-consulta { border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem; color: #fff; }
+        .bloco-bloqueio {
+            border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem;
+            background: repeating-linear-gradient(45deg, #c85a71, #c85a71 4px, #b3435c 4px, #b3435c 8px);
+            color: #fff;
+        }
+        .timeline { list-style: none; padding: 0; margin: 0; }
+        .timeline li { border-left: 2px solid #e5ddf3; padding: 0 0 1rem .75rem; margin-left: .25rem; position: relative; }
+        .timeline li::before {
+            content: ""; position: absolute; left: -5px; top: 2px; width: 8px; height: 8px;
+            border-radius: 50%; background: var(--accent);
+        }
+        .timeline .quando { font-size: .75rem; color: var(--text-muted); }
+        form.acao { display: flex; flex-direction: column; gap: .75rem; max-width: 480px; }
+        form.acao label { font-size: .85rem; color: var(--text-muted); display: block; margin-bottom: .25rem; }
+        form.acao input, form.acao select, form.acao textarea {
+            width: 100%; padding: .5rem; border: 1px solid #ddd5ee; border-radius: 8px; box-sizing: border-box;
+        }
+
+        .jornada { display: flex; align-items: flex-start; overflow-x: auto; padding: .5rem 0 .25rem; }
+        .jornada-etapa { display: flex; flex-direction: column; align-items: center; min-width: 84px; text-align: center; }
+        .jornada-etapa .circulo {
+            width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; font-weight: 700; font-size: .8rem; background: #ede8f5; color: #9c93ad;
+            flex-shrink: 0;
+        }
+        .jornada-etapa.concluida .circulo { background: var(--accent); color: #fff; }
+        .jornada-etapa.atual .circulo { background: #fff; border: 2px solid var(--accent); color: var(--accent); }
+        .jornada-etapa .rotulo { font-size: .72rem; color: var(--text-muted); margin-top: .35rem; max-width: 90px; }
+        .jornada-etapa.atual .rotulo { color: var(--accent-soft-text); font-weight: 600; }
+        .jornada-linha { flex: 1; height: 2px; background: #e5ddf3; margin-top: 15px; min-width: 16px; }
+        .jornada-linha.concluida { background: var(--accent); }
+
+        .tabs { display: flex; gap: 1.25rem; border-bottom: 1px solid #ece6f5; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .tabs a {
+            padding: .5rem .1rem; color: var(--text-muted); text-decoration: none; font-size: .9rem;
+            border-bottom: 2px solid transparent;
+        }
+        .tabs a.ativo { color: var(--accent-soft-text); border-bottom-color: var(--accent); font-weight: 600; }
+
+        .checklist { list-style: none; margin: 0; padding: 0; }
+        .checklist li { display: flex; align-items: center; gap: .5rem; padding: .3rem 0; font-size: .9rem; }
+        .checklist .caixa {
+            width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid #cabfe3; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; font-size: .75rem; color: #fff;
+        }
+        .checklist li.feito .caixa { background: var(--accent); border-color: var(--accent); }
+        .checklist li.feito { color: var(--text-muted); text-decoration: line-through; }
+
+        .alerta-item {
+            background: #fdf1d9; color: #8a5a10; padding: .5rem .75rem; border-radius: 8px;
+            font-size: .85rem; margin-bottom: .5rem;
+        }
+
+        @media (max-width: 800px) {
+            .grid-2-1, .grid-2col { grid-template-columns: 1fr; }
+            .shell { flex-direction: column; }
+            .sidebar {
+                width: 100%; flex-direction: row; align-items: center; overflow-x: auto;
+                border-right: none; border-bottom: 1px solid var(--sidebar-border); padding: 1rem;
+            }
+            .sidebar nav { flex-direction: row; }
+            .sidebar .rodape { display: none; }
+            main { padding: 1.25rem; }
+        }
     </style>
 </head>
 <body>
-<header>
-    <a class="brand" href="{% url 'core:home' %}">🏥 Sistema da Clínica</a>
-    <nav>
-        <a href="{% url 'core:home' %}">Início</a>
-        <a href="/admin/pacientes/paciente/">Pacientes</a>
-        <a href="/admin/agenda/consulta/">Agenda</a>
-        <a href="/admin/prontuarios/atendimento/">Prontuários</a>
-        <a href="{% url 'financeiro:relatorio' %}">Financeiro</a>
-        <a href="/admin/">Administração</a>
-    </nav>
-</header>
-<main>
-    {% block content %}{% endblock %}
-</main>
+<div class="shell">
+    {% if user.is_authenticated %}
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="nome">{{ user.organizacao.nome|default:"Sistema da Clínica" }}</div>
+                <div class="sub">ambiente principal</div>
+            </div>
+            <nav>
+                <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'home' %}ativo{% endif %}" href="{% url 'core:home' %}"><span class="icone">🗓️</span> O que fazer hoje</a>
+                <a class="{% if request.resolver_match.app_name == 'leads' %}ativo{% endif %}" href="{% url 'leads:kanban' %}"><span class="icone">👥</span> CRM de leads</a>
+                <a class="{% if request.resolver_match.app_name == 'pacientes' %}ativo{% endif %}" href="{% url 'pacientes:lista' %}"><span class="icone">📄</span> Ficha da paciente</a>
+                <a class="{% if request.resolver_match.app_name == 'agenda' %}ativo{% endif %}" href="{% url 'agenda:semana' %}"><span class="icone">📅</span> Agenda</a>
+                <a href="/admin/prontuarios/atendimento/"><span class="icone">📋</span> Prontuários</a>
+                <a class="{% if request.resolver_match.app_name == 'financeiro' %}ativo{% endif %}" href="{% url 'financeiro:relatorio' %}"><span class="icone">💰</span> Financeiro</a>
+                <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'indicadores' %}ativo{% endif %}" href="{% url 'core:indicadores' %}"><span class="icone">📊</span> Indicadores</a>
+                <a href="{% url 'core:em_breve' modulo='Produtos e Estoque' %}"><span class="icone">📦</span> Produtos &amp; Estoque</a>
+                <a href="/admin/programas/programa/"><span class="icone">🗂️</span> Programas</a>
+                <a href="/admin/"><span class="icone">⚙️</span> Administração</a>
+            </nav>
+            <div class="rodape">
+                <a href="{% url 'logout' %}">Sair ({{ user }})</a>
+            </div>
+        </aside>
+    {% endif %}
+    <main>
+        {% if not user.is_authenticated %}
+            <p style="margin-bottom:1rem;"><a href="{% url 'login' %}">Entrar</a></p>
+        {% endif %}
+        {% if messages %}
+            <ul class="messages">
+                {% for message in messages %}
+                    <li class="{{ message.tags }}">{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
 </body>
 </html>

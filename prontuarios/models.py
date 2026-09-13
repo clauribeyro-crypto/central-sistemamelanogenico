@@ -1,11 +1,12 @@
 from django.db import models
 
 from agenda.models import Consulta
+from contas.models import ModeloDaOrganizacao
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
 
-class Atendimento(models.Model):
+class Atendimento(ModeloDaOrganizacao):
     """Registro de prontuário de um atendimento realizado a um paciente."""
 
     paciente = models.ForeignKey(

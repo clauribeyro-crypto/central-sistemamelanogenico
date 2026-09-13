@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Enviar WhatsApp · {{ lead.nome }}{% endblock %}
+{% block content %}
+    <p><a href="{% url 'leads:detalhe' lead.pk %}">← Voltar</a></p>
+    <div class="card">
+        <h1>Enviar WhatsApp — {{ lead.nome }} ({{ lead.whatsapp }})</h1>
+        <p>Edite o texto se quiser. Ao confirmar, o WhatsApp Web/app abre com a mensagem pronta — só falta enviar.</p>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            <div>
+                <label for="{{ form.texto.id_for_label }}">Mensagem</label>
+                {{ form.texto }}
+            </div>
+            <button class="btn" type="submit">Abrir no WhatsApp</button>
+        </form>
+    </div>
+{% endblock %}

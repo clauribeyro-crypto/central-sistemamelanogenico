@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Indicadores · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Indicadores</h1>
+
+    <div class="grid">
+        <div class="card stat">
+            <div class="num">{{ total_leads }}</div>
+            <div class="rotulo">Total de leads</div>
+        </div>
+    </div>
+
+    <div class="grid-2col">
+        <div class="card">
+            <h2>Leads por status</h2>
+            {% if por_status %}
+                <table>
+                    <thead><tr><th>Status</th><th>Total</th></tr></thead>
+                    <tbody>
+                    {% for item in por_status %}
+                        <tr><td>{{ item.label }}</td><td>{{ item.total }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Sem leads cadastrados ainda.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2>Leads por origem</h2>
+            {% if por_origem %}
+                <table>
+                    <thead><tr><th>Origem</th><th>Total</th></tr></thead>
+                    <tbody>
+                    {% for item in por_origem %}
+                        <tr><td>{{ item.origem__nome }}</td><td>{{ item.total }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Sem leads cadastrados ainda.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2>Consultas por status</h2>
+            {% if consultas_por_status %}
+                <table>
+                    <thead><tr><th>Status</th><th>Total</th></tr></thead>
+                    <tbody>
+                    {% for item in consultas_por_status %}
+                        <tr><td>{{ item.label }}</td><td>{{ item.total }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Sem consultas registradas ainda.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <h2>Principais motivos de perda</h2>
+            {% if por_motivo_perda %}
+                <table>
+                    <thead><tr><th>Motivo</th><th>Total</th></tr></thead>
+                    <tbody>
+                    {% for item in por_motivo_perda %}
+                        <tr><td>{{ item.perdido_motivo__nome }}</td><td>{{ item.total }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nenhuma lead perdida registrada ainda.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <p style="color:var(--text-muted); font-size:.85rem;">
+        Conversões (lead → resposta → consulta → venda) e "qual origem converte mais"
+        ficam para quando o módulo de Programas estiver pronto — hoje ainda não temos
+        o conceito de venda fechada no sistema.
+    </p>
+{% endblock %}

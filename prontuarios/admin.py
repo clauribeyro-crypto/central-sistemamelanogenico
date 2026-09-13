@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from contas.admin import OrganizacaoAdminMixin
+
 from .models import Atendimento
 
 
 @admin.register(Atendimento)
-class AtendimentoAdmin(admin.ModelAdmin):
+class AtendimentoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     list_display = ("data_hora", "paciente", "profissional")
     list_filter = ("profissional",)
     search_fields = ("paciente__nome", "diagnostico", "queixa_principal")

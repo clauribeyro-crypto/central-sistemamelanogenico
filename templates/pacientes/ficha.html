@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}{{ paciente.nome }} · Ficha da paciente{% endblock %}
+{% block content %}
+    <p><a href="{% url 'pacientes:lista' %}">← Voltar</a></p>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap;">
+            <div>
+                <h1 style="margin-bottom:.25rem;">{{ paciente.nome }}</h1>
+                <p style="color:var(--text-muted); margin:0 0 .6rem;">
+                    {% if paciente.idade %}{{ paciente.idade }} anos{% endif %}
+                    {% if paciente.idade and paciente.cidade %} · {% endif %}
+                    {{ paciente.cidade }}
+                </p>
+                {% if acompanhamento %}
+                    <span class="badge">Programa: {{ acompanhamento.programa.nome }}</span>
+                    <span class="badge">{{ acompanhamento.get_status_display }}</span>
+                {% else %}
+                    <span class="badge">Sem programa ativo</span>
+                {% endif %}
+            </div>
+            {% if acompanhamento %}
+                <div style="text-align:right; font-size:.85rem; color:var(--text-muted);">
+                    <div>Início: {{ acompanhamento.data_inicio|date:"d/m/Y" }}</div>
+                    <div>Término previsto: {{ acompanhamento.data_termino_prevista|date:"d/m/Y" }}</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not acompanhamento %}
+        <div class="card">
+            <p>Esta paciente ainda não tem um programa de acompanhamento ativo.</p>
+            <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar protocolo de acompanhamento</a>
+        </div>
+    {% else %}
+        <div class="card">
+            <div class="jornada">
+                {% for etapa in jornada %}
+                    <div class="jornada-etapa {% if etapa.concluida %}concluida{% elif etapa.atual %}atual{% endif %}">
+                        <div class="circulo">{% if etapa.concluida %}✓{% else %}{{ forloop.counter }}{% endif %}</div>
+                        <div class="rotulo">{{ etapa.nome }}</div>
+                    </div>
+                    {% if not forloop.last %}
+                        <div class="jornada-linha {% if etapa.concluida %}concluida{% endif %}"></div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="tabs">
+            {% for slug, label in abas %}
+                <a class="{% if slug == aba_atual %}ativo{% endif %}" href="?aba={{ slug }}">{{ label }}</a>
+            {% endfor %}
+        </div>
+
+        {% if not aba_pronta %}
+            <div class="card">
+                <p>Esta aba ({{ aba_atual }}) faz parte do módulo de Anamnese/Evolução, ainda em construção.</p>
+            </div>
+        {% elif aba_atual == "geral" %}
+            <div class="grid-2-1">
+                <div class="card">
+                    <h2>Checklist do programa</h2>
+                    <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin-bottom:.25rem;">Consultas</p>
+                    <ul class="checklist">
+                        {% for c in acompanhamento.consultas_previstas.all %}
+                            <li class="{% if c.status == 'REALIZADA' %}feito{% endif %}">
+                                <span class="caixa">{% if c.status == 'REALIZADA' %}✓{% endif %}</span>
+                                Consulta {{ c.numero }} — {{ c.get_status_display }}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:.75rem 0 .25rem;">Produtos</p>
+                    <ul class="checklist">
+                        {% for k in acompanhamento.kits_previstos.all %}
+                            <li class="{% if k.status == 'ENVIADO' %}feito{% endif %}">
+                                <span class="caixa">{% if k.status == 'ENVIADO' %}✓{% endif %}</span>
+                                Kit {{ k.numero }} entregue
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <p style="font-size:.85rem; color:var(--text-muted); margin-top:.75rem;">
+                        Dias restantes: {{ acompanhamento.dias_restantes }}
+                    </p>
+                </div>
+
+                <div class="card">
+                    <h2>Resumo financeiro</h2>
+                    <ul class="fila">
+                        <li><div class="nome">Recebido</div><span class="badge">R$ {{ recebido|floatformat:2 }}</span></li>
+                        <li><div class="nome">A receber</div><span class="badge">R$ {{ a_receber|floatformat:2 }}</span></li>
+                        <li><div class="nome">Custos</div><span class="badge">R$ {{ total_custos|floatformat:2 }}</span></li>
+                    </ul>
+
+                    {% if alertas %}
+                        <h2 style="margin-top:1.25rem;">Alertas automáticos</h2>
+                        {% for alerta in alertas %}
+                            <div class="alerta-item">⚠️ {{ alerta }}</div>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+        {% elif aba_atual == "produtos" %}
+            <div class="card">
+                <h2>Produtos / kits</h2>
+                <table>
+                    <thead><tr><th>Kit</th><th>Status</th><th>Data de envio</th></tr></thead>
+                    <tbody>
+                    {% for k in kits %}
+                        <tr><td>Kit {{ k.numero }}</td><td>{{ k.get_status_display }}</td><td>{{ k.data_envio|date:"d/m/Y"|default:"—" }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% elif aba_atual == "financeiro" %}
+            <div class="grid">
+                <div class="card stat"><div class="num">R$ {{ recebido|floatformat:2 }}</div><div class="rotulo">Recebido</div></div>
+                <div class="card stat"><div class="num">R$ {{ a_receber|floatformat:2 }}</div><div class="rotulo">A receber</div></div>
+                <div class="card stat"><div class="num">R$ {{ total_custos|floatformat:2 }}</div><div class="rotulo">Custos</div></div>
+                <div class="card stat"><div class="num">R$ {{ resultado|floatformat:2 }}</div><div class="rotulo">Resultado (recebido − custos)</div></div>
+            </div>
+            <div class="card">
+                <h2>Pagamentos</h2>
+                {% if pagamentos %}
+                    <table>
+                        <thead><tr><th>Vencimento</th><th>Valor</th><th>Forma</th><th>Status</th></tr></thead>
+                        <tbody>
+                        {% for p in pagamentos %}
+                            <tr><td>{{ p.data_vencimento|date:"d/m/Y" }}</td><td>R$ {{ p.valor|floatformat:2 }}</td><td>{{ p.get_forma_pagamento_display }}</td><td>{{ p.get_status_display }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>Nenhum pagamento lançado para este programa ainda. Lance pelo <a href="/admin/financeiro/pagamento/add/">admin</a> vinculando ao acompanhamento.</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <h2>Custos</h2>
+                {% if custos %}
+                    <table>
+                        <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
+                        <tbody>
+                        {% for c in custos %}
+                            <tr><td>{{ c.data|date:"d/m/Y" }}</td><td>{{ c.descricao }}</td><td>R$ {{ c.valor|floatformat:2 }}</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>Nenhum custo registrado ainda.</p>
+                {% endif %}
+            </div>
+        {% elif aba_atual == "historico" %}
+            <div class="card">
+                <h2>Linha do tempo</h2>
+                <ul class="timeline">
+                    {% for evento in eventos %}
+                        <li><div class="quando">{{ evento.data|date:"d/m/Y" }}</div>{{ evento.texto }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    {% endif %}
+{% endblock %}

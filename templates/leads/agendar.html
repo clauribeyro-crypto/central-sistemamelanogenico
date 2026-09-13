@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Agendar consulta · {{ lead.nome }}{% endblock %}
+{% block content %}
+    <p><a href="{% url 'leads:detalhe' lead.pk %}">← Voltar</a></p>
+    <div class="card">
+        <h1>Agendar consulta — {{ lead.nome }}</h1>
+        <p>Não é preciso cadastrar a paciente novamente: os dados do lead serão usados.</p>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<p style="color:#991b1b;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Confirmar agendamento</button>
+        </form>
+    </div>
+{% endblock %}

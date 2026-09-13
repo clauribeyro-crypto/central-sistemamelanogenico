@@ -1,0 +1,12 @@
+# Configuração explícita de build para o Railway (ou qualquer plataforma
+# que use Nixpacks). Evita depender de detecção automática — garante que
+# as dependências do requirements.txt sejam instaladas antes do start.
+
+[phases.setup]
+nixPkgs = ["python311"]
+
+[phases.install]
+cmds = ["python -m pip install --upgrade pip", "python -m pip install -r requirements.txt"]
+
+[start]
+cmd = "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python -m gunicorn clinica.wsgi --bind 0.0.0.0:$PORT --workers 2"

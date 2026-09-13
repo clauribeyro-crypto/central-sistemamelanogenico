@@ -1,10 +1,12 @@
 from django.contrib import admin
 
+from contas.admin import OrganizacaoAdminMixin
+
 from .models import Paciente
 
 
 @admin.register(Paciente)
-class PacienteAdmin(admin.ModelAdmin):
+class PacienteAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     list_display = ("nome", "telefone", "email", "cpf", "ativo", "criado_em")
     list_filter = ("ativo", "sexo")
     search_fields = ("nome", "cpf", "telefone", "email")
@@ -14,7 +16,7 @@ class PacienteAdmin(admin.ModelAdmin):
             "fields": ("nome", "cpf", "data_nascimento", "sexo", "ativo"),
         }),
         ("Contato", {
-            "fields": ("telefone", "email", "endereco"),
+            "fields": ("telefone", "email", "endereco", "cidade", "profissao"),
         }),
         ("Histórico", {
             "fields": ("historico_saude", "observacoes"),

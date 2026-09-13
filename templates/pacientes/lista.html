@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Ficha da paciente · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Ficha da paciente</h1>
+
+    <form class="filtro" method="get">
+        <div>
+            <label for="q">Buscar por nome ou telefone</label>
+            <input type="text" id="q" name="q" value="{{ busca }}">
+        </div>
+        <button class="btn" type="submit">Buscar</button>
+    </form>
+
+    <div class="card">
+        {% if pacientes %}
+            <table>
+                <thead><tr><th>Nome</th><th>Telefone</th><th>Programa atual</th><th></th></tr></thead>
+                <tbody>
+                {% for p in pacientes %}
+                    <tr>
+                        <td>{{ p.nome }}</td>
+                        <td>{{ p.telefone|default:"—" }}</td>
+                        <td>
+                            {% with acomp=p.acompanhamento_atual %}
+                                {% if acomp %}
+                                    <span class="badge">{{ acomp.programa.nome }}</span>
+                                {% else %}
+                                    <span style="color:var(--text-muted);">sem programa ativo</span>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td><a href="{% url 'pacientes:ficha' p.pk %}">Abrir ficha ›</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhuma paciente encontrada. Cadastre pela <a href="/admin/pacientes/paciente/add/">administração</a>.</p>
+        {% endif %}
+    </div>
+{% endblock %}

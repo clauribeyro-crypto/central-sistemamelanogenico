@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Agenda da semana · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Agenda da semana</h1>
+
+    <div class="legenda">
+        {% for tipo in tipos_consulta %}
+            <span><span class="ponto" style="background:{{ tipo.cor }};"></span>{{ tipo.nome }}</span>
+        {% endfor %}
+        <span><span class="ponto" style="background:#ef4444;"></span>Bloqueado</span>
+    </div>
+
+    <form class="filtro" method="get">
+        <div>
+            <label for="profissional">Profissional</label>
+            <select name="profissional" id="profissional" onchange="this.form.submit()">
+                <option value="">Agenda geral</option>
+                {% for p in profissionais %}
+                    <option value="{{ p.pk }}" {% if profissional_selecionado.pk == p.pk %}selected{% endif %}>{{ p.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <a class="btn btn-secondary" href="?data={{ semana_anterior }}{% if profissional_selecionado %}&profissional={{ profissional_selecionado.pk }}{% endif %}">← Semana anterior</a>
+        <a class="btn btn-secondary" href="?data={{ semana_seguinte }}{% if profissional_selecionado %}&profissional={{ profissional_selecionado.pk }}{% endif %}">Semana seguinte →</a>
+    </form>
+
+    <div class="card" style="overflow-x:auto;">
+        <table class="agenda-semana">
+            <thead>
+                <tr>
+                    <th style="width:70px;">Horário</th>
+                    {% for dia in dias %}
+                        <th class="{% if dia == hoje %}hoje{% endif %}">{{ dia|date:"D d/m" }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas %}
+                    <tr>
+                        <td><strong>{{ linha.horario|time:"H:i" }}</strong></td>
+                        {% for celula in linha.celulas %}
+                            <td>
+                                {% for item in celula %}
+                                    {% if item.tipo == "consulta" %}
+                                        <a class="bloco-consulta" style="background:{{ item.obj.tipo_consulta.cor }};"
+                                           href="/admin/agenda/consulta/{{ item.obj.pk }}/change/">
+                                            {{ item.obj.data_hora|time:"H:i" }} — {{ item.obj.paciente }}<br>
+                                            {{ item.obj.tipo_consulta }} · {{ item.obj.profissional }}
+                                        </a>
+                                    {% else %}
+                                        <div class="bloco-bloqueio">
+                                            {{ item.obj.get_motivo_display }}{% if not profissional_selecionado %} · {{ item.obj.profissional }}{% endif %}
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

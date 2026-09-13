@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Entrar · Sistema da Clínica{% endblock %}
+{% block content %}
+    <div class="card" style="max-width: 360px; margin: 2rem auto;">
+        <h1 style="font-size:1.1rem;">Entrar</h1>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            {% if form.errors %}
+                <p style="color:#991b1b;">Usuário ou senha inválidos.</p>
+            {% endif %}
+            <div>
+                <label for="{{ form.username.id_for_label }}">Usuário</label>
+                {{ form.username }}
+            </div>
+            <div>
+                <label for="{{ form.password.id_for_label }}">Senha</label>
+                {{ form.password }}
+            </div>
+            <button class="btn" type="submit">Entrar</button>
+            <input type="hidden" name="next" value="{{ next }}">
+        </form>
+    </div>
+{% endblock %}
