@@ -2,6 +2,7 @@ import datetime
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
+from django.utils import timezone
 
 from contas.utils import organizacao_do_usuario
 from profissionais.models import Profissional
@@ -69,18 +70,21 @@ def semana(request):
     celulas = {dia: {h: [] for h in horarios} for dia in dias}
 
     for consulta in consultas_qs:
-        dia = consulta.data_hora.date()
+        data_hora_local = timezone.localtime(consulta.data_hora)
+        dia = data_hora_local.date()
         if dia in celulas:
-            slot = _slot_de(horarios, consulta.data_hora.time())
+            slot = _slot_de(horarios, data_hora_local.time())
             celulas[dia][slot].append({"tipo": "consulta", "obj": consulta})
 
     for bloqueio in bloqueios_qs:
-        dia_atual = max(bloqueio.inicio.date(), dias[0])
-        dia_fim = min(bloqueio.fim.date(), dias[-1])
+        inicio_local = timezone.localtime(bloqueio.inicio)
+        fim_local = timezone.localtime(bloqueio.fim)
+        dia_atual = max(inicio_local.date(), dias[0])
+        dia_fim = min(fim_local.date(), dias[-1])
         while dia_atual <= dia_fim:
             if dia_atual in celulas:
-                hora_ini = bloqueio.inicio.time() if bloqueio.inicio.date() == dia_atual else horarios[0]
-                hora_fim = bloqueio.fim.time() if bloqueio.fim.date() == dia_atual else horarios[-1]
+                hora_ini = inicio_local.time() if inicio_local.date() == dia_atual else horarios[0]
+                hora_fim = fim_local.time() if fim_local.date() == dia_atual else horarios[-1]
                 for h in horarios:
                     if hora_ini <= h < hora_fim:
                         celulas[dia_atual][h].append({"tipo": "bloqueio", "obj": bloqueio})
