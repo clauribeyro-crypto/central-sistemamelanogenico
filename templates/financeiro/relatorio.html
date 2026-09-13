@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Relatório financeiro · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Relatório financeiro</h1>
+
+    <form class="filtro" method="get">
+        <div>
+            <label for="inicio">De</label>
+            <input type="date" id="inicio" name="inicio" value="{{ data_inicio|date:'Y-m-d' }}">
+        </div>
+        <div>
+            <label for="fim">Até</label>
+            <input type="date" id="fim" name="fim" value="{{ data_fim|date:'Y-m-d' }}">
+        </div>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <div class="grid">
+        <div class="card stat">
+            <div class="num">R$ {{ total_pago }}</div>
+            <div>Total recebido no período</div>
+        </div>
+        <div class="card stat">
+            <div class="num">R$ {{ total_pendente }}</div>
+            <div>Total pendente no período</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Recebido por forma de pagamento</h2>
+        {% if por_forma_pagamento %}
+            <table>
+                <thead><tr><th>Forma</th><th>Total</th></tr></thead>
+                <tbody>
+                {% for item in por_forma_pagamento %}
+                    <tr>
+                        <td>{{ item.forma_pagamento }}</td>
+                        <td>R$ {{ item.total }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Sem pagamentos recebidos no período.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Recebido por profissional</h2>
+        {% if por_profissional %}
+            <table>
+                <thead><tr><th>Profissional</th><th>Total</th></tr></thead>
+                <tbody>
+                {% for item in por_profissional %}
+                    <tr>
+                        <td>{{ item.consulta__profissional__nome }}</td>
+                        <td>R$ {{ item.total }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Sem pagamentos vinculados a consultas no período.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Lançamentos no período</h2>
+        <table>
+            <thead>
+                <tr><th>Vencimento</th><th>Paciente</th><th>Valor</th><th>Forma</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+            {% for p in pagamentos %}
+                <tr>
+                    <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
+                    <td>{{ p.paciente }}</td>
+                    <td>R$ {{ p.valor }}</td>
+                    <td>{{ p.get_forma_pagamento_display }}</td>
+                    <td>{{ p.get_status_display }}</td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="5">Nenhum lançamento no período.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

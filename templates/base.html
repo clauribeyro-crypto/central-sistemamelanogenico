@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Sistema da Clínica{% endblock %}</title>
+    <style>
+        :root { color-scheme: light; }
+        body {
+            font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            margin: 0; background: #f4f6f8; color: #1c1f24;
+        }
+        header {
+            background: #1f4b5f; color: #fff; padding: 1rem 1.5rem;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+        }
+        header a { color: #fff; text-decoration: none; }
+        header .brand { font-weight: 600; font-size: 1.1rem; }
+        nav a { margin-left: 1rem; opacity: .9; }
+        nav a:hover { opacity: 1; text-decoration: underline; }
+        main { padding: 1.5rem; max-width: 1100px; margin: 0 auto; }
+        .card {
+            background: #fff; border-radius: 8px; padding: 1rem 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 1.25rem;
+        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+        .stat { text-align: center; }
+        .stat .num { font-size: 2rem; font-weight: 700; color: #1f4b5f; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #e5e7eb; }
+        th { color: #555; font-weight: 600; font-size: .85rem; text-transform: uppercase; }
+        form.filtro { display: flex; gap: .75rem; flex-wrap: wrap; align-items: end; margin-bottom: 1rem; }
+        form.filtro label { display: block; font-size: .8rem; color: #555; }
+        form.filtro input, form.filtro button {
+            padding: .4rem .6rem; border-radius: 4px; border: 1px solid #ccc;
+        }
+        form.filtro button { background: #1f4b5f; color: #fff; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+<header>
+    <a class="brand" href="{% url 'core:home' %}">🏥 Sistema da Clínica</a>
+    <nav>
+        <a href="{% url 'core:home' %}">Início</a>
+        <a href="/admin/pacientes/paciente/">Pacientes</a>
+        <a href="/admin/agenda/consulta/">Agenda</a>
+        <a href="/admin/prontuarios/atendimento/">Prontuários</a>
+        <a href="{% url 'financeiro:relatorio' %}">Financeiro</a>
+        <a href="/admin/">Administração</a>
+    </nav>
+</header>
+<main>
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>
