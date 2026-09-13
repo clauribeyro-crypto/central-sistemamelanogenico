@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Sem acesso · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Sua conta ainda não está vinculada a uma clínica</h1>
+    <div class="card">
+        <p>
+            Seu usuário existe e o login funcionou, mas ele ainda não foi
+            associado a nenhuma organização dentro do sistema — por isso as
+            telas do dia a dia (painel, CRM, agenda, financeiro) não abrem.
+        </p>
+        <p>
+            Peça para um administrador geral entrar em
+            <a href="/admin/contas/usuario/">/admin/ → Contas → Usuários</a>,
+            abrir o seu usuário e preencher o campo <strong>Organização</strong>
+            com a clínica correta. Depois disso, é só atualizar esta página.
+        </p>
+    </div>
+{% endblock %}
