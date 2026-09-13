@@ -42,7 +42,21 @@ Relação entre os módulos:
 - **Profissional** tem horários de atendimento recorrentes
   (`HorarioAtendimento`) usados como referência para a agenda.
 
-## Como rodar localmente
+## Como rodar no Windows (mais fácil)
+
+Com o [Python](https://www.python.org/downloads/) já instalado (marque
+**"Add python.exe to PATH"** durante a instalação), dê duplo clique em
+**`iniciar.bat`**, na raiz do projeto.
+
+- Na primeira vez, ele cria o ambiente virtual, instala as dependências,
+  aplica as migrações e pede para você criar o usuário administrador.
+- Nas próximas vezes, ele apenas sobe o servidor.
+- Em ambos os casos, ele abre `http://127.0.0.1:8000/` automaticamente no
+  navegador.
+- Para parar o sistema, feche a janela chamada **"Servidor - Sistema da
+  Clínica"**.
+
+## Como rodar localmente (manual)
 
 Pré-requisito: Python 3.11+.
 
