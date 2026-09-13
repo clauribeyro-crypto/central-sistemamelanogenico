@@ -35,21 +35,113 @@
             padding: .4rem .6rem; border-radius: 4px; border: 1px solid #ccc;
         }
         form.filtro button { background: #1f4b5f; color: #fff; border: none; cursor: pointer; }
+
+        .btn {
+            display: inline-block; padding: .5rem 1rem; border-radius: 6px; border: none;
+            background: #1f4b5f; color: #fff; cursor: pointer; text-decoration: none;
+            font-size: .9rem;
+        }
+        .btn:hover { background: #163947; }
+        .btn-secondary { background: #e5e7eb; color: #1c1f24; }
+        .btn-secondary:hover { background: #d1d5db; }
+        .btn-danger { background: #b91c1c; }
+        .btn-danger:hover { background: #991414; }
+        .btn-sm { padding: .3rem .6rem; font-size: .8rem; }
+
+        .messages { list-style: none; padding: 0; margin: 0 0 1rem; }
+        .messages li {
+            padding: .6rem 1rem; border-radius: 6px; margin-bottom: .5rem; font-size: .9rem;
+        }
+        .messages .success { background: #dcfce7; color: #166534; }
+        .messages .info { background: #dbeafe; color: #1e40af; }
+        .messages .warning { background: #fef3c7; color: #92400e; }
+        .messages .error { background: #fee2e2; color: #991b1b; }
+
+        .kanban { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: .5rem; }
+        .kanban-col {
+            background: #eef1f4; border-radius: 8px; padding: .75rem; min-width: 240px; flex: 1;
+        }
+        .kanban-col h3 {
+            font-size: .85rem; text-transform: uppercase; color: #444; margin: 0 0 .5rem;
+            display: flex; justify-content: space-between;
+        }
+        .lead-card {
+            background: #fff; border-radius: 6px; padding: .6rem .75rem; margin-bottom: .5rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,.08); display: block; color: inherit; text-decoration: none;
+        }
+        .lead-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,.15); }
+        .lead-card .nome { font-weight: 600; }
+        .lead-card .meta { font-size: .8rem; color: #666; }
+
+        .badge {
+            display: inline-block; padding: .15rem .5rem; border-radius: 999px;
+            font-size: .75rem; background: #e5e7eb; color: #1c1f24;
+        }
+        .filtros-status { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .filtros-status a {
+            padding: .4rem .8rem; border-radius: 999px; background: #eef1f4; color: #1c1f24;
+            text-decoration: none; font-size: .85rem;
+        }
+        .filtros-status a.ativo { background: #1f4b5f; color: #fff; }
+
+        .legenda { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: .85rem; }
+        .legenda span.ponto {
+            display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .3rem;
+        }
+        table.agenda-semana { table-layout: fixed; }
+        table.agenda-semana th, table.agenda-semana td { vertical-align: top; }
+        table.agenda-semana td.hoje { background: #fff8e1; }
+        .bloco-consulta {
+            border-radius: 4px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem;
+            color: #fff;
+        }
+        .bloco-bloqueio {
+            border-radius: 4px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem;
+            background: repeating-linear-gradient(45deg, #ef4444, #ef4444 4px, #dc2626 4px, #dc2626 8px);
+            color: #fff;
+        }
+        .timeline { list-style: none; padding: 0; margin: 0; }
+        .timeline li {
+            border-left: 2px solid #d1d5db; padding: 0 0 1rem .75rem; margin-left: .25rem; position: relative;
+        }
+        .timeline li::before {
+            content: ""; position: absolute; left: -5px; top: 2px; width: 8px; height: 8px;
+            border-radius: 50%; background: #1f4b5f;
+        }
+        .timeline .quando { font-size: .75rem; color: #666; }
+        form.acao { display: flex; flex-direction: column; gap: .75rem; max-width: 480px; }
+        form.acao label { font-size: .85rem; color: #444; display: block; margin-bottom: .25rem; }
+        form.acao input, form.acao select, form.acao textarea {
+            width: 100%; padding: .5rem; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+        }
     </style>
 </head>
 <body>
 <header>
     <a class="brand" href="{% url 'core:home' %}">🏥 Sistema da Clínica</a>
     <nav>
-        <a href="{% url 'core:home' %}">Início</a>
-        <a href="/admin/pacientes/paciente/">Pacientes</a>
-        <a href="/admin/agenda/consulta/">Agenda</a>
-        <a href="/admin/prontuarios/atendimento/">Prontuários</a>
-        <a href="{% url 'financeiro:relatorio' %}">Financeiro</a>
-        <a href="/admin/">Administração</a>
+        {% if user.is_authenticated %}
+            <a href="{% url 'core:home' %}">Início</a>
+            <a href="{% url 'leads:kanban' %}">CRM</a>
+            <a href="{% url 'agenda:semana' %}">Agenda</a>
+            <a href="/admin/pacientes/paciente/">Pacientes</a>
+            <a href="/admin/prontuarios/atendimento/">Prontuários</a>
+            <a href="{% url 'financeiro:relatorio' %}">Financeiro</a>
+            <a href="/admin/">Administração</a>
+            <a href="{% url 'logout' %}">Sair ({{ user }})</a>
+        {% else %}
+            <a href="{% url 'login' %}">Entrar</a>
+        {% endif %}
     </nav>
 </header>
 <main>
+    {% if messages %}
+        <ul class="messages">
+            {% for message in messages %}
+                <li class="{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
     {% block content %}{% endblock %}
 </main>
 </body>

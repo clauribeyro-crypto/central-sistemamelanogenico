@@ -1,8 +1,9 @@
 from django.db import models
-from django.urls import reverse
+
+from contas.models import ModeloDaOrganizacao
 
 
-class Paciente(models.Model):
+class Paciente(ModeloDaOrganizacao):
     class Sexo(models.TextChoices):
         FEMININO = "F", "Feminino"
         MASCULINO = "M", "Masculino"
@@ -10,7 +11,7 @@ class Paciente(models.Model):
 
     nome = models.CharField("nome completo", max_length=150)
     cpf = models.CharField(
-        "CPF", max_length=14, unique=True, blank=True, null=True,
+        "CPF", max_length=14, blank=True, null=True,
         help_text="Opcional, mas evita cadastros duplicados.",
     )
     data_nascimento = models.DateField("data de nascimento", blank=True, null=True)
@@ -35,9 +36,13 @@ class Paciente(models.Model):
         verbose_name = "paciente"
         verbose_name_plural = "pacientes"
         ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organizacao", "cpf"],
+                condition=models.Q(cpf__isnull=False) & ~models.Q(cpf=""),
+                name="cpf_unico_por_organizacao",
+            ),
+        ]
 
     def __str__(self):
         return self.nome
-
-    def get_absolute_url(self):
-        return reverse("pacientes:detalhe", args=[self.pk])

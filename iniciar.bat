@@ -29,6 +29,13 @@ if not exist ".venv\Scripts\activate.bat" (
     echo  (informe um nome de usuario e uma senha)
     echo ============================================
     python manage.py createsuperuser
+
+    echo.
+    echo ============================================
+    echo  Configure a sua clinica
+    echo ============================================
+    set /p nome_clinica="Nome da clinica/organizacao: "
+    python manage.py configurar_organizacao "%nome_clinica%"
 ) else (
     call .venv\Scripts\activate.bat
     python manage.py migrate

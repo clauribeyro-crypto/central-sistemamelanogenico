@@ -1,5 +1,7 @@
 from django.db import models
 
+from contas.models import ModeloDaOrganizacao
+
 DIAS_SEMANA = [
     (0, "Segunda-feira"),
     (1, "Terça-feira"),
@@ -11,7 +13,7 @@ DIAS_SEMANA = [
 ]
 
 
-class Profissional(models.Model):
+class Profissional(ModeloDaOrganizacao):
     nome = models.CharField("nome completo", max_length=150)
     especialidade = models.CharField(max_length=100, blank=True)
     registro_conselho = models.CharField(

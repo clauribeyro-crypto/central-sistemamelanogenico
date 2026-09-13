@@ -1,27 +1,67 @@
 {% extends "base.html" %}
-{% block title %}Início · Sistema da Clínica{% endblock %}
+{% block title %}O que preciso fazer hoje? · Sistema da Clínica{% endblock %}
 {% block content %}
+    <h1>O que preciso fazer hoje?</h1>
+
     <div class="grid">
-        <div class="card stat">
-            <div class="num">{{ total_pacientes_ativos }}</div>
-            <div>Pacientes ativos</div>
-        </div>
-        <div class="card stat">
+        <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none; color:inherit;">
+            <div class="num">{{ novos_hoje }}</div>
+            <div>Novos leads hoje</div>
+        </a>
+        <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none; color:inherit;">
+            <div class="num">{{ contato_1 }}</div>
+            <div>1º contato</div>
+        </a>
+        <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none; color:inherit;">
+            <div class="num">{{ contato_2 }}</div>
+            <div>2º contato</div>
+        </a>
+        <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none; color:inherit;">
+            <div class="num">{{ contato_3 }}</div>
+            <div>Prova social</div>
+        </a>
+        <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none; color:inherit;">
+            <div class="num">{{ contato_4 }}</div>
+            <div>Encerramento</div>
+        </a>
+        <a class="card stat" href="{% url 'leads:kanban' %}?filtro=pausados" style="text-decoration:none; color:inherit;">
+            <div class="num">{{ retomar_hoje }}</div>
+            <div>Retomar cadência hoje</div>
+        </a>
+        <a class="card stat" href="{% url 'agenda:semana' %}" style="text-decoration:none; color:inherit;">
             <div class="num">{{ consultas_hoje|length }}</div>
             <div>Consultas hoje</div>
-        </div>
+        </a>
         <div class="card stat">
-            <div class="num">{{ pagamentos_pendentes|length }}</div>
-            <div>Pagamentos pendentes</div>
+            <div class="num">{{ atrasados|length }}</div>
+            <div>Tarefas atrasadas</div>
         </div>
     </div>
+
+    {% if atrasados %}
+        <div class="card">
+            <h2>⚠️ Tarefas atrasadas</h2>
+            <table>
+                <thead><tr><th>Lead</th><th>Etapa</th><th>Próxima ação prevista</th></tr></thead>
+                <tbody>
+                {% for lead in atrasados %}
+                    <tr>
+                        <td><a href="{% url 'leads:detalhe' lead.pk %}">{{ lead.nome }}</a></td>
+                        <td>{{ lead.get_etapa_display }}</td>
+                        <td>{{ lead.proxima_acao_em|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
 
     <div class="card">
         <h2>Consultas de hoje</h2>
         {% if consultas_hoje %}
             <table>
                 <thead>
-                    <tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Status</th></tr>
+                    <tr><th>Horário</th><th>Paciente</th><th>Profissional</th><th>Tipo</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                 {% for c in consultas_hoje %}
@@ -29,6 +69,7 @@
                         <td>{{ c.data_hora|date:"H:i" }}</td>
                         <td>{{ c.paciente }}</td>
                         <td>{{ c.profissional }}</td>
+                        <td><span class="badge" style="background:{{ c.tipo_consulta.cor }}22; color:{{ c.tipo_consulta.cor }};">{{ c.tipo_consulta }}</span></td>
                         <td>{{ c.get_status_display }}</td>
                     </tr>
                 {% endfor %}
@@ -36,28 +77,6 @@
             </table>
         {% else %}
             <p>Nenhuma consulta agendada para hoje.</p>
-        {% endif %}
-    </div>
-
-    <div class="card">
-        <h2>Próximas consultas</h2>
-        {% if proximas_consultas %}
-            <table>
-                <thead>
-                    <tr><th>Data</th><th>Paciente</th><th>Profissional</th></tr>
-                </thead>
-                <tbody>
-                {% for c in proximas_consultas %}
-                    <tr>
-                        <td>{{ c.data_hora|date:"d/m/Y H:i" }}</td>
-                        <td>{{ c.paciente }}</td>
-                        <td>{{ c.profissional }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        {% else %}
-            <p>Nenhuma consulta futura agendada.</p>
         {% endif %}
     </div>
 

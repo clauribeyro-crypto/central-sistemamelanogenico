@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}CRM de leads · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>CRM de leads</h1>
+
+    <div class="filtros-status">
+        <a class="ativo" href="{% url 'leads:kanban' %}">Cadência ativa</a>
+        <a href="{% url 'leads:kanban' %}?filtro=pausados">Pausados ({{ contadores.pausados }})</a>
+        <a href="{% url 'leads:kanban' %}?filtro=agendados">Agendados ({{ contadores.agendados }})</a>
+        <a href="{% url 'leads:kanban' %}?filtro=sem_resposta">Sem resposta ({{ contadores.sem_resposta }})</a>
+        <a href="{% url 'leads:kanban' %}?filtro=perdidos">Perdidos ({{ contadores.perdidos }})</a>
+    </div>
+
+    <div class="kanban">
+        {% for codigo, rotulo, leads in colunas %}
+            <div class="kanban-col">
+                <h3>{{ rotulo }} <span class="badge">{{ leads|length }}</span></h3>
+                {% for lead in leads %}
+                    <a class="lead-card" href="{% url 'leads:detalhe' lead.pk %}">
+                        <div class="nome">{{ lead.nome }}</div>
+                        <div class="meta">{{ lead.origem }}</div>
+                        <div class="meta">
+                            {% if lead.status == "EM_ANDAMENTO" %}
+                                <span class="badge">Em andamento</span>
+                            {% elif lead.esta_atrasado %}
+                                <span class="badge" style="background:#fee2e2;color:#991b1b;">Atrasado</span>
+                            {% else %}
+                                Entrou {{ lead.entrou_em|date:"d/m H:i" }}
+                            {% endif %}
+                        </div>
+                    </a>
+                {% empty %}
+                    <p class="meta">Nenhum lead nesta etapa.</p>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}

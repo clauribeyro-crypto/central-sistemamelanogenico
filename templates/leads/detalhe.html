@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{{ lead.nome }} · CRM · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'leads:kanban' %}">← Voltar ao CRM</a></p>
+
+    <div class="card">
+        <h1 style="margin-top:0;">{{ lead.nome }}</h1>
+        <p>
+            <span class="badge">{{ lead.get_status_display }}</span>
+            <span class="badge">{{ lead.get_etapa_display }}</span>
+            <span class="badge">Origem: {{ lead.origem }}</span>
+        </p>
+        <p>
+            📱 WhatsApp: <strong>{{ lead.whatsapp }}</strong>
+            {% if lead.telefone %} · ☎️ {{ lead.telefone }}{% endif %}
+        </p>
+        <p>Responsável: {{ lead.responsavel|default:"—" }} · Entrou em {{ lead.entrou_em|date:"d/m/Y H:i" }}</p>
+        {% if lead.observacoes %}<p><em>{{ lead.observacoes }}</em></p>{% endif %}
+        {% if lead.paciente %}
+            <p>✅ Vinculado ao paciente <strong>{{ lead.paciente }}</strong></p>
+        {% endif %}
+    </div>
+
+    {% if pausa_ativa %}
+        <div class="card" style="border:2px solid #f59e0b;">
+            <h2>⏸️ RETOMAR CONTATO — CADÊNCIA PAUSADA</h2>
+            <p>Etapa em que estava: <strong>{{ lead.get_etapa_display }}</strong></p>
+            <p>Pausado em: {{ pausa_ativa.criada_em|date:"d/m/Y H:i" }} · Retomar em: {{ pausa_ativa.data_retomada_prevista|date:"d/m/Y" }}</p>
+            <p>Motivo: {{ pausa_ativa.motivo }}</p>
+            {% if pausa_ativa.observacao %}<p>Observação: {{ pausa_ativa.observacao }}</p>{% endif %}
+            <form method="post" action="{% url 'leads:retomar' lead.pk %}">
+                {% csrf_token %}
+                <button class="btn" type="submit">Retomar cadência</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if pode_agir %}
+        {% if mostrar_ligacao %}
+            <div class="card">
+                <h2>Registrar {{ numero_ligacao }}ª ligação</h2>
+                <form method="post" action="{% url 'leads:registrar_ligacao' lead.pk %}" class="acao">
+                    {% csrf_token %}
+                    {% for radio in form_ligacao.resultado %}
+                        <label style="display:flex; align-items:center; gap:.4rem; font-weight:normal;">
+                            {{ radio.tag }} {{ radio.choice_label }}
+                        </label>
+                    {% endfor %}
+                    <button class="btn" type="submit">Registrar</button>
+                </form>
+            </div>
+        {% endif %}
+
+        {% if mostrar_whatsapp %}
+            <div class="card">
+                <h2>Enviar WhatsApp ({{ lead.get_etapa_display }})</h2>
+                <p>Prepara a mensagem, você pode editar antes de enviar.</p>
+                <a class="btn" href="{% url 'leads:enviar_whatsapp' lead.pk %}">Preparar mensagem no WhatsApp</a>
+            </div>
+
+            <div class="card">
+                <h2>Resultado do contato</h2>
+                <form method="post" action="{% url 'leads:resultado_contato' lead.pk %}" class="acao">
+                    {% csrf_token %}
+                    {% for radio in form_resultado.resultado %}
+                        <label style="display:flex; align-items:center; gap:.4rem; font-weight:normal;">
+                            {{ radio.tag }} {{ radio.choice_label }}
+                        </label>
+                    {% endfor %}
+                    <button class="btn" type="submit">Registrar</button>
+                </form>
+            </div>
+        {% endif %}
+
+        <div class="card">
+            <h2>Outras ações</h2>
+            <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                <a class="btn" href="{% url 'leads:agendar' lead.pk %}">📅 Agendar consulta</a>
+                {% if not pausa_ativa %}
+                    <a class="btn btn-secondary" href="{% url 'leads:pausar' lead.pk %}">⏸️ Pausar cadência</a>
+                {% endif %}
+                <a class="btn btn-danger" href="{% url 'leads:perder' lead.pk %}">✖ Marcar como perdida</a>
+            </div>
+        </div>
+    {% else %}
+        <div class="card">
+            {% if lead.status == "PERDIDA" %}
+                <p>Motivo da perda: <strong>{{ lead.perdido_motivo|default:"—" }}</strong></p>
+                {% if lead.perdido_detalhe %}<p>{{ lead.perdido_detalhe }}</p>{% endif %}
+            {% else %}
+                <p>Consulta agendada. Veja os detalhes na <a href="{% url 'agenda:semana' %}">agenda</a>.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Histórico</h2>
+        <ul class="timeline">
+            <li>
+                <div class="quando">{{ lead.entrou_em|date:"d/m/Y H:i" }}</div>
+                Lead entrou pela origem {{ lead.origem }}
+            </li>
+            {% for h in historico %}
+                <li>
+                    <div class="quando">{{ h.data_hora|date:"d/m/Y H:i" }}{% if h.responsavel %} · {{ h.responsavel }}{% endif %}</div>
+                    {{ h.descricao }}
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}

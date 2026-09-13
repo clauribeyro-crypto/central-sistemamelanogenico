@@ -1,13 +1,18 @@
 import datetime
 
+from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.shortcuts import render
+
+from contas.utils import organizacao_do_usuario
 
 from .models import Pagamento
 
 
+@login_required
 def relatorio(request):
     """Relatório financeiro simples, filtrável por período (mês corrente por padrão)."""
+    org = organizacao_do_usuario(request)
     hoje = datetime.date.today()
 
     data_inicio = request.GET.get("inicio")
@@ -24,7 +29,7 @@ def relatorio(request):
         data_fim = hoje
 
     pagamentos = Pagamento.objects.filter(
-        data_vencimento__gte=data_inicio, data_vencimento__lte=data_fim
+        organizacao=org, data_vencimento__gte=data_inicio, data_vencimento__lte=data_fim
     )
 
     total_pago = pagamentos.filter(status=Pagamento.Status.PAGO).aggregate(

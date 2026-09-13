@@ -1,10 +1,11 @@
 from django.db import models
 
 from agenda.models import Consulta
+from contas.models import ModeloDaOrganizacao
 from pacientes.models import Paciente
 
 
-class Servico(models.Model):
+class Servico(ModeloDaOrganizacao):
     """Tabela de preços: procedimentos/consultas e seus valores padrão."""
 
     nome = models.CharField(max_length=150)
@@ -20,7 +21,7 @@ class Servico(models.Model):
         return f"{self.nome} (R$ {self.valor_padrao})"
 
 
-class Pagamento(models.Model):
+class Pagamento(ModeloDaOrganizacao):
     class FormaPagamento(models.TextChoices):
         DINHEIRO = "DINHEIRO", "Dinheiro"
         PIX = "PIX", "Pix"

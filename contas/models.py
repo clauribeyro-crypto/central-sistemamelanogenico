@@ -1,0 +1,72 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+
+class Organizacao(models.Model):
+    """
+    Uma clínica/mentorada dentro do sistema. Todo o resto dos dados (leads,
+    pacientes, agenda, financeiro...) pertence a uma Organizacao, e uma
+    organização nunca enxerga os dados de outra.
+    """
+
+    nome = models.CharField(max_length=150)
+    slug = models.SlugField(
+        unique=True,
+        help_text="Identificador curto usado internamente, sem espaços. Ex.: clinica-exemplo",
+    )
+    ativo = models.BooleanField(default=True)
+
+    # Configurações da agenda desta organização.
+    agenda_hora_inicio = models.TimeField(default="08:00")
+    agenda_hora_fim = models.TimeField(default="18:00")
+    agenda_intervalo_minutos = models.PositiveIntegerField(
+        default=30,
+        help_text="Intervalo entre horários na grade da agenda (em minutos).",
+    )
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "organização"
+        verbose_name_plural = "organizações"
+        ordering = ["nome"]
+
+    def __str__(self):
+        return self.nome
+
+
+class Usuario(AbstractUser):
+    """
+    Usuário do sistema. Deixar `organizacao` em branco identifica um
+    administrador geral, que pode configurar todas as organizações. Qualquer
+    outro usuário só enxerga e edita dados da própria organização.
+    """
+
+    organizacao = models.ForeignKey(
+        Organizacao,
+        on_delete=models.CASCADE,
+        related_name="usuarios",
+        blank=True,
+        null=True,
+        help_text="Deixe em branco apenas para administradores gerais do sistema.",
+    )
+
+    class Meta:
+        verbose_name = "usuário"
+        verbose_name_plural = "usuários"
+
+    def __str__(self):
+        return self.get_full_name() or self.username
+
+
+class ModeloDaOrganizacao(models.Model):
+    """
+    Base abstrata para qualquer dado que pertence a uma organização
+    (paciente, lead, consulta, etc.). Isolar por organização é o que garante
+    que uma mentorada nunca veja os dados de outra.
+    """
+
+    organizacao = models.ForeignKey(Organizacao, on_delete=models.CASCADE)
+
+    class Meta:
+        abstract = True
