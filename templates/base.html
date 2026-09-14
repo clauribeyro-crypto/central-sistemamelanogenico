@@ -209,6 +209,18 @@
             max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(43,38,53,.25);
         }
 
+        .campo-com-lista { position: relative; }
+        .autocomplete-resultados {
+            position: absolute; left: 0; right: 0; top: 100%; z-index: 60;
+            background: #fff; border: 1px solid #ddd5ee; border-radius: 8px; margin-top: .25rem;
+            max-height: 220px; overflow-y: auto; box-shadow: 0 6px 16px rgba(43,38,53,.15);
+        }
+        .autocomplete-item { padding: .5rem .7rem; font-size: .88rem; cursor: pointer; }
+        .autocomplete-item:hover { background: var(--accent-soft); }
+        .autocomplete-item .meta { color: var(--text-muted); font-size: .8rem; }
+        .autocomplete-item.autocomplete-vazio { color: var(--text-muted); cursor: default; }
+        .autocomplete-item.autocomplete-vazio:hover { background: none; }
+
         @media (max-width: 800px) {
             .grid-2-1, .grid-2col { grid-template-columns: 1fr; }
             .shell { flex-direction: column; }

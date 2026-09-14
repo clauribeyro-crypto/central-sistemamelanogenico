@@ -109,7 +109,11 @@ def semana(request):
         "profissionais": profissionais,
         "profissional_selecionado": profissional_selecionado,
         "tipos_consulta": TipoConsulta.objects.filter(organizacao=org, ativo=True),
-        "pacientes": Paciente.objects.filter(organizacao=org, ativo=True).order_by("nome"),
+        "pacientes_json": list(
+            Paciente.objects.filter(organizacao=org, ativo=True)
+            .order_by("nome")
+            .values("id", "nome", "telefone")
+        ),
         "intervalo_minutos": org.agenda_intervalo_minutos,
         "semana_anterior": (inicio_semana - datetime.timedelta(days=7)).isoformat(),
         "semana_seguinte": (inicio_semana + datetime.timedelta(days=7)).isoformat(),
@@ -138,9 +142,17 @@ def criar_consulta_rapida(request):
         datetime.datetime.combine(form.cleaned_data["data"], form.cleaned_data["hora"])
     )
 
+    paciente = form.cleaned_data["paciente"]
+    if not paciente:
+        paciente = Paciente.objects.create(
+            organizacao=org,
+            nome=form.cleaned_data["nova_paciente_nome"].strip(),
+            telefone=form.cleaned_data.get("nova_paciente_telefone", "").strip(),
+        )
+
     consulta = Consulta.objects.create(
         organizacao=org,
-        paciente=form.cleaned_data["paciente"],
+        paciente=paciente,
         profissional=form.cleaned_data["profissional"],
         tipo_consulta=form.cleaned_data["tipo_consulta"],
         data_hora=data_hora,
