@@ -25,7 +25,7 @@
         <a class="btn btn-secondary" href="?data={{ semana_seguinte }}{% if profissional_selecionado %}&profissional={{ profissional_selecionado.pk }}{% endif %}">Semana seguinte →</a>
     </form>
 
-    <p style="font-size:.82rem; color:var(--text-muted);">Clique num horário vazio para agendar uma consulta ali{% if colunas_profissionais|length > 1 %} — cada profissional tem sua própria coluna, então um horário ocupado não bloqueia os outros{% endif %}.</p>
+    <p style="font-size:.82rem; color:var(--text-muted);">Clique num horário vazio para agendar uma consulta ou bloquear o horário (almoço, reunião, folga…){% if colunas_profissionais|length > 1 %} — cada profissional tem sua própria coluna, então um horário ocupado não bloqueia os outros{% endif %}. Clique num bloqueio já criado pra excluí-lo.</p>
 
     <div class="card" style="overflow-x:auto;">
         <table class="agenda-semana">
@@ -58,9 +58,7 @@
                                             {% if item.tipo == "consulta" %}
                                                 {% include "agenda/_bloco_consulta.html" with consulta=item.obj %}
                                             {% else %}
-                                                <div class="bloco-bloqueio">
-                                                    {{ item.obj.get_motivo_display }}
-                                                </div>
+                                                {% include "agenda/_bloco_bloqueio.html" with bloqueio=item.obj %}
                                             {% endif %}
                                         {% endfor %}
                                     </td>
@@ -77,6 +75,11 @@
 
     <div class="modal-fundo" id="modal-agendar" hidden>
         <div class="modal-caixa">
+            <div style="display:flex; gap:.5rem; margin-bottom:1rem;">
+                <button type="button" class="btn btn-tab ativo" id="tab-agendar">Agendar consulta</button>
+                <button type="button" class="btn btn-secondary btn-tab" id="tab-bloquear">Bloquear horário</button>
+            </div>
+        <div id="modo-agendar">
             <h2>Agendar consulta</h2>
             <p id="modal-quando" style="color:var(--text-muted); margin-top:-.5rem;"></p>
             <form id="form-agendar" class="acao">
@@ -142,6 +145,47 @@
                     <button class="btn btn-secondary" type="button" id="modal-cancelar">Cancelar</button>
                 </div>
             </form>
+        </div>
+
+        <div id="modo-bloquear" hidden>
+            <h2>Bloquear horário</h2>
+            <p id="modal-quando-bloqueio" style="color:var(--text-muted); margin-top:-.5rem;"></p>
+            <form id="form-bloquear" class="acao">
+                {% csrf_token %}
+                <div>
+                    <label for="fb-profissional">Profissional</label>
+                    <select id="fb-profissional" name="profissional" required>
+                        <option value="">Selecione…</option>
+                        {% for p in profissionais %}
+                            <option value="{{ p.pk }}" {% if profissional_selecionado.pk == p.pk %}selected{% endif %}>{{ p.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="fb-motivo">Motivo</label>
+                    <select id="fb-motivo" name="motivo" required>
+                        {% for valor, rotulo in motivos_bloqueio %}
+                            <option value="{{ valor }}">{{ rotulo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="fb-duracao">Duração (min)</label>
+                    <input type="number" id="fb-duracao" name="duracao_minutos" value="{{ intervalo_minutos }}" min="5" required>
+                </div>
+                <div>
+                    <label for="fb-observacoes">Observações</label>
+                    <textarea id="fb-observacoes" name="observacoes" rows="2" placeholder="Opcional"></textarea>
+                </div>
+                <input type="hidden" name="data" id="fb-data">
+                <input type="hidden" name="hora" id="fb-hora">
+                <p id="modal-erro-bloqueio" style="color:#8f2e45; font-size:.85rem;"></p>
+                <div style="display:flex; gap:.5rem;">
+                    <button class="btn" type="submit">Bloquear</button>
+                    <button class="btn btn-secondary" type="button" id="modal-cancelar-bloqueio">Cancelar</button>
+                </div>
+            </form>
+        </div>
         </div>
     </div>
 
@@ -229,17 +273,54 @@
             }
         });
 
+        const modoAgendar = document.getElementById("modo-agendar");
+        const modoBloquear = document.getElementById("modo-bloquear");
+        const tabAgendar = document.getElementById("tab-agendar");
+        const tabBloquear = document.getElementById("tab-bloquear");
+        const quandoBloqueio = document.getElementById("modal-quando-bloqueio");
+        const erroBloqueio = document.getElementById("modal-erro-bloqueio");
+        const formBloquear = document.getElementById("form-bloquear");
+
+        function mostrarAbaAgendar() {
+            modoAgendar.hidden = false;
+            modoBloquear.hidden = true;
+            tabAgendar.classList.add("ativo");
+            tabAgendar.classList.remove("btn-secondary");
+            tabBloquear.classList.remove("ativo");
+            tabBloquear.classList.add("btn-secondary");
+        }
+
+        function mostrarAbaBloquear() {
+            modoBloquear.hidden = false;
+            modoAgendar.hidden = true;
+            tabBloquear.classList.add("ativo");
+            tabBloquear.classList.remove("btn-secondary");
+            tabAgendar.classList.remove("ativo");
+            tabAgendar.classList.add("btn-secondary");
+        }
+
+        tabAgendar.addEventListener("click", mostrarAbaAgendar);
+        tabBloquear.addEventListener("click", mostrarAbaBloquear);
+
         function abrirModal(dia, horario, profissionalId) {
             form.reset();
+            formBloquear.reset();
             erro.textContent = "";
+            erroBloqueio.textContent = "";
             mostrarModoPacienteExistente();
+            mostrarAbaAgendar();
             pacienteIdInput.value = "";
             resultadosDiv.hidden = true;
             document.getElementById("fr-data").value = dia;
             document.getElementById("fr-hora").value = horario;
             document.getElementById("fr-profissional").value = profissionalId || "";
+            document.getElementById("fb-data").value = dia;
+            document.getElementById("fb-hora").value = horario;
+            document.getElementById("fb-profissional").value = profissionalId || "";
             const [ano, mes, diaNum] = dia.split("-");
-            quando.textContent = diaNum + "/" + mes + "/" + ano + " às " + horario;
+            const quandoTexto = diaNum + "/" + mes + "/" + ano + " às " + horario;
+            quando.textContent = quandoTexto;
+            quandoBloqueio.textContent = quandoTexto;
             modal.hidden = false;
         }
 
@@ -254,8 +335,51 @@
         });
 
         document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+        document.getElementById("modal-cancelar-bloqueio").addEventListener("click", fecharModal);
         modal.addEventListener("click", function (ev) {
             if (ev.target === modal) fecharModal();
+        });
+
+        formBloquear.addEventListener("submit", function (ev) {
+            ev.preventDefault();
+            erroBloqueio.textContent = "";
+            const dados = new FormData(formBloquear);
+            fetch("{% url 'agenda:criar_bloqueio_rapido' %}", {
+                method: "POST",
+                headers: { "X-CSRFToken": formBloquear.querySelector("[name=csrfmiddlewaretoken]").value },
+                body: dados,
+            })
+                .then((r) => r.json().then((json) => ({ status: r.status, json })))
+                .then(({ status, json }) => {
+                    if (status !== 200 || !json.ok) {
+                        const primeiraChave = json.errors ? Object.keys(json.errors)[0] : null;
+                        erroBloqueio.textContent = primeiraChave
+                            ? json.errors[primeiraChave][0].message
+                            : "Não foi possível bloquear. Confira os campos.";
+                        return;
+                    }
+                    // O bloqueio pode ocupar vários horários da grade — mais
+                    // simples recarregar a página do que remendar cada célula.
+                    window.location.reload();
+                })
+                .catch(function () {
+                    erroBloqueio.textContent = "Erro de conexão. Tente novamente.";
+                });
+        });
+
+        document.querySelector("table.agenda-semana tbody").addEventListener("click", function (ev) {
+            const bloco = ev.target.closest(".bloco-bloqueio[data-bloqueio-id]");
+            if (!bloco) return;
+            if (!confirm("Excluir este bloqueio?")) return;
+            const urlExcluir = "{% url 'agenda:excluir_bloqueio' 0 %}".replace("0/excluir", bloco.dataset.bloqueioId + "/excluir");
+            fetch(urlExcluir, {
+                method: "POST",
+                headers: { "X-CSRFToken": form.querySelector("[name=csrfmiddlewaretoken]").value },
+            })
+                .then((r) => r.json())
+                .then(function (json) {
+                    if (json.ok) window.location.reload();
+                });
         });
 
         campoTipo.addEventListener("change", function () {
