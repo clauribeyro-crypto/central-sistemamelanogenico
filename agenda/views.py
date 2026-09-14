@@ -157,6 +157,7 @@ def criar_consulta_rapida(request):
         tipo_consulta=form.cleaned_data["tipo_consulta"],
         data_hora=data_hora,
         duracao_minutos=form.cleaned_data["duracao_minutos"],
+        valor=form.cleaned_data["valor"],
         observacoes=form.cleaned_data["observacoes"],
     )
 

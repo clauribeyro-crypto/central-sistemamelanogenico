@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 {% block title %}Agenda da semana · Sistema da Clínica{% endblock %}
 {% block content %}
     <h1>Agenda da semana</h1>
@@ -105,13 +106,18 @@
                     <select id="fr-tipo" name="tipo_consulta" required>
                         <option value="">Selecione…</option>
                         {% for t in tipos_consulta %}
-                            <option value="{{ t.pk }}" data-duracao="{{ t.duracao_padrao_minutos }}">{{ t.nome }}</option>
+                            <option value="{{ t.pk }}" data-duracao="{{ t.duracao_padrao_minutos }}" data-valor="{{ t.valor|default_if_none:''|unlocalize }}">{{ t.nome }}</option>
                         {% endfor %}
                     </select>
                 </div>
                 <div>
                     <label for="fr-duracao">Duração (min)</label>
                     <input type="number" id="fr-duracao" name="duracao_minutos" value="{{ intervalo_minutos }}" min="5" required>
+                </div>
+                <div>
+                    <label for="fr-valor">Valor (R$)</label>
+                    <input type="number" id="fr-valor" name="valor" step="0.01" min="0" placeholder="Ex.: 200.00">
+                    <p style="font-size:.78rem; color:var(--text-muted); margin:.25rem 0 0;">Preenchido pelo tipo de consulta — edite se for um valor combinado com a paciente. Cria automaticamente uma receita prevista no Financeiro.</p>
                 </div>
                 <div>
                     <label for="fr-observacoes">Observações</label>
@@ -137,6 +143,7 @@
         const erro = document.getElementById("modal-erro");
         const campoTipo = document.getElementById("fr-tipo");
         const campoDuracao = document.getElementById("fr-duracao");
+        const campoValor = document.getElementById("fr-valor");
 
         const pacientesData = JSON.parse(document.getElementById("pacientes-data").textContent);
         const buscaInput = document.getElementById("fr-paciente-busca");
@@ -243,6 +250,9 @@
             const opcao = campoTipo.selectedOptions[0];
             if (opcao && opcao.dataset.duracao) {
                 campoDuracao.value = opcao.dataset.duracao;
+            }
+            if (opcao) {
+                campoValor.value = opcao.dataset.valor || "";
             }
         });
 

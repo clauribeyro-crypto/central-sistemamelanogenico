@@ -33,7 +33,7 @@ class HorarioBloqueadoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
 class ConsultaAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     list_display = (
         "data_hora", "paciente", "profissional", "tipo_consulta",
-        "duracao_minutos", "status",
+        "duracao_minutos", "valor", "status",
     )
     list_filter = ("status", "profissional", "tipo_consulta")
     search_fields = ("paciente__nome", "profissional__nome", "motivo")
