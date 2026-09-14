@@ -15,7 +15,7 @@ from financeiro.models import Pagamento, Recebimento
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
-from .forms import ConsultaRapidaForm
+from .forms import BloqueioRapidoForm, ConsultaRapidaForm
 from .models import Consulta, HorarioBloqueado, TipoConsulta
 
 
@@ -133,6 +133,7 @@ def semana(request):
         "colunas_profissionais": colunas_profissionais,
         "profissional_selecionado": profissional_selecionado,
         "tipos_consulta": TipoConsulta.objects.filter(organizacao=org, ativo=True),
+        "motivos_bloqueio": HorarioBloqueado.Motivo.choices,
         "pacientes_json": list(
             Paciente.objects.filter(organizacao=org, ativo=True)
             .order_by("nome")
@@ -196,6 +197,51 @@ def criar_consulta_rapida(request):
         "horario": _slot_de(_horarios_do_dia(org), data_hora_local.time()).strftime("%H:%M"),
         "profissional": consulta.profissional_id,
     })
+
+
+@login_required
+@require_POST
+def criar_bloqueio_rapido(request):
+    """
+    Bloqueia um horário (almoço, reunião, folga etc.) a partir do mesmo modal
+    de criação rápida da agenda, sem precisar de nenhuma paciente.
+    """
+    org = organizacao_do_usuario(request)
+    form = BloqueioRapidoForm(request.POST, organizacao=org)
+
+    if not form.is_valid():
+        return JsonResponse(
+            {"ok": False, "errors": form.errors.get_json_data()}, status=400
+        )
+
+    inicio = timezone.make_aware(
+        datetime.datetime.combine(form.cleaned_data["data"], form.cleaned_data["hora"])
+    )
+    fim = inicio + datetime.timedelta(minutes=form.cleaned_data["duracao_minutos"])
+
+    HorarioBloqueado.objects.create(
+        organizacao=org,
+        profissional=form.cleaned_data["profissional"],
+        inicio=inicio,
+        fim=fim,
+        motivo=form.cleaned_data["motivo"],
+        observacoes=form.cleaned_data["observacoes"],
+    )
+
+    # Um bloqueio pode ocupar vários slots da grade (ex.: 1h de almoço em
+    # slots de 30 min) — mais simples e seguro recarregar a página do que
+    # tentar remendar cada célula afetada via JS.
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def excluir_bloqueio(request, pk):
+    """Remove um bloqueio de horário direto da grade da agenda."""
+    org = organizacao_do_usuario(request)
+    bloqueio = get_object_or_404(HorarioBloqueado, pk=pk, organizacao=org)
+    bloqueio.delete()
+    return JsonResponse({"ok": True})
 
 
 @login_required

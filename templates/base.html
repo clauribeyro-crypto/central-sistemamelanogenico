@@ -70,6 +70,9 @@
         .stat { text-align: left; }
         .stat .num { font-family: "Playfair Display", Georgia, serif; font-size: 2.1rem; font-weight: 700; color: var(--text); line-height: 1; }
         .stat .rotulo { font-size: .82rem; color: var(--text-muted); margin-top: .35rem; }
+        .stat-em-breve { opacity: .55; }
+        .stat-em-breve .num { color: var(--text-muted); }
+        .placeholder-em-breve { font-size: .82rem; color: var(--text-muted); font-style: italic; }
 
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: .5rem; border-bottom: 1px solid #efeaf6; }
@@ -178,8 +181,10 @@
         .bloco-bloqueio {
             border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem;
             background: repeating-linear-gradient(45deg, #c85a71, #c85a71 4px, #b3435c 4px, #b3435c 8px);
-            color: #fff;
+            color: #fff; cursor: pointer;
         }
+        .btn-tab { opacity: .55; }
+        .btn-tab.ativo { opacity: 1; }
         .timeline { list-style: none; padding: 0; margin: 0; }
         .timeline li { border-left: 2px solid #e5ddf3; padding: 0 0 1rem .75rem; margin-left: .25rem; position: relative; }
         .timeline li::before {

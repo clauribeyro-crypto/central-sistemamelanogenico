@@ -1,0 +1,3 @@
+<div class="bloco-bloqueio" data-bloqueio-id="{{ bloqueio.pk }}" title="Clique para excluir este bloqueio">
+    {{ bloqueio.get_motivo_display }}{% if bloqueio.observacoes %} — {{ bloqueio.observacoes }}{% endif %}
+</div>

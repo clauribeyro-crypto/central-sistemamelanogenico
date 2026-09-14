@@ -3,7 +3,7 @@ from django import forms
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
-from .models import TipoConsulta
+from .models import HorarioBloqueado, TipoConsulta
 
 
 class ConsultaRapidaForm(forms.Form):
@@ -50,3 +50,24 @@ class ConsultaRapidaForm(forms.Form):
                 "Selecione uma paciente existente ou informe o nome da nova paciente."
             )
         return cleaned
+
+
+class BloqueioRapidoForm(forms.Form):
+    """
+    Formulário do modal de bloqueio rápido de horário, aberto ao clicar num
+    horário vazio da agenda e escolher "Bloquear horário" em vez de agendar
+    uma consulta — sem precisar informar nenhuma paciente.
+    """
+
+    profissional = forms.ModelChoiceField(queryset=Profissional.objects.none())
+    motivo = forms.ChoiceField(choices=HorarioBloqueado.Motivo.choices)
+    data = forms.DateField()
+    hora = forms.TimeField()
+    duracao_minutos = forms.IntegerField(min_value=5, initial=30)
+    observacoes = forms.CharField(required=False, widget=forms.Textarea)
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["profissional"].queryset = Profissional.objects.filter(
+            organizacao=organizacao, ativo=True
+        ).order_by("nome")
