@@ -1,4 +1,4 @@
-<div class="lead-card" draggable="true" data-lead-id="{{ lead.pk }}" data-etapa="{{ lead.etapa }}">
+<div class="lead-card" draggable="true" data-lead-id="{{ lead.pk }}" data-etapa="{{ lead.etapa }}" data-nome="{{ lead.nome }}" data-telefone="{{ lead.whatsapp }} {{ lead.telefone }}">
     <a class="nome" href="{% url 'leads:detalhe' lead.pk %}">{{ lead.nome }}</a>
     <div class="meta">
         {% if lead.cidade or lead.estado %}{{ lead.cidade }}{% if lead.cidade and lead.estado %}/{% endif %}{{ lead.estado }} · {% endif %}{{ lead.origem }}

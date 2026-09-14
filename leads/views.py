@@ -94,9 +94,33 @@ def kanban(request):
     }
 
     origens = Origem.objects.filter(organizacao=org, ativo=True)
+
+    # Dataset pra busca cruzando abas: todo lead da organização, com a aba
+    # e a etapa já resolvidas em texto — a busca em si roda no navegador.
+    aba_por_status = {
+        Lead.Status.PENDENTE: "Cadência ativa",
+        Lead.Status.EM_ANDAMENTO: "Cadência ativa",
+        Lead.Status.PAUSADO: "Pausados",
+        Lead.Status.AGENDADA: "Agendados",
+        Lead.Status.SEM_RESPOSTA: "Sem resposta",
+        Lead.Status.PERDIDA: "Perdidos",
+    }
+    etapa_por_codigo = dict(Lead.Etapa.choices)
+    leads_busca = [
+        {
+            "id": lead.pk,
+            "nome": lead.nome,
+            "telefone": f"{lead.whatsapp} {lead.telefone}".strip(),
+            "status": lead.status,
+            "aba": aba_por_status.get(lead.status, ""),
+            "etapa": etapa_por_codigo.get(lead.etapa, ""),
+        }
+        for lead in leads_qs.only("id", "nome", "whatsapp", "telefone", "status", "etapa")
+    ]
+
     return render(
         request, "leads/kanban.html",
-        {"colunas": colunas, "contadores": contadores, "origens": origens},
+        {"colunas": colunas, "contadores": contadores, "origens": origens, "leads_busca": leads_busca},
     )
 
 
