@@ -251,7 +251,8 @@
                 <a class="{% if request.resolver_match.app_name == 'financeiro' %}ativo{% endif %}" href="{% url 'financeiro:relatorio' %}"><span class="icone">💰</span> Financeiro</a>
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'indicadores' %}ativo{% endif %}" href="{% url 'core:indicadores' %}"><span class="icone">📊</span> Indicadores</a>
                 <a href="{% url 'core:em_breve' modulo='Produtos e Estoque' %}"><span class="icone">📦</span> Produtos &amp; Estoque</a>
-                <a href="/admin/programas/programa/"><span class="icone">🗂️</span> Programas</a>
+                <a class="{% if request.resolver_match.app_name == 'programas' %}ativo{% endif %}" href="{% url 'programas:configuracoes' %}"><span class="icone">🗂️</span> Programas</a>
+                <a class="{% if request.resolver_match.app_name == 'profissionais' %}ativo{% endif %}" href="{% url 'profissionais:lista' %}"><span class="icone">🩺</span> Profissionais</a>
                 <a href="/admin/"><span class="icone">⚙️</span> Administração</a>
             </nav>
             <div class="rodape">

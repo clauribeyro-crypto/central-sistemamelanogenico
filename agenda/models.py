@@ -15,6 +15,18 @@ class TipoConsulta(ModeloDaOrganizacao):
         help_text="Cor em hexadecimal usada nos blocos e na legenda da agenda. Ex.: #7C3AED",
     )
     duracao_padrao_minutos = models.PositiveIntegerField(default=30)
+    valor = models.DecimalField(
+        "valor",
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text=(
+            "Valor cobrado nesse tipo de consulta. Ao agendar uma consulta "
+            "desse tipo, esse valor entra automaticamente no Financeiro como "
+            "receita prevista (pendente)."
+        ),
+    )
     ativo = models.BooleanField(default=True)
     ordem = models.PositiveIntegerField(default=0)
 

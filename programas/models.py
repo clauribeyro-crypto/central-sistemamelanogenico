@@ -107,6 +107,20 @@ class Acompanhamento(ModeloDaOrganizacao):
             ConsultaPrevista.objects.create(acompanhamento=acompanhamento, numero=numero)
         for numero in range(1, programa.qtd_kits + 1):
             KitPrevisto.objects.create(acompanhamento=acompanhamento, numero=numero)
+
+        # Gera automaticamente a receita prevista (pendente) do plano fechado.
+        from financeiro.models import Pagamento
+
+        Pagamento.objects.create(
+            organizacao=acompanhamento.organizacao,
+            paciente=paciente,
+            acompanhamento=acompanhamento,
+            valor=acompanhamento.valor_contratado - acompanhamento.desconto,
+            forma_pagamento=forma_pagamento,
+            status=Pagamento.Status.PENDENTE,
+            data_vencimento=data_inicio,
+        )
+
         return acompanhamento
 
     def jornada(self):
