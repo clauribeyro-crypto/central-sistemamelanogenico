@@ -1,12 +1,24 @@
 import datetime
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario
 
+from .forms import PagamentoForm
 from .models import Pagamento
+
+
+def _redirecionar_com_seguranca(request, destino_padrao):
+    proximo = request.POST.get("next") or request.GET.get("next")
+    if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        return redirect(proximo)
+    return redirect(destino_padrao)
 
 
 @login_required
@@ -63,3 +75,34 @@ def relatorio(request):
         "por_profissional": por_profissional,
     }
     return render(request, "financeiro/relatorio.html", contexto)
+
+
+@login_required
+def editar_pagamento(request, pk):
+    org = organizacao_do_usuario(request)
+    pagamento = get_object_or_404(Pagamento, pk=pk, organizacao=org)
+
+    if request.method == "POST":
+        form = PagamentoForm(request.POST, instance=pagamento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Lançamento atualizado.")
+            return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
+    else:
+        form = PagamentoForm(instance=pagamento)
+
+    proximo = request.GET.get("next", "")
+    return render(
+        request, "financeiro/editar_pagamento.html",
+        {"form": form, "pagamento": pagamento, "next": proximo},
+    )
+
+
+@login_required
+@require_POST
+def excluir_pagamento(request, pk):
+    org = organizacao_do_usuario(request)
+    pagamento = get_object_or_404(Pagamento, pk=pk, organizacao=org)
+    pagamento.delete()
+    messages.success(request, "Lançamento excluído.")
+    return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))

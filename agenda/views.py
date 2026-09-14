@@ -1,13 +1,17 @@
 import datetime
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario
+from financeiro.forms import PagamentoForm
+from financeiro.models import Pagamento
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
@@ -171,3 +175,63 @@ def criar_consulta_rapida(request):
         "dia": data_hora_local.date().isoformat(),
         "horario": _slot_de(_horarios_do_dia(org), data_hora_local.time()).strftime("%H:%M"),
     })
+
+
+@login_required
+def detalhe_consulta(request, pk):
+    """
+    Tela da consulta aberta ao clicar num agendamento já marcado na Agenda.
+    Reúne as informações da consulta e o gerenciamento do lançamento
+    financeiro vinculado (marcar como pago, editar valor, excluir), sem
+    precisar ir até o Financeiro separadamente.
+    """
+    org = organizacao_do_usuario(request)
+    consulta = get_object_or_404(
+        Consulta.objects.select_related("paciente", "profissional", "tipo_consulta"),
+        pk=pk, organizacao=org,
+    )
+    pagamento = Pagamento.objects.filter(consulta=consulta, organizacao=org).order_by("-criado_em").first()
+    pagamento_form = PagamentoForm(instance=pagamento) if pagamento else None
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+
+        if acao == "salvar_pagamento" and pagamento:
+            pagamento_form = PagamentoForm(request.POST, instance=pagamento)
+            if pagamento_form.is_valid():
+                pagamento_form.save()
+                messages.success(request, "Lançamento atualizado.")
+                return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "excluir_pagamento" and pagamento:
+            pagamento.delete()
+            messages.success(request, "Lançamento excluído.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "cancelar_consulta":
+            consulta.status = Consulta.Status.CANCELADA
+            consulta.save()  # dispara a sincronização automática do Financeiro
+            messages.success(
+                request,
+                "Consulta cancelada. O lançamento pendente vinculado (se houver) também foi cancelado.",
+            )
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "excluir_consulta":
+            semana_da_consulta = timezone.localtime(consulta.data_hora).date().isoformat()
+            tinha_pagamento = pagamento is not None
+            if pagamento:
+                pagamento.delete()
+            consulta.delete()
+            if tinha_pagamento:
+                messages.success(request, "Consulta excluída — o lançamento financeiro vinculado também foi removido.")
+            else:
+                messages.success(request, "Consulta excluída.")
+            return redirect(f"{reverse('agenda:semana')}?data={semana_da_consulta}")
+
+    contexto = {
+        "consulta": consulta,
+        "pagamento": pagamento,
+        "pagamento_form": pagamento_form,
+    }
+    return render(request, "agenda/detalhe_consulta.html", contexto)
