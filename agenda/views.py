@@ -10,8 +10,8 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario
-from financeiro.forms import PagamentoForm
-from financeiro.models import Pagamento
+from financeiro.forms import PagamentoForm, RecebimentoForm
+from financeiro.models import Pagamento, Recebimento
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
@@ -212,7 +212,8 @@ def detalhe_consulta(request, pk):
         pk=pk, organizacao=org,
     )
     pagamento = Pagamento.objects.filter(consulta=consulta, organizacao=org).order_by("-criado_em").first()
-    pagamento_form = PagamentoForm(instance=pagamento) if pagamento else None
+    pagamento_form = None
+    recebimento_form = None
 
     if request.method == "POST":
         acao = request.POST.get("acao")
@@ -223,6 +224,24 @@ def detalhe_consulta(request, pk):
                 pagamento_form.save()
                 messages.success(request, "Lançamento atualizado.")
                 return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "adicionar_recebimento" and pagamento:
+            recebimento_form = RecebimentoForm(request.POST, pagamento=pagamento)
+            if recebimento_form.is_valid():
+                recebimento = recebimento_form.save(commit=False)
+                recebimento.organizacao = org
+                recebimento.pagamento = pagamento
+                recebimento.save()
+                messages.success(request, "Recebimento registrado.")
+                return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "excluir_recebimento" and pagamento:
+            recebimento = get_object_or_404(
+                Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
+            )
+            recebimento.delete()
+            messages.success(request, "Recebimento excluído.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
         elif acao == "excluir_pagamento" and pagamento:
             pagamento.delete()
@@ -250,9 +269,17 @@ def detalhe_consulta(request, pk):
                 messages.success(request, "Consulta excluída.")
             return redirect(f"{reverse('agenda:semana')}?data={semana_da_consulta}")
 
+    if pagamento and pagamento_form is None:
+        pagamento_form = PagamentoForm(instance=pagamento)
+    if pagamento and recebimento_form is None:
+        recebimento_form = RecebimentoForm(pagamento=pagamento)
+
     contexto = {
         "consulta": consulta,
         "pagamento": pagamento,
         "pagamento_form": pagamento_form,
+        "recebimento_form": recebimento_form,
+        "recebimentos": pagamento.recebimentos.all() if pagamento else [],
+        "next": "",
     }
     return render(request, "agenda/detalhe_consulta.html", contexto)

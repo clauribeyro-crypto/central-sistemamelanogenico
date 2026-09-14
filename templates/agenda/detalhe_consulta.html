@@ -36,13 +36,11 @@
         </div>
     </div>
 
-    <div class="card">
-        <h2 style="margin-top:0;">Financeiro</h2>
-        {% if pagamento %}
-            <p style="color:var(--text-muted);">
-                Status atual: <strong>{{ pagamento.get_status_display }}</strong>
-                {% if pagamento.status == pagamento.Status.PAGO %} — {{ pagamento.get_forma_pagamento_display }}{% if pagamento.data_pagamento %}, em {{ pagamento.data_pagamento|date:"d/m/Y" }}{% endif %}{% endif %}
-            </p>
+    {% if pagamento %}
+        {% include "financeiro/_recebimentos.html" %}
+
+        <div class="card">
+            <h2 style="margin-top:0;">Editar valor e vencimento</h2>
             <form method="post" class="acao">
                 {% csrf_token %}
                 <input type="hidden" name="acao" value="salvar_pagamento">
@@ -53,15 +51,18 @@
                         {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
                     </div>
                 {% endfor %}
-                <button class="btn" type="submit">Salvar lançamento</button>
+                <button class="btn" type="submit">Salvar</button>
             </form>
-            <form method="post" style="margin-top:1rem;" onsubmit="return confirm('Excluir o lançamento financeiro desta consulta?');">
+            <form method="post" style="margin-top:1rem;" onsubmit="return confirm('Excluir o lançamento financeiro desta consulta (e todos os recebimentos vinculados)?');">
                 {% csrf_token %}
                 <input type="hidden" name="acao" value="excluir_pagamento">
                 <button class="btn btn-secondary" type="submit" style="color:#8f2e45;">Excluir lançamento</button>
             </form>
-        {% else %}
+        </div>
+    {% else %}
+        <div class="card">
+            <h2 style="margin-top:0;">Financeiro</h2>
             <p style="color:var(--text-muted);">Nenhum lançamento financeiro gerado para esta consulta (o tipo de consulta não tem valor cadastrado, ou o valor foi definido como 0 no agendamento).</p>
-        {% endif %}
-    </div>
+        </div>
+    {% endif %}
 {% endblock %}
