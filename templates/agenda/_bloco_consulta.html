@@ -1,0 +1,5 @@
+<a class="bloco-consulta" style="background:{{ consulta.tipo_consulta.cor }};"
+   href="/admin/agenda/consulta/{{ consulta.pk }}/change/">
+    {{ consulta.data_hora|time:"H:i" }} — {{ consulta.paciente }}<br>
+    {{ consulta.tipo_consulta }} · {{ consulta.profissional }}
+</a>
