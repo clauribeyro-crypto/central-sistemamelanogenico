@@ -23,6 +23,10 @@ class ConsultaRapidaForm(forms.Form):
     data = forms.DateField()
     hora = forms.TimeField()
     duracao_minutos = forms.IntegerField(min_value=5, initial=30)
+    valor = forms.DecimalField(
+        max_digits=10, decimal_places=2, min_value=0, required=False,
+        help_text="Preenchido automaticamente pelo tipo de consulta — pode ser personalizado.",
+    )
     observacoes = forms.CharField(required=False, widget=forms.Textarea)
 
     def __init__(self, *args, organizacao=None, **kwargs):

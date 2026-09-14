@@ -1,5 +1,9 @@
 <a class="bloco-consulta" style="background:{{ consulta.tipo_consulta.cor }};"
-   href="/admin/agenda/consulta/{{ consulta.pk }}/change/">
+   href="{% url 'agenda:detalhe_consulta' consulta.pk %}"
+   title="{{ consulta.paciente }} — {{ consulta.tipo_consulta }}{% if consulta.valor %} — R$ {{ consulta.valor|floatformat:2 }}{% endif %}">
     {{ consulta.data_hora|time:"H:i" }} — {{ consulta.paciente }}<br>
     {{ consulta.tipo_consulta }} · {{ consulta.profissional }}
+    {% if consulta.valor %}
+        <br><span class="bloco-consulta-valor">R$ {{ consulta.valor|floatformat:2 }}</span>
+    {% endif %}
 </a>

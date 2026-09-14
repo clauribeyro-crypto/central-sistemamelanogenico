@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Consulta — {{ consulta.paciente }} · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'agenda:semana' %}?data={{ consulta.data_hora|date:'Y-m-d' }}">← Voltar para a agenda</a></p>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+            <div>
+                <h1 style="margin-bottom:.25rem;">{{ consulta.paciente }}</h1>
+                <p style="color:var(--text-muted); margin-top:0;">
+                    <span style="display:inline-block; width:.8rem; height:.8rem; border-radius:50%; background:{{ consulta.tipo_consulta.cor }}; margin-right:.3rem; vertical-align:middle;"></span>
+                    {{ consulta.tipo_consulta }} · {{ consulta.profissional }}<br>
+                    {{ consulta.data_hora|date:"d/m/Y" }} às {{ consulta.data_hora|time:"H:i" }} · {{ consulta.duracao_minutos }} min
+                </p>
+            </div>
+            <span class="badge">{{ consulta.get_status_display }}</span>
+        </div>
+        {% if consulta.observacoes %}
+            <p><strong>Observações:</strong> {{ consulta.observacoes }}</p>
+        {% endif %}
+        <p style="font-size:.82rem;"><a href="/admin/agenda/consulta/{{ consulta.pk }}/change/">Editar profissional, tipo, data ou duração (administração) ›</a></p>
+
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem;">
+            {% if consulta.status != "CANCELADA" and consulta.status != "REALIZADA" %}
+                <form method="post" onsubmit="return confirm('Cancelar esta consulta? O lançamento financeiro pendente vinculado (se houver) também será cancelado.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="cancelar_consulta">
+                    <button class="btn btn-secondary" type="submit">Cancelar consulta</button>
+                </form>
+            {% endif %}
+            <form method="post" onsubmit="return confirm('Excluir esta consulta{% if pagamento %} e o lançamento financeiro vinculado (R$ {{ pagamento.valor|floatformat:2 }}, {{ pagamento.get_status_display }}){% endif %}? Essa ação não pode ser desfeita.');">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="excluir_consulta">
+                <button class="btn btn-secondary" type="submit" style="color:#8f2e45;">Excluir consulta</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Financeiro</h2>
+        {% if pagamento %}
+            <p style="color:var(--text-muted);">
+                Status atual: <strong>{{ pagamento.get_status_display }}</strong>
+                {% if pagamento.status == pagamento.Status.PAGO %} — {{ pagamento.get_forma_pagamento_display }}{% if pagamento.data_pagamento %}, em {{ pagamento.data_pagamento|date:"d/m/Y" }}{% endif %}{% endif %}
+            </p>
+            <form method="post" class="acao">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="salvar_pagamento">
+                {% for field in pagamento_form %}
+                    <div>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endfor %}
+                <button class="btn" type="submit">Salvar lançamento</button>
+            </form>
+            <form method="post" style="margin-top:1rem;" onsubmit="return confirm('Excluir o lançamento financeiro desta consulta?');">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="excluir_pagamento">
+                <button class="btn btn-secondary" type="submit" style="color:#8f2e45;">Excluir lançamento</button>
+            </form>
+        {% else %}
+            <p style="color:var(--text-muted);">Nenhum lançamento financeiro gerado para esta consulta (o tipo de consulta não tem valor cadastrado, ou o valor foi definido como 0 no agendamento).</p>
+        {% endif %}
+    </div>
+{% endblock %}

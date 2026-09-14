@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -120,6 +122,11 @@ class Lead(ModeloDaOrganizacao):
     nome = models.CharField("nome do paciente", max_length=150)
     whatsapp = models.CharField(max_length=20)
     telefone = models.CharField(max_length=20, blank=True)
+    cidade = models.CharField(max_length=100, blank=True)
+    estado = models.CharField(
+        "estado (UF)", max_length=2, blank=True,
+        help_text="Sigla do estado, ex.: SP, RJ, MG.",
+    )
     origem = models.ForeignKey(Origem, on_delete=models.PROTECT, related_name="leads")
     responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -187,13 +194,73 @@ class Lead(ModeloDaOrganizacao):
             return False
         return bool(self.proxima_acao_em and self.proxima_acao_em <= timezone.now())
 
+    @property
+    def proxima_consulta(self):
+        """Consulta (ativa, não cancelada) vinculada a este lead, para exibir na aba Agendados."""
+        return self.consultas.exclude(status="CANCELADA").order_by("-data_hora").first()
+
     def registrar_historico(self, tipo, descricao, responsavel=None):
         return self.historico.create(tipo=tipo, descricao=descricao, responsavel=responsavel)
+
+    @classmethod
+    def buscar_por_paciente(cls, organizacao, paciente):
+        """
+        Procura, entre os leads em cadência ativa, um que corresponda ao
+        telefone ou nome dessa paciente — usado para vincular automaticamente
+        o lead à consulta que acabou de ser agendada na Agenda.
+        """
+        filtro = models.Q(nome__iexact=paciente.nome)
+        if paciente.telefone:
+            filtro |= models.Q(whatsapp=paciente.telefone) | models.Q(telefone=paciente.telefone)
+        return cls.objects.filter(
+            organizacao=organizacao, status__in=[cls.Status.PENDENTE, cls.Status.EM_ANDAMENTO],
+        ).filter(filtro).order_by("-entrou_em").first()
+
+    def encontrar_consulta_correspondente(self):
+        """
+        Fallback manual (arrastar o card pra aba Agendados): procura uma
+        consulta já agendada para essa paciente/lead, pelo vínculo direto
+        (`paciente`) ou por telefone/nome, quando o vínculo automático não
+        pegou por algum motivo.
+        """
+        from agenda.models import Consulta
+
+        qs = Consulta.objects.filter(organizacao=self.organizacao).exclude(status="CANCELADA")
+        if self.paciente_id:
+            qs = qs.filter(paciente_id=self.paciente_id)
+        else:
+            filtro = models.Q(paciente__nome__iexact=self.nome)
+            if self.whatsapp:
+                filtro |= models.Q(paciente__telefone=self.whatsapp)
+            if self.telefone:
+                filtro |= models.Q(paciente__telefone=self.telefone)
+            qs = qs.filter(filtro)
+        return qs.order_by("-data_hora").first()
+
+    def marcar_agendada(self, consulta=None, responsavel=None):
+        """Move o lead para a aba "Agendados", vinculando a consulta encontrada, se houver."""
+        self.status = self.Status.AGENDADA
+        if consulta:
+            self.paciente = consulta.paciente
+            if consulta.lead_id != self.pk:
+                consulta.lead = self
+                consulta.save(update_fields=["lead"])
+        self.save(update_fields=["status", "paciente", "atualizado_em"])
+        descricao = "Consulta agendada"
+        if consulta:
+            data_hora_local = timezone.localtime(consulta.data_hora)
+            descricao += f" para {data_hora_local:%d/%m/%Y %H:%M} ({consulta.tipo_consulta})"
+        self.registrar_historico(HistoricoLead.Tipo.AGENDAMENTO, descricao, responsavel)
 
     ORDEM_ETAPAS = [
         Etapa.NOVO, Etapa.CONTATO_1, Etapa.CONTATO_2,
         Etapa.CONTATO_3, Etapa.CONTATO_4, Etapa.CONCLUIDA,
     ]
+
+    # As etapas exibidas como colunas no board (kanban) — a cadência
+    # automática ainda usa CONCLUIDA como estado terminal de "sem resposta",
+    # mas essa etapa não tem coluna própria no board.
+    ETAPAS_KANBAN = [Etapa.NOVO, Etapa.CONTATO_1, Etapa.CONTATO_2, Etapa.CONTATO_3, Etapa.CONTATO_4]
 
     def avancar_etapa(self):
         """Move a cadência para a próxima etapa e zera o contador de tentativas."""
@@ -204,6 +271,44 @@ class Lead(ModeloDaOrganizacao):
         if self.etapa == self.Etapa.CONCLUIDA:
             self.status = self.Status.SEM_RESPOSTA
         self.save(update_fields=["etapa", "tentativas_etapa_atual", "status", "atualizado_em"])
+
+    def mover_para_etapa(self, nova_etapa, responsavel=None):
+        """Move o lead manualmente para outra etapa (arrastar o card no board)."""
+        if nova_etapa == self.etapa:
+            return
+        etapa_anterior = self.get_etapa_display()
+        self.etapa = nova_etapa
+        self.tentativas_etapa_atual = 0
+        self.status = self.Status.PENDENTE if nova_etapa == self.Etapa.NOVO else self.Status.EM_ANDAMENTO
+        self.save(update_fields=["etapa", "tentativas_etapa_atual", "status", "atualizado_em"])
+        self.registrar_historico(
+            HistoricoLead.Tipo.STATUS,
+            f"Movido manualmente de {etapa_anterior} para {self.get_etapa_display()} (arrastar no board)",
+            responsavel,
+        )
+
+    def marcar_respondido(self, responsavel=None):
+        """
+        Botão rápido do card no board: avança a cadência por resposta da lead,
+        sem precisar abrir a tela de detalhe. Para na última etapa da cadência
+        (4º contato) — não empurra sozinho para "cadência concluída".
+        """
+        indice = self.ORDEM_ETAPAS.index(self.etapa)
+        indice_maximo = self.ORDEM_ETAPAS.index(self.Etapa.CONTATO_4)
+        etapa_anterior = self.get_etapa_display()
+        if indice < indice_maximo:
+            self.etapa = self.ORDEM_ETAPAS[indice + 1]
+        self.status = self.Status.EM_ANDAMENTO
+        self.tentativas_etapa_atual = 0
+        self.ultimo_contato_em = timezone.now()
+        self.save(update_fields=[
+            "etapa", "tentativas_etapa_atual", "status", "ultimo_contato_em", "atualizado_em",
+        ])
+        self.registrar_historico(
+            HistoricoLead.Tipo.RESPOSTA,
+            f"Marcado como respondido — avançou de {etapa_anterior} para {self.get_etapa_display()}",
+            responsavel,
+        )
 
 
 class HistoricoLead(models.Model):
@@ -254,3 +359,77 @@ class PausaLead(models.Model):
 
     def __str__(self):
         return f"Pausa de {self.lead} até {self.data_retomada_prevista:%d/%m/%Y}"
+
+
+class WebhookImportacao(ModeloDaOrganizacao):
+    """
+    Endpoint automático de entrada de leads (ex.: um Google Apps Script
+    vinculado à planilha do Respondi, disparado a cada nova resposta de
+    formulário, fazendo um POST pra esse webhook). O token na URL funciona
+    como a senha de acesso — não tem outra autenticação.
+    """
+
+    token = models.CharField(max_length=64, unique=True, editable=False)
+    origem_padrao = models.ForeignKey(
+        Origem, on_delete=models.PROTECT, related_name="webhooks_importacao",
+        help_text="Origem atribuída aos leads recebidos por aqui quando o envio não informar uma.",
+    )
+    ativo = models.BooleanField(default=True)
+    total_recebidos = models.PositiveIntegerField(default=0)
+    total_duplicados = models.PositiveIntegerField(default=0)
+    ultimo_recebido_em = models.DateTimeField(blank=True, null=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "webhook de importação de leads"
+        verbose_name_plural = "webhooks de importação de leads"
+
+    def __str__(self):
+        return f"Importação automática — {self.organizacao}"
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
+
+    def gerar_novo_token(self):
+        self.token = secrets.token_urlsafe(32)
+        self.save(update_fields=["token"])
+
+    def registrar_lead_importado(self, *, nome, telefone, origem=None, data_primeiro_contato=None):
+        """
+        Cria o lead se o telefone ainda não existir nesta organização (evita
+        duplicados). Retorna (lead, criado, motivo) — motivo explica por que
+        não criou, quando `criado` é False.
+        """
+        nome = (nome or "").strip()
+        telefone_normalizado = "".join(ch for ch in (telefone or "") if ch.isdigit())
+
+        if not nome or not telefone_normalizado:
+            return None, False, "Nome e telefone são obrigatórios."
+
+        ja_existe = Lead.objects.filter(
+            organizacao=self.organizacao,
+        ).filter(
+            models.Q(whatsapp=telefone_normalizado) | models.Q(telefone=telefone_normalizado)
+        ).first()
+        if ja_existe:
+            self.total_duplicados += 1
+            self.ultimo_recebido_em = timezone.now()
+            self.save(update_fields=["total_duplicados", "ultimo_recebido_em"])
+            return ja_existe, False, "Já existe um lead com esse telefone."
+
+        lead = Lead.objects.create(
+            organizacao=self.organizacao,
+            nome=nome,
+            whatsapp=telefone_normalizado,
+            origem=origem or self.origem_padrao,
+            entrou_em=data_primeiro_contato or timezone.now(),
+        )
+        lead.registrar_historico(
+            HistoricoLead.Tipo.ENTRADA, "Lead importado automaticamente (Respondi/planilha)", None
+        )
+        self.total_recebidos += 1
+        self.ultimo_recebido_em = timezone.now()
+        self.save(update_fields=["total_recebidos", "ultimo_recebido_em"])
+        return lead, True, ""

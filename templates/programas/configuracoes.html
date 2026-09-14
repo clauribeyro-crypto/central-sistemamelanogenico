@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Tipos de consulta & planos · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Tipos de consulta &amp; planos de acompanhamento</h1>
+
+    <div class="tabs">
+        <a class="{% if aba_atual == 'tipos' %}ativo{% endif %}" href="?aba=tipos">Tipos de consulta</a>
+        <a class="{% if aba_atual == 'planos' %}ativo{% endif %}" href="?aba=planos">Planos de acompanhamento</a>
+    </div>
+
+    {% if aba_atual == 'tipos' %}
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <p style="color:var(--text-muted); margin:0;">Aparecem na agenda com a cor escolhida. Definir um valor cria automaticamente uma receita prevista no Financeiro ao agendar.</p>
+            <a class="btn" href="{% url 'programas:tipo_criar' %}">+ Novo tipo de consulta</a>
+        </div>
+        <div class="card">
+            {% if tipos_consulta %}
+                <table>
+                    <thead>
+                        <tr><th>Cor</th><th>Nome</th><th>Duração padrão</th><th>Valor</th><th>Status</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for tipo in tipos_consulta %}
+                        <tr>
+                            <td><span style="display:inline-block; width:.9rem; height:.9rem; border-radius:50%; background:{{ tipo.cor }};"></span></td>
+                            <td>{{ tipo.nome }}</td>
+                            <td>{{ tipo.duracao_padrao_minutos }} min</td>
+                            <td>{% if tipo.valor %}R$ {{ tipo.valor|floatformat:2 }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                            <td>
+                                {% if tipo.ativo %}<span class="badge">Ativo</span>
+                                {% else %}<span style="color:var(--text-muted);">Inativo</span>{% endif %}
+                            </td>
+                            <td><a href="{% url 'programas:tipo_editar' tipo.pk %}">Editar ›</a></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nenhum tipo de consulta cadastrado ainda. <a href="{% url 'programas:tipo_criar' %}">Cadastre o primeiro</a>.</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <p style="color:var(--text-muted); margin:0;">Planos de acompanhamento contratáveis pelas pacientes. Você pode personalizar o valor de cada plano ao fechar com uma paciente específica.</p>
+            <a class="btn" href="{% url 'programas:plano_criar' %}">+ Novo plano</a>
+        </div>
+        <div class="card">
+            {% if programas %}
+                <table>
+                    <thead>
+                        <tr><th>Nome</th><th>Duração</th><th>Valor</th><th>À vista</th><th>Consultas</th><th>Kits</th><th>Status</th><th></th></tr>
+                    </thead>
+                    <tbody>
+                    {% for plano in programas %}
+                        <tr>
+                            <td>{{ plano.nome }}</td>
+                            <td>{{ plano.duracao_meses }} {% if plano.duracao_meses == 1 %}mês{% else %}meses{% endif %}</td>
+                            <td>R$ {{ plano.valor|floatformat:2 }}</td>
+                            <td>{% if plano.valor_a_vista %}R$ {{ plano.valor_a_vista|floatformat:2 }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                            <td>{{ plano.qtd_consultas }}</td>
+                            <td>{{ plano.qtd_kits }}</td>
+                            <td>
+                                {% if plano.ativo %}<span class="badge">Ativo</span>
+                                {% else %}<span style="color:var(--text-muted);">Inativo</span>{% endif %}
+                            </td>
+                            <td><a href="{% url 'programas:plano_editar' plano.pk %}">Editar ›</a></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nenhum plano cadastrado ainda. <a href="{% url 'programas:plano_criar' %}">Cadastre o primeiro</a>.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

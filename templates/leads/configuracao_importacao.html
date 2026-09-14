@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Importação automática de leads · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'leads:kanban' %}">← Voltar pro CRM</a></p>
+    <h1>Importação automática de leads</h1>
+    <p style="color:var(--text-muted); max-width:640px;">
+        Recebe leads automaticamente de fora do sistema (ex.: um Google Apps Script
+        vinculado à planilha que o Respondi alimenta, disparando a cada nova resposta
+        de formulário). Leads com telefone já cadastrado são ignorados automaticamente
+        (sem duplicar).
+    </p>
+
+    {% if not webhook %}
+        <div class="card">
+            <p>Nenhum webhook criado ainda.</p>
+            <form method="post" class="acao">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="criar">
+                <button class="btn" type="submit">Criar webhook de importação</button>
+            </form>
+        </div>
+    {% else %}
+        <div class="card">
+            <h2 style="margin-top:0;">URL do webhook</h2>
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                É essa URL que a planilha (via Google Apps Script) ou o Respondi (se ele tiver
+                integração por webhook) deve chamar com um POST a cada novo lead. O token na
+                URL já é a senha de acesso.
+            </p>
+            <input type="text" readonly value="{{ url_webhook }}" style="width:100%; font-family:monospace; font-size:.82rem;" onclick="this.select();">
+
+            <div style="display:flex; gap:.75rem; align-items:center; margin-top:1rem; flex-wrap:wrap;">
+                <span class="badge {% if not webhook.ativo %}badge-neutro{% endif %}">
+                    {% if webhook.ativo %}Ativo{% else %}Inativo{% endif %}
+                </span>
+                <span style="font-size:.85rem; color:var(--text-muted);">
+                    {{ webhook.total_recebidos }} recebido{{ webhook.total_recebidos|pluralize }} ·
+                    {{ webhook.total_duplicados }} duplicado{{ webhook.total_duplicados|pluralize }} ignorado{{ webhook.total_duplicados|pluralize }}
+                    {% if webhook.ultimo_recebido_em %} · último em {{ webhook.ultimo_recebido_em|date:"d/m/Y H:i" }}{% endif %}
+                </span>
+            </div>
+
+            <div style="display:flex; gap:.5rem; margin-top:1rem; flex-wrap:wrap;">
+                <form method="post" onsubmit="return confirm('Regenerar o token invalida a URL atual — quem estiver usando a URL antiga vai parar de conseguir enviar leads. Continuar?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="regenerar_token">
+                    <button class="btn btn-secondary" type="submit">Regenerar token</button>
+                </form>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="alternar_ativo">
+                    <button class="btn btn-secondary" type="submit">{% if webhook.ativo %}Desativar{% else %}Ativar{% endif %}</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top:0;">Origem padrão</h2>
+            <p style="font-size:.85rem; color:var(--text-muted);">Usada quando o envio não informar uma origem.</p>
+            <form method="post" class="acao" style="max-width:320px;">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="mudar_origem">
+                <select name="origem_padrao">
+                    {% for origem in origens %}
+                        <option value="{{ origem.pk }}" {% if origem.pk == webhook.origem_padrao_id %}selected{% endif %}>{{ origem.nome }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn" type="submit">Salvar</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2 style="margin-top:0;">Formato esperado</h2>
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                O POST pode ser form-urlencoded ou JSON, com estes campos:
+            </p>
+            <table>
+                <thead><tr><th>Campo</th><th>Obrigatório</th><th>Observação</th></tr></thead>
+                <tbody>
+                    <tr><td><code>nome</code></td><td>Sim</td><td>—</td></tr>
+                    <tr><td><code>telefone</code></td><td>Sim</td><td>Aceita <code>whatsapp</code> ou <code>phone</code> também. Só os números já resolvem — o sistema limpa formatação.</td></tr>
+                    <tr><td><code>origem</code></td><td>Não</td><td>Nome de uma origem já cadastrada; se não bater com nenhuma ou vier em branco, usa a origem padrão acima.</td></tr>
+                    <tr><td><code>data</code></td><td>Não</td><td>Data/hora do primeiro contato (ex.: <code>2026-09-14 10:00:00</code> ou <code>14/09/2026 10:00:00</code>); se não vier, usa o momento do recebimento.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+{% endblock %}

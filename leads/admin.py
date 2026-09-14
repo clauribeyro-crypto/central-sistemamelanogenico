@@ -2,7 +2,10 @@ from django.contrib import admin
 
 from contas.admin import OrganizacaoAdminMixin
 
-from .models import HistoricoLead, Lead, MensagemModelo, MotivoPerda, Origem, PausaLead, ProvaSocial
+from .models import (
+    HistoricoLead, Lead, MensagemModelo, MotivoPerda, Origem, PausaLead,
+    ProvaSocial, WebhookImportacao,
+)
 
 
 @admin.register(Origem)
@@ -61,3 +64,10 @@ class LeadAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     autocomplete_fields = ("origem", "perdido_motivo", "paciente")
     date_hierarchy = "entrou_em"
     inlines = [PausaLeadInline, HistoricoLeadInline]
+
+
+@admin.register(WebhookImportacao)
+class WebhookImportacaoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
+    list_display = ("organizacao", "origem_padrao", "ativo", "total_recebidos", "total_duplicados", "ultimo_recebido_em")
+    readonly_fields = ("token", "total_recebidos", "total_duplicados", "ultimo_recebido_em", "criado_em")
+    autocomplete_fields = ("origem_padrao",)

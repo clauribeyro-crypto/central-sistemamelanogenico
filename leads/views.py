@@ -1,20 +1,26 @@
+import json
 from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
 from pacientes.models import Paciente
 
 from .forms import (
-    AgendarConsultaForm, EnviarWhatsAppForm, PausarCadenciaForm,
+    AgendarConsultaForm, EnviarWhatsAppForm, NovoLeadForm, PausarCadenciaForm,
     PerderLeadForm, RegistrarLigacaoForm, ResultadoContatoForm,
 )
-from .models import HistoricoLead, Lead, MensagemModelo
+from .models import HistoricoLead, Lead, MensagemModelo, Origem, WebhookImportacao
 
 MENSAGENS_PADRAO = {
     MensagemModelo.Etapa.CONTATO_1: (
@@ -87,7 +93,71 @@ def kanban(request):
         for chave, status in status_por_filtro.items()
     }
 
-    return render(request, "leads/kanban.html", {"colunas": colunas, "contadores": contadores})
+    origens = Origem.objects.filter(organizacao=org, ativo=True)
+    return render(
+        request, "leads/kanban.html",
+        {"colunas": colunas, "contadores": contadores, "origens": origens},
+    )
+
+
+@login_required
+@require_POST
+def criar_lead(request):
+    """Cadastro rápido de lead direto no board (botão "+ Novo lead")."""
+    org = organizacao_do_usuario(request)
+    form = NovoLeadForm(request.POST, organizacao=org)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": form.errors.get_json_data()}, status=400)
+
+    lead = form.save(commit=False)
+    lead.organizacao = org
+    lead.status = Lead.Status.PENDENTE
+    lead.etapa = Lead.Etapa.NOVO
+    lead.save()
+    lead.registrar_historico(HistoricoLead.Tipo.ENTRADA, "Lead cadastrada manualmente pelo board", request.user)
+
+    html = render_to_string("leads/_lead_card.html", {"lead": lead}, request=request)
+    return JsonResponse({"ok": True, "html": html, "etapa": lead.etapa})
+
+
+@login_required
+@require_POST
+def mover_etapa(request, pk):
+    """Arrastar e soltar o card entre colunas do board."""
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    nova_etapa = request.POST.get("etapa")
+    if nova_etapa not in Lead.ETAPAS_KANBAN:
+        return JsonResponse({"ok": False, "erro": "Etapa inválida."}, status=400)
+    lead.mover_para_etapa(nova_etapa, responsavel=request.user)
+    return JsonResponse({"ok": True, "etapa": lead.etapa})
+
+
+@login_required
+@require_POST
+def marcar_respondido_rapido(request, pk):
+    """Botão rápido do card: avança a cadência sem abrir a tela de detalhe."""
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    lead.marcar_respondido(responsavel=request.user)
+    html = render_to_string("leads/_lead_card.html", {"lead": lead}, request=request)
+    return JsonResponse({"ok": True, "etapa": lead.etapa, "html": html})
+
+
+@login_required
+@require_POST
+def mover_para_agendados(request, pk):
+    """
+    Fallback manual: arrastar o card do board direto pra aba "Agendados",
+    para quando o vínculo automático (por telefone/nome) não pegar sozinho.
+    Tenta achar a consulta correspondente para exibir na aba; se não achar,
+    move o lead mesmo assim.
+    """
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    consulta = lead.encontrar_consulta_correspondente()
+    lead.marcar_agendada(consulta=consulta, responsavel=request.user)
+    return JsonResponse({"ok": True})
 
 
 @login_required
@@ -315,3 +385,95 @@ def agendar(request, pk):
     else:
         form = AgendarConsultaForm(organizacao=org)
     return render(request, "leads/agendar.html", {"lead": lead, "form": form})
+
+
+@csrf_exempt
+@require_POST
+def webhook_importar_lead(request, token):
+    """
+    Recebe leads automaticamente de fora do sistema (ex.: um Google Apps
+    Script vinculado à planilha do Respondi, disparado a cada nova resposta
+    de formulário). O token na URL é a autenticação — sem sessão, sem CSRF.
+    Aceita tanto JSON quanto form-urlencoded no corpo do POST.
+    """
+    webhook = WebhookImportacao.objects.filter(token=token, ativo=True).first()
+    if not webhook:
+        return JsonResponse({"ok": False, "erro": "Token inválido."}, status=404)
+
+    if request.content_type == "application/json":
+        try:
+            dados = json.loads(request.body or "{}")
+        except ValueError:
+            return JsonResponse({"ok": False, "erro": "JSON inválido."}, status=400)
+    else:
+        dados = request.POST
+
+    nome = dados.get("nome") or dados.get("name") or ""
+    telefone = dados.get("telefone") or dados.get("whatsapp") or dados.get("phone") or ""
+
+    origem = None
+    nome_origem = (dados.get("origem") or "").strip()
+    if nome_origem:
+        origem = Origem.objects.filter(organizacao=webhook.organizacao, nome__iexact=nome_origem).first()
+
+    data_primeiro_contato = None
+    valor_data = dados.get("data") or dados.get("data_primeiro_contato") or dados.get("timestamp")
+    if valor_data:
+        data_primeiro_contato = parse_datetime(valor_data)
+        if not data_primeiro_contato:
+            # aceita também "dd/mm/aaaa hh:mm:ss", formato comum de planilha do Google
+            try:
+                data_primeiro_contato = timezone.datetime.strptime(valor_data, "%d/%m/%Y %H:%M:%S")
+            except ValueError:
+                data_primeiro_contato = None
+        if data_primeiro_contato and timezone.is_naive(data_primeiro_contato):
+            data_primeiro_contato = timezone.make_aware(data_primeiro_contato)
+
+    lead, criado, motivo = webhook.registrar_lead_importado(
+        nome=nome, telefone=telefone, origem=origem, data_primeiro_contato=data_primeiro_contato,
+    )
+    if lead is None:
+        return JsonResponse({"ok": False, "erro": motivo}, status=400)
+    return JsonResponse({"ok": True, "criado": criado, "lead_id": lead.pk, "motivo": motivo})
+
+
+@login_required
+def configuracao_importacao(request):
+    """Tela de configuração do webhook de importação automática de leads."""
+    org = organizacao_do_usuario(request)
+    webhook = WebhookImportacao.objects.filter(organizacao=org).first()
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+        if acao == "criar" and not webhook:
+            origem_padrao = Origem.objects.filter(organizacao=org, ativo=True).first()
+            if not origem_padrao:
+                messages.error(request, "Cadastre pelo menos uma origem de lead antes de criar o webhook.")
+                return redirect("leads:configuracao_importacao")
+            webhook = WebhookImportacao.objects.create(organizacao=org, origem_padrao=origem_padrao)
+            messages.success(request, "Webhook de importação criado.")
+        elif acao == "regenerar_token" and webhook:
+            webhook.gerar_novo_token()
+            messages.success(request, "Token regenerado — atualize a URL onde ela estiver configurada.")
+        elif acao == "mudar_origem" and webhook:
+            nova_origem = get_object_or_404(Origem, pk=request.POST.get("origem_padrao"), organizacao=org)
+            webhook.origem_padrao = nova_origem
+            webhook.save(update_fields=["origem_padrao"])
+            messages.success(request, "Origem padrão atualizada.")
+        elif acao == "alternar_ativo" and webhook:
+            webhook.ativo = not webhook.ativo
+            webhook.save(update_fields=["ativo"])
+            messages.success(request, "Webhook ativado." if webhook.ativo else "Webhook desativado.")
+        return redirect("leads:configuracao_importacao")
+
+    url_webhook = None
+    if webhook:
+        url_webhook = request.build_absolute_uri(
+            reverse("leads:webhook_importar_lead", kwargs={"token": webhook.token})
+        )
+    contexto = {
+        "webhook": webhook,
+        "url_webhook": url_webhook,
+        "origens": Origem.objects.filter(organizacao=org, ativo=True),
+    }
+    return render(request, "leads/configuracao_importacao.html", contexto)

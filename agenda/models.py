@@ -15,6 +15,18 @@ class TipoConsulta(ModeloDaOrganizacao):
         help_text="Cor em hexadecimal usada nos blocos e na legenda da agenda. Ex.: #7C3AED",
     )
     duracao_padrao_minutos = models.PositiveIntegerField(default=30)
+    valor = models.DecimalField(
+        "valor",
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text=(
+            "Valor cobrado nesse tipo de consulta. Ao agendar uma consulta "
+            "desse tipo, esse valor entra automaticamente no Financeiro como "
+            "receita prevista (pendente)."
+        ),
+    )
     ativo = models.BooleanField(default=True)
     ordem = models.PositiveIntegerField(default=0)
 
@@ -105,6 +117,19 @@ class Consulta(ModeloDaOrganizacao):
     )
     motivo = models.CharField("motivo da consulta", max_length=255, blank=True)
     observacoes = models.TextField(blank=True)
+    valor = models.DecimalField(
+        "valor cobrado",
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text=(
+            "Valor cobrado nesta consulta (pode ser diferente do valor padrão "
+            "do tipo de consulta, para personalizar por paciente). Gera "
+            "automaticamente a receita prevista no Financeiro; deixe em 0 "
+            "para não cobrar por esta consulta."
+        ),
+    )
 
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -120,3 +145,11 @@ class Consulta(ModeloDaOrganizacao):
 
     def __str__(self):
         return f"{self.paciente} com {self.profissional} em {self.data_hora:%d/%m/%Y %H:%M}"
+
+    def save(self, *args, **kwargs):
+        # Ao criar sem valor explícito, usa o valor padrão do tipo de consulta.
+        # Numa edição posterior, um valor deixado em branco é respeitado como
+        # está (ver sincronizar_receita_prevista em signals.py).
+        if self.valor is None and self._state.adding and self.tipo_consulta_id:
+            self.valor = self.tipo_consulta.valor
+        super().save(*args, **kwargs)

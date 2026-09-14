@@ -102,29 +102,47 @@
         .messages .error { background: var(--danger-soft); color: #8f2e45; }
 
         .kanban { display: flex; gap: 1rem; overflow-x: auto; padding-bottom: .5rem; }
-        .kanban-col { background: #f4f0fa; border-radius: 12px; padding: .75rem; min-width: 230px; flex: 1; }
+        .kanban-col {
+            background: #f4f0fa; border-radius: 12px; padding: .75rem; min-width: 230px; flex: 1;
+            transition: background .12s, outline .12s;
+        }
+        .kanban-col.drop-alvo { background: #e7dbf9; outline: 2px dashed var(--accent); outline-offset: -2px; }
         .kanban-col h3 {
             font-size: .8rem; text-transform: uppercase; color: var(--text-muted); margin: 0 0 .5rem;
             display: flex; justify-content: space-between; letter-spacing: .02em;
         }
         .lead-card {
             background: #fff; border-radius: 10px; padding: .6rem .75rem; margin-bottom: .5rem;
-            box-shadow: 0 1px 2px rgba(43,38,53,.07); display: block; color: inherit; text-decoration: none;
+            box-shadow: 0 1px 2px rgba(43,38,53,.07); cursor: grab;
         }
         .lead-card:hover { box-shadow: 0 2px 8px rgba(43,38,53,.14); }
-        .lead-card .nome { font-weight: 600; }
+        .lead-card.arrastando { opacity: .4; }
+        .lead-card .nome { font-weight: 600; display: block; color: inherit; text-decoration: none; }
+        .lead-card .nome:hover { text-decoration: underline; }
         .lead-card .meta { font-size: .8rem; color: var(--text-muted); }
+        .lead-card .lead-status-linha { display: flex; justify-content: space-between; align-items: center; margin-top: .3rem; }
+        .lead-card .btn-respondido {
+            margin-top: .5rem; width: 100%; font-size: .74rem; padding: .35rem .5rem;
+            border-radius: 8px; border: 1px solid var(--accent-soft); background: #fff;
+            color: var(--accent-soft-text); cursor: pointer;
+        }
+        .lead-card .btn-respondido:hover { background: var(--accent-soft); }
+        .lead-card .btn-respondido:disabled { opacity: .5; cursor: default; }
+        .placeholder-vazio { padding: .25rem 0; }
 
         .badge {
             display: inline-block; padding: .2rem .6rem; border-radius: 999px;
             font-size: .75rem; background: var(--accent-soft); color: var(--accent-soft-text);
         }
+        .badge-atrasado { background: #fee2e2; color: #991b1b; }
+        .badge-neutro { background: #ece9f2; color: var(--text-muted); }
         .filtros-status { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
         .filtros-status a {
             padding: .4rem .8rem; border-radius: 999px; background: #f4f0fa; color: var(--text);
             text-decoration: none; font-size: .85rem;
         }
         .filtros-status a.ativo { background: var(--accent); color: #fff; }
+        .filtros-status a.drop-alvo { background: var(--accent); color: #fff; outline: 2px dashed #fff; outline-offset: -3px; }
 
         .fila { list-style: none; margin: 0; padding: 0; }
         .fila li {
@@ -139,10 +157,17 @@
 
         .legenda { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: .85rem; }
         .legenda span.ponto { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .3rem; }
-        table.agenda-semana { table-layout: fixed; }
-        table.agenda-semana th, table.agenda-semana td { vertical-align: top; }
+        table.agenda-semana { border-collapse: collapse; }
+        table.agenda-semana th, table.agenda-semana td { vertical-align: top; min-width: 92px; }
+        table.agenda-semana th:first-child, table.agenda-semana td:first-child { min-width: 70px; width: 70px; }
         table.agenda-semana td.hoje { background: #f4effc; }
+        table.agenda-semana th.subcoluna-profissional {
+            font-size: .72rem; font-weight: 500; color: var(--text-muted);
+            text-transform: none; padding-top: .15rem; padding-bottom: .4rem;
+            border-top: none;
+        }
         .bloco-consulta { border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem; color: #fff; }
+        .bloco-consulta-valor { opacity: .85; font-size: .72rem; }
         .bloco-bloqueio {
             border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem;
             background: repeating-linear-gradient(45deg, #c85a71, #c85a71 4px, #b3435c 4px, #b3435c 8px);
@@ -251,7 +276,8 @@
                 <a class="{% if request.resolver_match.app_name == 'financeiro' %}ativo{% endif %}" href="{% url 'financeiro:relatorio' %}"><span class="icone">💰</span> Financeiro</a>
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'indicadores' %}ativo{% endif %}" href="{% url 'core:indicadores' %}"><span class="icone">📊</span> Indicadores</a>
                 <a href="{% url 'core:em_breve' modulo='Produtos e Estoque' %}"><span class="icone">📦</span> Produtos &amp; Estoque</a>
-                <a href="/admin/programas/programa/"><span class="icone">🗂️</span> Programas</a>
+                <a class="{% if request.resolver_match.app_name == 'programas' %}ativo{% endif %}" href="{% url 'programas:configuracoes' %}"><span class="icone">🗂️</span> Programas</a>
+                <a class="{% if request.resolver_match.app_name == 'profissionais' %}ativo{% endif %}" href="{% url 'profissionais:lista' %}"><span class="icone">🩺</span> Profissionais</a>
                 <a href="/admin/"><span class="icone">⚙️</span> Administração</a>
             </nav>
             <div class="rodape">

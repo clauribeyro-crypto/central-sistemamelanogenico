@@ -3,7 +3,29 @@ from django import forms
 from agenda.models import TipoConsulta
 from profissionais.models import Profissional
 
-from .models import Lead, MotivoPerda
+from .models import Lead, MotivoPerda, Origem
+
+
+class NovoLeadForm(forms.ModelForm):
+    """Cadastro rápido de lead direto no board do CRM ("+ Novo lead")."""
+
+    class Meta:
+        model = Lead
+        fields = ["nome", "whatsapp", "telefone", "cidade", "estado", "origem"]
+        widgets = {
+            "nome": forms.TextInput(attrs={"placeholder": "Nome completo"}),
+            "whatsapp": forms.TextInput(attrs={"placeholder": "(11) 91234-5678"}),
+            "telefone": forms.TextInput(attrs={"placeholder": "Opcional"}),
+            "cidade": forms.TextInput(attrs={"placeholder": "Ex.: São Paulo"}),
+            "estado": forms.TextInput(attrs={"placeholder": "UF", "maxlength": 2}),
+        }
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["origem"].queryset = Origem.objects.filter(organizacao=organizacao, ativo=True)
+
+    def clean_estado(self):
+        return self.cleaned_data["estado"].upper()
 
 
 class PausarCadenciaForm(forms.Form):

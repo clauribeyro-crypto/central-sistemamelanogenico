@@ -1,13 +1,17 @@
 import datetime
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario
+from financeiro.forms import PagamentoForm
+from financeiro.models import Pagamento
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
@@ -48,11 +52,16 @@ def semana(request):
     inicio_semana = referencia - datetime.timedelta(days=referencia.weekday())
     dias = [inicio_semana + datetime.timedelta(days=i) for i in range(7)]  # segunda a domingo
 
-    profissionais = Profissional.objects.filter(organizacao=org, ativo=True)
+    profissionais = Profissional.objects.filter(organizacao=org, ativo=True).order_by("nome")
     profissional_id = request.GET.get("profissional")
     profissional_selecionado = (
         profissionais.filter(pk=profissional_id).first() if profissional_id else None
     )
+
+    # Colunas exibidas na grade: só a profissional escolhida no filtro, ou
+    # todas as profissionais ativas lado a lado ("Agenda geral") — assim dois
+    # profissionais podem atender no mesmo horário sem um bloquear o outro.
+    colunas_profissionais = [profissional_selecionado] if profissional_selecionado else list(profissionais)
 
     consultas_qs = (
         Consulta.objects.filter(
@@ -70,18 +79,23 @@ def semana(request):
         bloqueios_qs = bloqueios_qs.filter(profissional=profissional_selecionado)
 
     horarios = _horarios_do_dia(org)
+    ids_colunas = [prof.pk for prof in colunas_profissionais]
 
-    # células[dia][horario] = lista de itens (consultas/bloqueios) daquele slot
-    celulas = {dia: {h: [] for h in horarios} for dia in dias}
+    # células[dia][horario][profissional_id] = lista de itens daquele
+    # profissional naquele slot — cada profissional tem sua própria coluna,
+    # então a agenda de um não bloqueia a do outro no mesmo horário.
+    celulas = {dia: {h: {pid: [] for pid in ids_colunas} for h in horarios} for dia in dias}
 
     for consulta in consultas_qs:
         data_hora_local = timezone.localtime(consulta.data_hora)
         dia = data_hora_local.date()
-        if dia in celulas:
+        if dia in celulas and consulta.profissional_id in ids_colunas:
             slot = _slot_de(horarios, data_hora_local.time())
-            celulas[dia][slot].append({"tipo": "consulta", "obj": consulta})
+            celulas[dia][slot][consulta.profissional_id].append({"tipo": "consulta", "obj": consulta})
 
     for bloqueio in bloqueios_qs:
+        if bloqueio.profissional_id not in ids_colunas:
+            continue
         inicio_local = timezone.localtime(bloqueio.inicio)
         fim_local = timezone.localtime(bloqueio.fim)
         dia_atual = max(inicio_local.date(), dias[0])
@@ -92,13 +106,22 @@ def semana(request):
                 hora_fim = fim_local.time() if fim_local.date() == dia_atual else horarios[-1]
                 for h in horarios:
                     if hora_ini <= h < hora_fim:
-                        celulas[dia_atual][h].append({"tipo": "bloqueio", "obj": bloqueio})
+                        celulas[dia_atual][h][bloqueio.profissional_id].append({"tipo": "bloqueio", "obj": bloqueio})
             dia_atual += datetime.timedelta(days=1)
 
     linhas = [
         {
             "horario": h,
-            "celulas": [{"dia": dia, "itens": celulas[dia][h]} for dia in dias],
+            "celulas": [
+                {
+                    "dia": dia,
+                    "colunas": [
+                        {"profissional": prof, "itens": celulas[dia][h][prof.pk]}
+                        for prof in colunas_profissionais
+                    ],
+                }
+                for dia in dias
+            ],
         }
         for h in horarios
     ]
@@ -107,6 +130,7 @@ def semana(request):
         "dias": dias,
         "linhas": linhas,
         "profissionais": profissionais,
+        "colunas_profissionais": colunas_profissionais,
         "profissional_selecionado": profissional_selecionado,
         "tipos_consulta": TipoConsulta.objects.filter(organizacao=org, ativo=True),
         "pacientes_json": list(
@@ -157,6 +181,7 @@ def criar_consulta_rapida(request):
         tipo_consulta=form.cleaned_data["tipo_consulta"],
         data_hora=data_hora,
         duracao_minutos=form.cleaned_data["duracao_minutos"],
+        valor=form.cleaned_data["valor"],
         observacoes=form.cleaned_data["observacoes"],
     )
 
@@ -169,4 +194,65 @@ def criar_consulta_rapida(request):
         "html": html,
         "dia": data_hora_local.date().isoformat(),
         "horario": _slot_de(_horarios_do_dia(org), data_hora_local.time()).strftime("%H:%M"),
+        "profissional": consulta.profissional_id,
     })
+
+
+@login_required
+def detalhe_consulta(request, pk):
+    """
+    Tela da consulta aberta ao clicar num agendamento já marcado na Agenda.
+    Reúne as informações da consulta e o gerenciamento do lançamento
+    financeiro vinculado (marcar como pago, editar valor, excluir), sem
+    precisar ir até o Financeiro separadamente.
+    """
+    org = organizacao_do_usuario(request)
+    consulta = get_object_or_404(
+        Consulta.objects.select_related("paciente", "profissional", "tipo_consulta"),
+        pk=pk, organizacao=org,
+    )
+    pagamento = Pagamento.objects.filter(consulta=consulta, organizacao=org).order_by("-criado_em").first()
+    pagamento_form = PagamentoForm(instance=pagamento) if pagamento else None
+
+    if request.method == "POST":
+        acao = request.POST.get("acao")
+
+        if acao == "salvar_pagamento" and pagamento:
+            pagamento_form = PagamentoForm(request.POST, instance=pagamento)
+            if pagamento_form.is_valid():
+                pagamento_form.save()
+                messages.success(request, "Lançamento atualizado.")
+                return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "excluir_pagamento" and pagamento:
+            pagamento.delete()
+            messages.success(request, "Lançamento excluído.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "cancelar_consulta":
+            consulta.status = Consulta.Status.CANCELADA
+            consulta.save()  # dispara a sincronização automática do Financeiro
+            messages.success(
+                request,
+                "Consulta cancelada. O lançamento pendente vinculado (se houver) também foi cancelado.",
+            )
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "excluir_consulta":
+            semana_da_consulta = timezone.localtime(consulta.data_hora).date().isoformat()
+            tinha_pagamento = pagamento is not None
+            if pagamento:
+                pagamento.delete()
+            consulta.delete()
+            if tinha_pagamento:
+                messages.success(request, "Consulta excluída — o lançamento financeiro vinculado também foi removido.")
+            else:
+                messages.success(request, "Consulta excluída.")
+            return redirect(f"{reverse('agenda:semana')}?data={semana_da_consulta}")
+
+    contexto = {
+        "consulta": consulta,
+        "pagamento": pagamento,
+        "pagamento_form": pagamento_form,
+    }
+    return render(request, "agenda/detalhe_consulta.html", contexto)

@@ -68,7 +68,7 @@
         <h2>Lançamentos no período</h2>
         <table>
             <thead>
-                <tr><th>Vencimento</th><th>Paciente</th><th>Valor</th><th>Forma</th><th>Status</th></tr>
+                <tr><th>Vencimento</th><th>Paciente</th><th>Valor</th><th>Forma</th><th>Status</th><th></th></tr>
             </thead>
             <tbody>
             {% for p in pagamentos %}
@@ -76,11 +76,16 @@
                     <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
                     <td>{{ p.paciente }}</td>
                     <td>R$ {{ p.valor|floatformat:2 }}</td>
-                    <td>{{ p.get_forma_pagamento_display }}</td>
-                    <td>{{ p.get_status_display }}</td>
+                    <td>{{ p.get_forma_pagamento_display|default:"—" }}</td>
+                    <td>
+                        {% if p.status == p.Status.PAGO %}<span class="badge">Pago</span>
+                        {% elif p.status == p.Status.CANCELADO %}<span style="color:var(--text-muted);">Cancelado</span>
+                        {% else %}{{ p.get_status_display }}{% endif %}
+                    </td>
+                    <td><a href="{% url 'financeiro:editar_pagamento' p.pk %}?next={{ request.get_full_path|urlencode }}">Gerenciar ›</a></td>
                 </tr>
             {% empty %}
-                <tr><td colspan="5">Nenhum lançamento no período.</td></tr>
+                <tr><td colspan="6">Nenhum lançamento no período.</td></tr>
             {% endfor %}
             </tbody>
         </table>
