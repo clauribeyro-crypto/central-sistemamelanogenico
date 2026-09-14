@@ -94,6 +94,20 @@
     {% endif %}
 
     <div class="card">
+        <h2>Excluir lead</h2>
+        <p style="font-size:.85rem; color:var(--text-muted);">
+            Remove esta lead definitivamente (cadastro por engano, duplicado, teste…).
+            {% if lead.paciente %}A paciente vinculada e as consultas já agendadas não são afetadas — só perdem o vínculo com esta lead.{% endif %}
+            Essa ação não pode ser desfeita.
+        </p>
+        <form method="post" action="{% url 'leads:excluir' lead.pk %}"
+              onsubmit="return confirm('Excluir a lead \'{{ lead.nome|escapejs }}\'? Essa ação não pode ser desfeita.');">
+            {% csrf_token %}
+            <button class="btn btn-danger" type="submit">🗑️ Excluir lead</button>
+        </form>
+    </div>
+
+    <div class="card">
         <h2>Histórico</h2>
         <ul class="timeline">
             <li>
