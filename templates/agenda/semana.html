@@ -24,6 +24,8 @@
         <a class="btn btn-secondary" href="?data={{ semana_seguinte }}{% if profissional_selecionado %}&profissional={{ profissional_selecionado.pk }}{% endif %}">Semana seguinte →</a>
     </form>
 
+    <p style="font-size:.82rem; color:var(--text-muted);">Clique num horário vazio para agendar uma consulta ali.</p>
+
     <div class="card" style="overflow-x:auto;">
         <table class="agenda-semana">
             <thead>
@@ -39,25 +41,151 @@
                     <tr>
                         <td><strong>{{ linha.horario|time:"H:i" }}</strong></td>
                         {% for celula in linha.celulas %}
-                            <td>
-                                {% for item in celula %}
-                                    {% if item.tipo == "consulta" %}
-                                        <a class="bloco-consulta" style="background:{{ item.obj.tipo_consulta.cor }};"
-                                           href="/admin/agenda/consulta/{{ item.obj.pk }}/change/">
-                                            {{ item.obj.data_hora|time:"H:i" }} — {{ item.obj.paciente }}<br>
-                                            {{ item.obj.tipo_consulta }} · {{ item.obj.profissional }}
-                                        </a>
-                                    {% else %}
-                                        <div class="bloco-bloqueio">
-                                            {{ item.obj.get_motivo_display }}{% if not profissional_selecionado %} · {{ item.obj.profissional }}{% endif %}
-                                        </div>
-                                    {% endif %}
-                                {% endfor %}
-                            </td>
+                            {% if celula.itens %}
+                                <td>
+                                    {% for item in celula.itens %}
+                                        {% if item.tipo == "consulta" %}
+                                            {% include "agenda/_bloco_consulta.html" with consulta=item.obj %}
+                                        {% else %}
+                                            <div class="bloco-bloqueio">
+                                                {{ item.obj.get_motivo_display }}{% if not profissional_selecionado %} · {{ item.obj.profissional }}{% endif %}
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </td>
+                            {% else %}
+                                <td class="slot-vazio" data-dia="{{ celula.dia|date:'Y-m-d' }}" data-horario="{{ linha.horario|time:'H:i' }}"></td>
+                            {% endif %}
                         {% endfor %}
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <div class="modal-fundo" id="modal-agendar" hidden>
+        <div class="modal-caixa">
+            <h2>Agendar consulta</h2>
+            <p id="modal-quando" style="color:var(--text-muted); margin-top:-.5rem;"></p>
+            <form id="form-agendar" class="acao">
+                {% csrf_token %}
+                <div>
+                    <label for="fr-paciente">Paciente</label>
+                    <select id="fr-paciente" name="paciente" required>
+                        <option value="">Selecione…</option>
+                        {% for p in pacientes %}
+                            <option value="{{ p.pk }}">{{ p.nome }}{% if p.telefone %} — {{ p.telefone }}{% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="fr-profissional">Profissional</label>
+                    <select id="fr-profissional" name="profissional" required>
+                        <option value="">Selecione…</option>
+                        {% for p in profissionais %}
+                            <option value="{{ p.pk }}" {% if profissional_selecionado.pk == p.pk %}selected{% endif %}>{{ p.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="fr-tipo">Tipo de consulta</label>
+                    <select id="fr-tipo" name="tipo_consulta" required>
+                        <option value="">Selecione…</option>
+                        {% for t in tipos_consulta %}
+                            <option value="{{ t.pk }}" data-duracao="{{ t.duracao_padrao_minutos }}">{{ t.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="fr-duracao">Duração (min)</label>
+                    <input type="number" id="fr-duracao" name="duracao_minutos" value="{{ intervalo_minutos }}" min="5" required>
+                </div>
+                <div>
+                    <label for="fr-observacoes">Observações</label>
+                    <textarea id="fr-observacoes" name="observacoes" rows="2"></textarea>
+                </div>
+                <input type="hidden" name="data" id="fr-data">
+                <input type="hidden" name="hora" id="fr-hora">
+                <p id="modal-erro" style="color:#8f2e45; font-size:.85rem;"></p>
+                <div style="display:flex; gap:.5rem;">
+                    <button class="btn" type="submit">Agendar</button>
+                    <button class="btn btn-secondary" type="button" id="modal-cancelar">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const modal = document.getElementById("modal-agendar");
+        const form = document.getElementById("form-agendar");
+        const quando = document.getElementById("modal-quando");
+        const erro = document.getElementById("modal-erro");
+        const campoTipo = document.getElementById("fr-tipo");
+        const campoDuracao = document.getElementById("fr-duracao");
+
+        function abrirModal(dia, horario) {
+            form.reset();
+            erro.textContent = "";
+            document.getElementById("fr-data").value = dia;
+            document.getElementById("fr-hora").value = horario;
+            const [ano, mes, diaNum] = dia.split("-");
+            quando.textContent = diaNum + "/" + mes + "/" + ano + " às " + horario;
+            modal.hidden = false;
+        }
+
+        function fecharModal() {
+            modal.hidden = true;
+        }
+
+        document.querySelectorAll("td.slot-vazio").forEach(function (celula) {
+            celula.addEventListener("click", function () {
+                abrirModal(celula.dataset.dia, celula.dataset.horario);
+            });
+        });
+
+        document.getElementById("modal-cancelar").addEventListener("click", fecharModal);
+        modal.addEventListener("click", function (ev) {
+            if (ev.target === modal) fecharModal();
+        });
+
+        campoTipo.addEventListener("change", function () {
+            const opcao = campoTipo.selectedOptions[0];
+            if (opcao && opcao.dataset.duracao) {
+                campoDuracao.value = opcao.dataset.duracao;
+            }
+        });
+
+        form.addEventListener("submit", function (ev) {
+            ev.preventDefault();
+            erro.textContent = "";
+            const dados = new FormData(form);
+            fetch("{% url 'agenda:criar_rapido' %}", {
+                method: "POST",
+                headers: { "X-CSRFToken": form.querySelector("[name=csrfmiddlewaretoken]").value },
+                body: dados,
+            })
+                .then((r) => r.json().then((json) => ({ status: r.status, json })))
+                .then(({ status, json }) => {
+                    if (status !== 200 || !json.ok) {
+                        const primeiraChave = json.errors ? Object.keys(json.errors)[0] : null;
+                        erro.textContent = primeiraChave
+                            ? json.errors[primeiraChave][0].message
+                            : "Não foi possível agendar. Confira os campos.";
+                        return;
+                    }
+                    const celula = document.querySelector(
+                        'td.slot-vazio[data-dia="' + json.dia + '"][data-horario="' + json.horario + '"]'
+                    );
+                    if (celula) {
+                        celula.outerHTML = "<td>" + json.html + "</td>";
+                    }
+                    fecharModal();
+                })
+                .catch(function () {
+                    erro.textContent = "Erro de conexão. Tente novamente.";
+                });
+        });
+    })();
+    </script>
 {% endblock %}

@@ -1,12 +1,17 @@
 import datetime
 
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario
+from pacientes.models import Paciente
 from profissionais.models import Profissional
 
+from .forms import ConsultaRapidaForm
 from .models import Consulta, HorarioBloqueado, TipoConsulta
 
 
@@ -91,7 +96,10 @@ def semana(request):
             dia_atual += datetime.timedelta(days=1)
 
     linhas = [
-        {"horario": h, "celulas": [celulas[dia][h] for dia in dias]}
+        {
+            "horario": h,
+            "celulas": [{"dia": dia, "itens": celulas[dia][h]} for dia in dias],
+        }
         for h in horarios
     ]
 
@@ -101,8 +109,52 @@ def semana(request):
         "profissionais": profissionais,
         "profissional_selecionado": profissional_selecionado,
         "tipos_consulta": TipoConsulta.objects.filter(organizacao=org, ativo=True),
+        "pacientes": Paciente.objects.filter(organizacao=org, ativo=True).order_by("nome"),
+        "intervalo_minutos": org.agenda_intervalo_minutos,
         "semana_anterior": (inicio_semana - datetime.timedelta(days=7)).isoformat(),
         "semana_seguinte": (inicio_semana + datetime.timedelta(days=7)).isoformat(),
         "hoje": datetime.date.today(),
     }
     return render(request, "agenda/semana.html", contexto)
+
+
+@login_required
+@require_POST
+def criar_consulta_rapida(request):
+    """
+    Cria uma consulta a partir do formulário rápido aberto ao clicar num
+    horário vazio da grade semanal. Responde em JSON para a página atualizar
+    a célula sem recarregar.
+    """
+    org = organizacao_do_usuario(request)
+    form = ConsultaRapidaForm(request.POST, organizacao=org)
+
+    if not form.is_valid():
+        return JsonResponse(
+            {"ok": False, "errors": form.errors.get_json_data()}, status=400
+        )
+
+    data_hora = timezone.make_aware(
+        datetime.datetime.combine(form.cleaned_data["data"], form.cleaned_data["hora"])
+    )
+
+    consulta = Consulta.objects.create(
+        organizacao=org,
+        paciente=form.cleaned_data["paciente"],
+        profissional=form.cleaned_data["profissional"],
+        tipo_consulta=form.cleaned_data["tipo_consulta"],
+        data_hora=data_hora,
+        duracao_minutos=form.cleaned_data["duracao_minutos"],
+        observacoes=form.cleaned_data["observacoes"],
+    )
+
+    data_hora_local = timezone.localtime(consulta.data_hora)
+    html = render_to_string(
+        "agenda/_bloco_consulta.html", {"consulta": consulta}, request=request
+    )
+    return JsonResponse({
+        "ok": True,
+        "html": html,
+        "dia": data_hora_local.date().isoformat(),
+        "horario": _slot_de(_horarios_do_dia(org), data_hora_local.time()).strftime("%H:%M"),
+    })
