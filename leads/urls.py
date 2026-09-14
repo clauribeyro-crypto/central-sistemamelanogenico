@@ -19,5 +19,6 @@ urlpatterns = [
     path("<int:pk>/pausar/", views.pausar, name="pausar"),
     path("<int:pk>/retomar/", views.retomar, name="retomar"),
     path("<int:pk>/perder/", views.perder, name="perder"),
+    path("<int:pk>/excluir/", views.excluir, name="excluir"),
     path("<int:pk>/agendar/", views.agendar, name="agendar"),
 ]

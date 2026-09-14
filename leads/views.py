@@ -350,6 +350,23 @@ def retomar(request, pk):
 
 
 @login_required
+@require_POST
+def excluir(request, pk):
+    """
+    Exclui a lead definitivamente (cadastro feito por engano, duplicado,
+    teste etc.) — diferente de "Marcar como perdida", que mantém o registro
+    no histórico. Consultas já agendadas a partir dessa lead não são
+    afetadas, só perdem o vínculo com ela.
+    """
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    nome = lead.nome
+    lead.delete()
+    messages.success(request, f"Lead \"{nome}\" excluída.")
+    return redirect("leads:kanban")
+
+
+@login_required
 def perder(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)

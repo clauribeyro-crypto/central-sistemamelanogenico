@@ -101,6 +101,27 @@
                     {% endif %}
                 </div>
             </div>
+        {% elif aba_atual == "anamnese" %}
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Prontuário — histórico de atendimentos</h2>
+                    <a class="btn" href="{% url 'prontuarios:criar' paciente.pk %}">+ Novo atendimento</a>
+                </div>
+                {% if atendimentos %}
+                    <ul class="timeline" style="margin-top:1rem;">
+                        {% for a in atendimentos %}
+                            <li>
+                                <div class="quando">{{ a.data_hora|date:"d/m/Y H:i" }} · {{ a.profissional }}</div>
+                                {% if a.queixa_principal %}<strong>Queixa:</strong> {{ a.queixa_principal }}<br>{% endif %}
+                                {% if a.diagnostico %}<strong>Diagnóstico:</strong> {{ a.diagnostico }}<br>{% endif %}
+                                <a href="{% url 'prontuarios:editar' a.pk %}">Ver/editar atendimento ›</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="margin-top:1rem;">Nenhum atendimento registrado ainda para esta paciente.</p>
+                {% endif %}
+            </div>
         {% elif aba_atual == "produtos" %}
             <div class="card">
                 <h2>Produtos / kits</h2>

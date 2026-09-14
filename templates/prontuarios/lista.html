@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Prontuários · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Prontuários</h1>
+
+    <div class="card">
+        <h2>Novo atendimento</h2>
+        <div class="campo-com-lista" style="max-width:420px;">
+            <label for="busca-paciente-prontuario">Escolha a paciente</label>
+            <input type="text" id="busca-paciente-prontuario" placeholder="Buscar por nome ou telefone…" autocomplete="off">
+            <div id="resultados-paciente-prontuario" class="autocomplete-resultados" hidden></div>
+        </div>
+    </div>
+
+    <form class="filtro" method="get">
+        <div>
+            <label for="q">Buscar atendimentos já registrados por paciente</label>
+            <input type="text" id="q" name="q" value="{{ busca }}">
+        </div>
+        <button class="btn" type="submit">Buscar</button>
+    </form>
+
+    <div class="card">
+        {% if atendimentos %}
+            <table>
+                <thead><tr><th>Data</th><th>Paciente</th><th>Profissional</th><th>Diagnóstico</th><th></th></tr></thead>
+                <tbody>
+                {% for a in atendimentos %}
+                    <tr>
+                        <td>{{ a.data_hora|date:"d/m/Y H:i" }}</td>
+                        <td>{{ a.paciente }}</td>
+                        <td>{{ a.profissional }}</td>
+                        <td>{{ a.diagnostico|default:"—"|truncatechars:60 }}</td>
+                        <td><a href="{% url 'prontuarios:editar' a.pk %}">Ver/editar ›</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhum atendimento registrado ainda.</p>
+        {% endif %}
+    </div>
+
+    {{ pacientes_json|json_script:"pacientes-data-prontuario" }}
+    <script>
+    (function () {
+        const dados = JSON.parse(document.getElementById("pacientes-data-prontuario").textContent);
+        const input = document.getElementById("busca-paciente-prontuario");
+        const resultados = document.getElementById("resultados-paciente-prontuario");
+
+        input.addEventListener("input", function () {
+            const termo = input.value.trim().toLowerCase();
+            if (!termo) {
+                resultados.hidden = true;
+                resultados.innerHTML = "";
+                return;
+            }
+            const encontrados = dados.filter(function (p) {
+                return p.nome.toLowerCase().includes(termo) || (p.telefone || "").includes(termo);
+            }).slice(0, 8);
+
+            if (!encontrados.length) {
+                resultados.innerHTML = '<div class="autocomplete-item autocomplete-vazio">Nenhuma paciente encontrada</div>';
+                resultados.hidden = false;
+                return;
+            }
+            resultados.innerHTML = encontrados.map(function (p) {
+                const metaTelefone = p.telefone ? ' <span class="meta">— ' + p.telefone + "</span>" : "";
+                return '<div class="autocomplete-item" data-id="' + p.id + '">' + p.nome + metaTelefone + "</div>";
+            }).join("");
+            resultados.hidden = false;
+        });
+
+        resultados.addEventListener("click", function (ev) {
+            const item = ev.target.closest(".autocomplete-item[data-id]");
+            if (!item) return;
+            const urlBase = "{% url 'prontuarios:criar' 0 %}";
+            window.location.href = urlBase.replace("0/", item.dataset.id + "/");
+        });
+
+        document.addEventListener("click", function (ev) {
+            if (!resultados.contains(ev.target) && ev.target !== input) {
+                resultados.hidden = true;
+            }
+        });
+    })();
+    </script>
+{% endblock %}

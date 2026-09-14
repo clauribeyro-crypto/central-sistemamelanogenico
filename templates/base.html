@@ -168,15 +168,15 @@
         .legenda { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: .85rem; }
         .legenda span.ponto { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .3rem; }
         table.agenda-semana { border-collapse: collapse; }
-        table.agenda-semana th, table.agenda-semana td { vertical-align: top; min-width: 92px; }
+        table.agenda-semana th, table.agenda-semana td { vertical-align: top; min-width: 130px; }
         table.agenda-semana th:first-child, table.agenda-semana td:first-child { min-width: 70px; width: 70px; }
         table.agenda-semana td.hoje { background: #f4effc; }
-        table.agenda-semana th.subcoluna-profissional {
-            font-size: .72rem; font-weight: 500; color: var(--text-muted);
-            text-transform: none; padding-top: .15rem; padding-bottom: .4rem;
-            border-top: none;
+        .slot-vazio-parcial {
+            cursor: pointer; font-size: .72rem; color: var(--text-muted);
+            border-top: 1px dashed #ddd5ee; padding-top: .25rem; margin-top: .15rem;
         }
-        .bloco-consulta { border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem; color: #fff; }
+        .slot-vazio-parcial:hover { color: var(--accent-soft-text); }
+        .bloco-consulta { display: block; border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem; color: #fff; }
         .bloco-consulta-valor { opacity: .85; font-size: .72rem; }
         .bloco-bloqueio {
             border-radius: 6px; padding: .25rem .4rem; margin-bottom: .25rem; font-size: .75rem;
@@ -284,7 +284,7 @@
                 <a class="{% if request.resolver_match.app_name == 'leads' %}ativo{% endif %}" href="{% url 'leads:kanban' %}"><span class="icone">👥</span> CRM de leads</a>
                 <a class="{% if request.resolver_match.app_name == 'pacientes' %}ativo{% endif %}" href="{% url 'pacientes:lista' %}"><span class="icone">📄</span> Ficha da paciente</a>
                 <a class="{% if request.resolver_match.app_name == 'agenda' %}ativo{% endif %}" href="{% url 'agenda:semana' %}"><span class="icone">📅</span> Agenda</a>
-                <a href="/admin/prontuarios/atendimento/"><span class="icone">📋</span> Prontuários</a>
+                <a class="{% if request.resolver_match.app_name == 'prontuarios' %}ativo{% endif %}" href="{% url 'prontuarios:lista' %}"><span class="icone">📋</span> Prontuários</a>
                 <a class="{% if request.resolver_match.app_name == 'financeiro' %}ativo{% endif %}" href="{% url 'financeiro:relatorio' %}"><span class="icone">💰</span> Financeiro</a>
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'indicadores' %}ativo{% endif %}" href="{% url 'core:indicadores' %}"><span class="icone">📊</span> Indicadores</a>
                 <a href="{% url 'core:em_breve' modulo='Produtos e Estoque' %}"><span class="icone">📦</span> Produtos &amp; Estoque</a>
