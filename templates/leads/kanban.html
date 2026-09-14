@@ -3,7 +3,10 @@
 {% block content %}
     <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
         <h1>CRM de leads</h1>
-        <button class="btn" type="button" id="btn-novo-lead">+ Novo lead</button>
+        <div style="display:flex; gap:.5rem;">
+            <a class="btn btn-secondary" href="{% url 'leads:configuracao_importacao' %}">⚙️ Importação automática</a>
+            <button class="btn" type="button" id="btn-novo-lead">+ Novo lead</button>
+        </div>
     </div>
 
     <div class="filtros-status">

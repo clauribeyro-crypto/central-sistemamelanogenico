@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -357,3 +359,77 @@ class PausaLead(models.Model):
 
     def __str__(self):
         return f"Pausa de {self.lead} até {self.data_retomada_prevista:%d/%m/%Y}"
+
+
+class WebhookImportacao(ModeloDaOrganizacao):
+    """
+    Endpoint automático de entrada de leads (ex.: um Google Apps Script
+    vinculado à planilha do Respondi, disparado a cada nova resposta de
+    formulário, fazendo um POST pra esse webhook). O token na URL funciona
+    como a senha de acesso — não tem outra autenticação.
+    """
+
+    token = models.CharField(max_length=64, unique=True, editable=False)
+    origem_padrao = models.ForeignKey(
+        Origem, on_delete=models.PROTECT, related_name="webhooks_importacao",
+        help_text="Origem atribuída aos leads recebidos por aqui quando o envio não informar uma.",
+    )
+    ativo = models.BooleanField(default=True)
+    total_recebidos = models.PositiveIntegerField(default=0)
+    total_duplicados = models.PositiveIntegerField(default=0)
+    ultimo_recebido_em = models.DateTimeField(blank=True, null=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "webhook de importação de leads"
+        verbose_name_plural = "webhooks de importação de leads"
+
+    def __str__(self):
+        return f"Importação automática — {self.organizacao}"
+
+    def save(self, *args, **kwargs):
+        if not self.token:
+            self.token = secrets.token_urlsafe(32)
+        super().save(*args, **kwargs)
+
+    def gerar_novo_token(self):
+        self.token = secrets.token_urlsafe(32)
+        self.save(update_fields=["token"])
+
+    def registrar_lead_importado(self, *, nome, telefone, origem=None, data_primeiro_contato=None):
+        """
+        Cria o lead se o telefone ainda não existir nesta organização (evita
+        duplicados). Retorna (lead, criado, motivo) — motivo explica por que
+        não criou, quando `criado` é False.
+        """
+        nome = (nome or "").strip()
+        telefone_normalizado = "".join(ch for ch in (telefone or "") if ch.isdigit())
+
+        if not nome or not telefone_normalizado:
+            return None, False, "Nome e telefone são obrigatórios."
+
+        ja_existe = Lead.objects.filter(
+            organizacao=self.organizacao,
+        ).filter(
+            models.Q(whatsapp=telefone_normalizado) | models.Q(telefone=telefone_normalizado)
+        ).first()
+        if ja_existe:
+            self.total_duplicados += 1
+            self.ultimo_recebido_em = timezone.now()
+            self.save(update_fields=["total_duplicados", "ultimo_recebido_em"])
+            return ja_existe, False, "Já existe um lead com esse telefone."
+
+        lead = Lead.objects.create(
+            organizacao=self.organizacao,
+            nome=nome,
+            whatsapp=telefone_normalizado,
+            origem=origem or self.origem_padrao,
+            entrou_em=data_primeiro_contato or timezone.now(),
+        )
+        lead.registrar_historico(
+            HistoricoLead.Tipo.ENTRADA, "Lead importado automaticamente (Respondi/planilha)", None
+        )
+        self.total_recebidos += 1
+        self.ultimo_recebido_em = timezone.now()
+        self.save(update_fields=["total_recebidos", "ultimo_recebido_em"])
+        return lead, True, ""
