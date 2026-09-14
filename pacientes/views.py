@@ -20,7 +20,7 @@ ABAS = [
     ("financeiro", "Financeiro"),
     ("historico", "Histórico"),
 ]
-ABAS_PRONTAS = {"geral", "produtos", "financeiro", "historico"}
+ABAS_PRONTAS = {"geral", "anamnese", "produtos", "financeiro", "historico"}
 
 
 @login_required
@@ -66,6 +66,9 @@ def ficha(request, pk):
             "total_custos": total_custos,
             "resultado": recebido - total_custos,
         })
+
+    if aba == "anamnese":
+        contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
 
     if acompanhamento and aba == "produtos":
         contexto["kits"] = acompanhamento.kits_previstos.order_by("numero")

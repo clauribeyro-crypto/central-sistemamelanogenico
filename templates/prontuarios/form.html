@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{% if atendimento %}Editar atendimento{% else %}Novo atendimento{% endif %} · {{ paciente.nome }}{% endblock %}
+{% block content %}
+    <p>
+        <a href="{% url 'prontuarios:lista' %}">← Voltar aos prontuários</a>
+        {% if paciente.acompanhamento_atual %} · <a href="{% url 'pacientes:ficha' paciente.pk %}?aba=anamnese">Ver ficha da paciente</a>{% endif %}
+    </p>
+    <div class="card">
+        <h1>{% if atendimento %}Editar atendimento{% else %}Novo atendimento{% endif %} — {{ paciente.nome }}</h1>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">{% if atendimento %}Salvar alterações{% else %}Registrar atendimento{% endif %}</button>
+        </form>
+    </div>
+{% endblock %}
