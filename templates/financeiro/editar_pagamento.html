@@ -2,10 +2,15 @@
 {% block title %}Editar lançamento · Sistema da Clínica{% endblock %}
 {% block content %}
     <p><a href="{% if next %}{{ next }}{% else %}{% url 'financeiro:relatorio' %}{% endif %}">← Voltar</a></p>
+    <h1>Lançamento — {{ pagamento.paciente }}</h1>
+
+    {% include "financeiro/_recebimentos.html" %}
+
     <div class="card">
-        <h1>Editar lançamento — {{ pagamento.paciente }}</h1>
+        <h2 style="margin-top:0;">Editar valor e vencimento</h2>
         <form method="post" class="acao">
             {% csrf_token %}
+            <input type="hidden" name="acao" value="salvar_pagamento">
             <input type="hidden" name="next" value="{{ next }}">
             {% for field in form %}
                 <div>
@@ -15,15 +20,15 @@
                     {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
                 </div>
             {% endfor %}
-            <button class="btn" type="submit">Salvar lançamento</button>
+            <button class="btn" type="submit">Salvar</button>
         </form>
     </div>
 
     <div class="card">
         <h2 style="margin-top:0;">Excluir lançamento</h2>
-        <p style="color:var(--text-muted);">Remove este lançamento do Financeiro (útil para testes ou consultas canceladas por engano). Essa ação não pode ser desfeita.</p>
+        <p style="color:var(--text-muted);">Remove este lançamento e todos os recebimentos vinculados a ele (útil para testes ou consultas canceladas por engano). Essa ação não pode ser desfeita.</p>
         <form method="post" action="{% url 'financeiro:excluir_pagamento' pagamento.pk %}"
-              onsubmit="return confirm('Excluir este lançamento de R$ {{ pagamento.valor|floatformat:2 }}? Essa ação não pode ser desfeita.');">
+              onsubmit="return confirm('Excluir este lançamento de R$ {{ pagamento.valor|floatformat:2 }} e seus recebimentos? Essa ação não pode ser desfeita.');">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ next }}">
             <button class="btn btn-secondary" type="submit" style="color:#8f2e45;">Excluir lançamento</button>

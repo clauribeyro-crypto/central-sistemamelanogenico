@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -10,8 +11,8 @@ from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario
 
-from .forms import PagamentoForm
-from .models import Pagamento
+from .forms import PagamentoForm, RecebimentoForm
+from .models import Pagamento, Recebimento
 
 
 def _redirecionar_com_seguranca(request, destino_padrao):
@@ -44,23 +45,30 @@ def relatorio(request):
         organizacao=org, data_vencimento__gte=data_inicio, data_vencimento__lte=data_fim
     )
 
-    total_pago = pagamentos.filter(status=Pagamento.Status.PAGO).aggregate(
-        total=Sum("valor")
-    )["total"] or 0
-    total_pendente = pagamentos.filter(status=Pagamento.Status.PENDENTE).aggregate(
-        total=Sum("valor")
-    )["total"] or 0
+    # "Recebido" é sempre baseado nos recebimentos de fato lançados no
+    # período (não no status do lançamento inteiro) — assim uma entrada
+    # parcial já conta como recebida mesmo que o lançamento como um todo
+    # ainda esteja "Parcial" (e não "Pago").
+    recebimentos_no_periodo = Recebimento.objects.filter(
+        organizacao=org, pagamento__in=pagamentos, data__gte=data_inicio, data__lte=data_fim,
+    )
+    total_pago = recebimentos_no_periodo.aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
+
+    pagamentos_em_aberto = pagamentos.filter(
+        status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL]
+    )
+    total_pendente = sum((p.saldo_pendente for p in pagamentos_em_aberto), Decimal("0.00"))
 
     por_forma_pagamento = (
-        pagamentos.filter(status=Pagamento.Status.PAGO)
+        recebimentos_no_periodo
         .values("forma_pagamento")
         .annotate(total=Sum("valor"))
         .order_by("-total")
     )
 
     por_profissional = (
-        pagamentos.filter(status=Pagamento.Status.PAGO, consulta__isnull=False)
-        .values("consulta__profissional__nome")
+        recebimentos_no_periodo.filter(pagamento__consulta__isnull=False)
+        .values("pagamento__consulta__profissional__nome")
         .annotate(total=Sum("valor"))
         .order_by("-total")
     )
@@ -81,21 +89,53 @@ def relatorio(request):
 def editar_pagamento(request, pk):
     org = organizacao_do_usuario(request)
     pagamento = get_object_or_404(Pagamento, pk=pk, organizacao=org)
+    proximo = request.GET.get("next") or request.POST.get("next") or ""
+    url_desta_pagina = f"{reverse('financeiro:editar_pagamento', args=[pagamento.pk])}?next={proximo}"
+
+    form = None
+    recebimento_form = None
 
     if request.method == "POST":
-        form = PagamentoForm(request.POST, instance=pagamento)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Lançamento atualizado.")
-            return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
-    else:
-        form = PagamentoForm(instance=pagamento)
+        acao = request.POST.get("acao")
 
-    proximo = request.GET.get("next", "")
-    return render(
-        request, "financeiro/editar_pagamento.html",
-        {"form": form, "pagamento": pagamento, "next": proximo},
-    )
+        if acao == "salvar_pagamento":
+            form = PagamentoForm(request.POST, instance=pagamento)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Lançamento atualizado.")
+                return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
+
+        elif acao == "adicionar_recebimento":
+            recebimento_form = RecebimentoForm(request.POST, pagamento=pagamento)
+            if recebimento_form.is_valid():
+                recebimento = recebimento_form.save(commit=False)
+                recebimento.organizacao = org
+                recebimento.pagamento = pagamento
+                recebimento.save()
+                messages.success(request, "Recebimento registrado.")
+                return redirect(url_desta_pagina)
+
+        elif acao == "excluir_recebimento":
+            recebimento = get_object_or_404(
+                Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
+            )
+            recebimento.delete()
+            messages.success(request, "Recebimento excluído.")
+            return redirect(url_desta_pagina)
+
+    if form is None:
+        form = PagamentoForm(instance=pagamento)
+    if recebimento_form is None:
+        recebimento_form = RecebimentoForm(pagamento=pagamento)
+
+    contexto = {
+        "form": form,
+        "pagamento": pagamento,
+        "recebimento_form": recebimento_form,
+        "recebimentos": pagamento.recebimentos.all(),
+        "next": proximo,
+    }
+    return render(request, "financeiro/editar_pagamento.html", contexto)
 
 
 @login_required

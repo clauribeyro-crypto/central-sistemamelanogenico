@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from contas.admin import OrganizacaoAdminMixin
 
-from .models import Pagamento, Servico
+from .models import Pagamento, Recebimento, Servico
 
 
 @admin.register(Servico)
@@ -12,13 +12,30 @@ class ServicoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     search_fields = ("nome",)
 
 
+class RecebimentoInline(admin.TabularInline):
+    model = Recebimento
+    extra = 0
+    fields = ("valor", "forma_pagamento", "data", "observacoes")
+
+
 @admin.register(Pagamento)
 class PagamentoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     list_display = (
-        "paciente", "valor", "forma_pagamento", "status",
-        "data_vencimento", "data_pagamento",
+        "paciente", "valor", "total_recebido", "saldo_pendente", "status", "data_vencimento",
     )
-    list_filter = ("status", "forma_pagamento")
+    list_filter = ("status",)
     search_fields = ("paciente__nome",)
     autocomplete_fields = ("paciente", "consulta", "servico", "acompanhamento")
     date_hierarchy = "data_vencimento"
+    readonly_fields = ("status", "forma_pagamento", "data_pagamento")
+    inlines = [RecebimentoInline]
+
+    def save_formset(self, request, form, formset, change):
+        # Recebimento herda ModeloDaOrganizacao — precisa da organização
+        # preenchida, que aqui vem do próprio Pagamento pai.
+        instancias = formset.save(commit=False)
+        for instancia in instancias:
+            if isinstance(instancia, Recebimento) and not instancia.organizacao_id:
+                instancia.organizacao = form.instance.organizacao
+            instancia.save()
+        formset.save_m2m()

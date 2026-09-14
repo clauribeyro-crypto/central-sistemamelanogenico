@@ -1,0 +1,67 @@
+<div class="card">
+    <h2 style="margin-top:0;">Financeiro</h2>
+    <div style="display:flex; gap:1.75rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:1rem;">
+        <div>
+            <div style="font-size:1.25rem; font-weight:700;">R$ {{ pagamento.valor|floatformat:2 }}</div>
+            <div style="font-size:.78rem; color:var(--text-muted);">Total</div>
+        </div>
+        <div>
+            <div style="font-size:1.25rem; font-weight:700; color:#2f8f5b;">R$ {{ pagamento.total_recebido|floatformat:2 }}</div>
+            <div style="font-size:.78rem; color:var(--text-muted);">Recebido</div>
+        </div>
+        <div>
+            <div style="font-size:1.25rem; font-weight:700; color:#8a5a10;">R$ {{ pagamento.saldo_pendente|floatformat:2 }}</div>
+            <div style="font-size:.78rem; color:var(--text-muted);">Pendente</div>
+        </div>
+        <div>
+            {% if pagamento.status == pagamento.Status.PAGO %}<span class="badge">Pago</span>
+            {% elif pagamento.status == pagamento.Status.PARCIAL %}<span class="badge badge-parcial">Parcial</span>
+            {% elif pagamento.status == pagamento.Status.CANCELADO %}<span class="badge badge-neutro">Cancelado</span>
+            {% else %}<span class="badge badge-neutro">Pendente</span>{% endif %}
+        </div>
+    </div>
+
+    {% if recebimentos %}
+        <table>
+            <thead><tr><th>Data</th><th>Valor</th><th>Forma</th><th>Observações</th><th></th></tr></thead>
+            <tbody>
+            {% for r in recebimentos %}
+                <tr>
+                    <td>{{ r.data|date:"d/m/Y" }}</td>
+                    <td>R$ {{ r.valor|floatformat:2 }}</td>
+                    <td>{{ r.get_forma_pagamento_display }}</td>
+                    <td>{{ r.observacoes|default:"—" }}</td>
+                    <td>
+                        <form method="post" style="display:inline;" onsubmit="return confirm('Excluir este recebimento de R$ {{ r.valor|floatformat:2 }}?');">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="excluir_recebimento">
+                            <input type="hidden" name="recebimento_id" value="{{ r.pk }}">
+                            <input type="hidden" name="next" value="{{ next }}">
+                            <button type="submit" style="color:#8f2e45; background:none; border:none; padding:0; cursor:pointer; font-size:.82rem; text-decoration:underline;">Excluir</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p style="color:var(--text-muted); font-size:.85rem;">Nenhum recebimento registrado ainda.</p>
+    {% endif %}
+
+    {% if pagamento.status != pagamento.Status.CANCELADO and pagamento.saldo_pendente > 0 %}
+        <h3 style="font-size:.9rem; margin:1.25rem 0 .5rem;">Registrar recebimento</h3>
+        <form method="post" class="acao" style="max-width:420px;">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="adicionar_recebimento">
+            <input type="hidden" name="next" value="{{ next }}">
+            {% for field in recebimento_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Registrar recebimento</button>
+        </form>
+    {% endif %}
+</div>
