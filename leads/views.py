@@ -142,6 +142,22 @@ def marcar_respondido_rapido(request, pk):
 
 
 @login_required
+@require_POST
+def mover_para_agendados(request, pk):
+    """
+    Fallback manual: arrastar o card do board direto pra aba "Agendados",
+    para quando o vínculo automático (por telefone/nome) não pegar sozinho.
+    Tenta achar a consulta correspondente para exibir na aba; se não achar,
+    move o lead mesmo assim.
+    """
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    consulta = lead.encontrar_consulta_correspondente()
+    lead.marcar_agendada(consulta=consulta, responsavel=request.user)
+    return JsonResponse({"ok": True})
+
+
+@login_required
 def detalhe(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)

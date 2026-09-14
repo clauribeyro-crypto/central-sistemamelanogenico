@@ -10,6 +10,7 @@ urlpatterns = [
     path("<int:pk>/", views.detalhe, name="detalhe"),
     path("<int:pk>/mover/", views.mover_etapa, name="mover_etapa"),
     path("<int:pk>/responder-rapido/", views.marcar_respondido_rapido, name="marcar_respondido_rapido"),
+    path("<int:pk>/mover-agendados/", views.mover_para_agendados, name="mover_para_agendados"),
     path("<int:pk>/ligacao/", views.registrar_ligacao, name="registrar_ligacao"),
     path("<int:pk>/whatsapp/", views.enviar_whatsapp, name="enviar_whatsapp"),
     path("<int:pk>/resultado/", views.resultado_contato, name="resultado_contato"),

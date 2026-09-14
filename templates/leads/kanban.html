@@ -9,12 +9,12 @@
     <div class="filtros-status">
         <a class="ativo" href="{% url 'leads:kanban' %}">Cadência ativa</a>
         <a href="{% url 'leads:kanban' %}?filtro=pausados">Pausados ({{ contadores.pausados }})</a>
-        <a href="{% url 'leads:kanban' %}?filtro=agendados">Agendados ({{ contadores.agendados }})</a>
+        <a href="{% url 'leads:kanban' %}?filtro=agendados" id="aba-agendados">Agendados ({{ contadores.agendados }})</a>
         <a href="{% url 'leads:kanban' %}?filtro=sem_resposta">Sem resposta ({{ contadores.sem_resposta }})</a>
         <a href="{% url 'leads:kanban' %}?filtro=perdidos">Perdidos ({{ contadores.perdidos }})</a>
     </div>
 
-    <p style="font-size:.82rem; color:var(--text-muted);">Arraste o card para mover o lead entre as etapas.</p>
+    <p style="font-size:.82rem; color:var(--text-muted);">Arraste o card para mover o lead entre as etapas, ou solte em cima da aba "Agendados" para marcar como agendado manualmente.</p>
 
     <div class="kanban">
         {% for codigo, rotulo, leads in colunas %}
@@ -227,6 +227,32 @@
                 });
             });
         });
+
+        // ---- Soltar o card na aba "Agendados" (fallback manual) ----
+        const abaAgendados = document.getElementById("aba-agendados");
+        if (abaAgendados) {
+            abaAgendados.addEventListener("dragover", function (ev) {
+                ev.preventDefault();
+                ev.dataTransfer.dropEffect = "move";
+                abaAgendados.classList.add("drop-alvo");
+            });
+            abaAgendados.addEventListener("dragleave", function () {
+                abaAgendados.classList.remove("drop-alvo");
+            });
+            abaAgendados.addEventListener("drop", function (ev) {
+                ev.preventDefault();
+                abaAgendados.classList.remove("drop-alvo");
+                const leadId = ev.dataTransfer.getData("text/plain");
+                const card = document.querySelector('.lead-card[data-lead-id="' + leadId + '"]');
+                if (!card) return;
+                const colunaOrigem = card.closest(".kanban-col");
+                post("/leads/" + leadId + "/mover-agendados/", new FormData()).then(({ status, json }) => {
+                    if (status !== 200 || !json.ok) return;
+                    card.remove();
+                    if (colunaOrigem) atualizarContador(colunaOrigem);
+                });
+            });
+        }
     })();
     </script>
 {% endblock %}

@@ -54,3 +54,21 @@ def sincronizar_receita_prevista(sender, instance, created, **kwargs):
         status=Pagamento.Status.PENDENTE,
         data_vencimento=instance.data_hora.date(),
     )
+
+
+@receiver(post_save, sender=Consulta)
+def vincular_lead_por_correspondencia(sender, instance, created, **kwargs):
+    """
+    Ao agendar uma consulta sem vínculo explícito com um lead do CRM (ex.:
+    paciente buscada/cadastrada direto no modal rápido da Agenda), procura um
+    lead em cadência ativa com o mesmo telefone ou nome da paciente e move
+    esse lead automaticamente para a aba "Agendados".
+    """
+    if not created or instance.lead_id:
+        return  # já veio vinculado (ex.: agendado a partir do próprio lead)
+
+    from leads.models import Lead
+
+    lead = Lead.buscar_por_paciente(instance.organizacao, instance.paciente)
+    if lead:
+        lead.marcar_agendada(consulta=instance)

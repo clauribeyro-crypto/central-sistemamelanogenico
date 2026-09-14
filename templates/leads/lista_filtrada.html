@@ -14,7 +14,12 @@
     <div class="card">
         {% if leads %}
             <table>
-                <thead><tr><th>Nome</th><th>WhatsApp</th><th>Origem</th><th>Responsável</th><th>Entrou em</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Nome</th><th>WhatsApp</th><th>Origem</th><th>Responsável</th>
+                        {% if filtro == "agendados" %}<th>Consulta agendada</th>{% else %}<th>Entrou em</th>{% endif %}
+                    </tr>
+                </thead>
                 <tbody>
                 {% for lead in leads %}
                     <tr>
@@ -22,7 +27,19 @@
                         <td>{{ lead.whatsapp }}</td>
                         <td>{{ lead.origem }}</td>
                         <td>{{ lead.responsavel|default:"—" }}</td>
-                        <td>{{ lead.entrou_em|date:"d/m/Y H:i" }}</td>
+                        {% if filtro == "agendados" %}
+                            <td>
+                                {% with consulta=lead.proxima_consulta %}
+                                    {% if consulta %}
+                                        {{ consulta.data_hora|date:"d/m/Y H:i" }} — {{ consulta.tipo_consulta }}
+                                    {% else %}
+                                        <span style="color:var(--text-muted);">Consulta não vinculada</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        {% else %}
+                            <td>{{ lead.entrou_em|date:"d/m/Y H:i" }}</td>
+                        {% endif %}
                     </tr>
                 {% endfor %}
                 </tbody>

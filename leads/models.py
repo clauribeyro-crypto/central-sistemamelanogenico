@@ -192,8 +192,63 @@ class Lead(ModeloDaOrganizacao):
             return False
         return bool(self.proxima_acao_em and self.proxima_acao_em <= timezone.now())
 
+    @property
+    def proxima_consulta(self):
+        """Consulta (ativa, não cancelada) vinculada a este lead, para exibir na aba Agendados."""
+        return self.consultas.exclude(status="CANCELADA").order_by("-data_hora").first()
+
     def registrar_historico(self, tipo, descricao, responsavel=None):
         return self.historico.create(tipo=tipo, descricao=descricao, responsavel=responsavel)
+
+    @classmethod
+    def buscar_por_paciente(cls, organizacao, paciente):
+        """
+        Procura, entre os leads em cadência ativa, um que corresponda ao
+        telefone ou nome dessa paciente — usado para vincular automaticamente
+        o lead à consulta que acabou de ser agendada na Agenda.
+        """
+        filtro = models.Q(nome__iexact=paciente.nome)
+        if paciente.telefone:
+            filtro |= models.Q(whatsapp=paciente.telefone) | models.Q(telefone=paciente.telefone)
+        return cls.objects.filter(
+            organizacao=organizacao, status__in=[cls.Status.PENDENTE, cls.Status.EM_ANDAMENTO],
+        ).filter(filtro).order_by("-entrou_em").first()
+
+    def encontrar_consulta_correspondente(self):
+        """
+        Fallback manual (arrastar o card pra aba Agendados): procura uma
+        consulta já agendada para essa paciente/lead, pelo vínculo direto
+        (`paciente`) ou por telefone/nome, quando o vínculo automático não
+        pegou por algum motivo.
+        """
+        from agenda.models import Consulta
+
+        qs = Consulta.objects.filter(organizacao=self.organizacao).exclude(status="CANCELADA")
+        if self.paciente_id:
+            qs = qs.filter(paciente_id=self.paciente_id)
+        else:
+            filtro = models.Q(paciente__nome__iexact=self.nome)
+            if self.whatsapp:
+                filtro |= models.Q(paciente__telefone=self.whatsapp)
+            if self.telefone:
+                filtro |= models.Q(paciente__telefone=self.telefone)
+            qs = qs.filter(filtro)
+        return qs.order_by("-data_hora").first()
+
+    def marcar_agendada(self, consulta=None, responsavel=None):
+        """Move o lead para a aba "Agendados", vinculando a consulta encontrada, se houver."""
+        self.status = self.Status.AGENDADA
+        if consulta:
+            self.paciente = consulta.paciente
+            if consulta.lead_id != self.pk:
+                consulta.lead = self
+                consulta.save(update_fields=["lead"])
+        self.save(update_fields=["status", "paciente", "atualizado_em"])
+        descricao = "Consulta agendada"
+        if consulta:
+            data_hora_local = timezone.localtime(consulta.data_hora)
+            descricao += f" para {data_hora_local:%d/%m/%Y %H:%M} ({consulta.tipo_consulta})"
+        self.registrar_historico(HistoricoLead.Tipo.AGENDAMENTO, descricao, responsavel)
 
     ORDEM_ETAPAS = [
         Etapa.NOVO, Etapa.CONTATO_1, Etapa.CONTATO_2,
