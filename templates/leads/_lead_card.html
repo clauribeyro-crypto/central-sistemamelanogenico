@@ -1,0 +1,17 @@
+<div class="lead-card" draggable="true" data-lead-id="{{ lead.pk }}" data-etapa="{{ lead.etapa }}">
+    <a class="nome" href="{% url 'leads:detalhe' lead.pk %}">{{ lead.nome }}</a>
+    <div class="meta">
+        {% if lead.cidade or lead.estado %}{{ lead.cidade }}{% if lead.cidade and lead.estado %}/{% endif %}{{ lead.estado }} · {% endif %}{{ lead.origem }}
+    </div>
+    <div class="meta lead-status-linha">
+        {% if lead.esta_atrasado %}
+            <span class="badge badge-atrasado">Atrasado</span>
+        {% elif lead.status == "EM_ANDAMENTO" %}
+            <span class="badge">Em andamento</span>
+        {% else %}
+            <span class="badge badge-neutro">Pendente</span>
+        {% endif %}
+        <span>{{ lead.ultimo_contato_em|default:lead.entrou_em|date:"d/m H:i" }}</span>
+    </div>
+    <button type="button" class="btn-respondido" data-lead-id="{{ lead.pk }}">✓ Marcar como respondido</button>
+</div>

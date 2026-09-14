@@ -120,6 +120,11 @@ class Lead(ModeloDaOrganizacao):
     nome = models.CharField("nome do paciente", max_length=150)
     whatsapp = models.CharField(max_length=20)
     telefone = models.CharField(max_length=20, blank=True)
+    cidade = models.CharField(max_length=100, blank=True)
+    estado = models.CharField(
+        "estado (UF)", max_length=2, blank=True,
+        help_text="Sigla do estado, ex.: SP, RJ, MG.",
+    )
     origem = models.ForeignKey(Origem, on_delete=models.PROTECT, related_name="leads")
     responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -195,6 +200,11 @@ class Lead(ModeloDaOrganizacao):
         Etapa.CONTATO_3, Etapa.CONTATO_4, Etapa.CONCLUIDA,
     ]
 
+    # As etapas exibidas como colunas no board (kanban) — a cadência
+    # automática ainda usa CONCLUIDA como estado terminal de "sem resposta",
+    # mas essa etapa não tem coluna própria no board.
+    ETAPAS_KANBAN = [Etapa.NOVO, Etapa.CONTATO_1, Etapa.CONTATO_2, Etapa.CONTATO_3, Etapa.CONTATO_4]
+
     def avancar_etapa(self):
         """Move a cadência para a próxima etapa e zera o contador de tentativas."""
         indice = self.ORDEM_ETAPAS.index(self.etapa)
@@ -204,6 +214,44 @@ class Lead(ModeloDaOrganizacao):
         if self.etapa == self.Etapa.CONCLUIDA:
             self.status = self.Status.SEM_RESPOSTA
         self.save(update_fields=["etapa", "tentativas_etapa_atual", "status", "atualizado_em"])
+
+    def mover_para_etapa(self, nova_etapa, responsavel=None):
+        """Move o lead manualmente para outra etapa (arrastar o card no board)."""
+        if nova_etapa == self.etapa:
+            return
+        etapa_anterior = self.get_etapa_display()
+        self.etapa = nova_etapa
+        self.tentativas_etapa_atual = 0
+        self.status = self.Status.PENDENTE if nova_etapa == self.Etapa.NOVO else self.Status.EM_ANDAMENTO
+        self.save(update_fields=["etapa", "tentativas_etapa_atual", "status", "atualizado_em"])
+        self.registrar_historico(
+            HistoricoLead.Tipo.STATUS,
+            f"Movido manualmente de {etapa_anterior} para {self.get_etapa_display()} (arrastar no board)",
+            responsavel,
+        )
+
+    def marcar_respondido(self, responsavel=None):
+        """
+        Botão rápido do card no board: avança a cadência por resposta da lead,
+        sem precisar abrir a tela de detalhe. Para na última etapa da cadência
+        (4º contato) — não empurra sozinho para "cadência concluída".
+        """
+        indice = self.ORDEM_ETAPAS.index(self.etapa)
+        indice_maximo = self.ORDEM_ETAPAS.index(self.Etapa.CONTATO_4)
+        etapa_anterior = self.get_etapa_display()
+        if indice < indice_maximo:
+            self.etapa = self.ORDEM_ETAPAS[indice + 1]
+        self.status = self.Status.EM_ANDAMENTO
+        self.tentativas_etapa_atual = 0
+        self.ultimo_contato_em = timezone.now()
+        self.save(update_fields=[
+            "etapa", "tentativas_etapa_atual", "status", "ultimo_contato_em", "atualizado_em",
+        ])
+        self.registrar_historico(
+            HistoricoLead.Tipo.RESPOSTA,
+            f"Marcado como respondido — avançou de {etapa_anterior} para {self.get_etapa_display()}",
+            responsavel,
+        )
 
 
 class HistoricoLead(models.Model):

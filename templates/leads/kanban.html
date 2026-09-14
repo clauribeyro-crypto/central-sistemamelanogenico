@@ -1,7 +1,10 @@
 {% extends "base.html" %}
 {% block title %}CRM de leads · Sistema da Clínica{% endblock %}
 {% block content %}
-    <h1>CRM de leads</h1>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+        <h1>CRM de leads</h1>
+        <button class="btn" type="button" id="btn-novo-lead">+ Novo lead</button>
+    </div>
 
     <div class="filtros-status">
         <a class="ativo" href="{% url 'leads:kanban' %}">Cadência ativa</a>
@@ -11,28 +14,219 @@
         <a href="{% url 'leads:kanban' %}?filtro=perdidos">Perdidos ({{ contadores.perdidos }})</a>
     </div>
 
+    <p style="font-size:.82rem; color:var(--text-muted);">Arraste o card para mover o lead entre as etapas.</p>
+
     <div class="kanban">
         {% for codigo, rotulo, leads in colunas %}
-            <div class="kanban-col">
-                <h3>{{ rotulo }} <span class="badge">{{ leads|length }}</span></h3>
-                {% for lead in leads %}
-                    <a class="lead-card" href="{% url 'leads:detalhe' lead.pk %}">
-                        <div class="nome">{{ lead.nome }}</div>
-                        <div class="meta">{{ lead.origem }}</div>
-                        <div class="meta">
-                            {% if lead.status == "EM_ANDAMENTO" %}
-                                <span class="badge">Em andamento</span>
-                            {% elif lead.esta_atrasado %}
-                                <span class="badge" style="background:#fee2e2;color:#991b1b;">Atrasado</span>
-                            {% else %}
-                                Entrou {{ lead.entrou_em|date:"d/m H:i" }}
-                            {% endif %}
-                        </div>
-                    </a>
-                {% empty %}
-                    <p class="meta">Nenhum lead nesta etapa.</p>
-                {% endfor %}
+            <div class="kanban-col" data-etapa="{{ codigo }}">
+                <h3>{{ rotulo }} <span class="badge contador-coluna">{{ leads|length }}</span></h3>
+                <div class="kanban-col-cards">
+                    {% for lead in leads %}
+                        {% include "leads/_lead_card.html" %}
+                    {% empty %}
+                        <p class="meta placeholder-vazio">Nenhum lead nesta etapa.</p>
+                    {% endfor %}
+                </div>
             </div>
         {% endfor %}
     </div>
+
+    <form id="csrf-form">{% csrf_token %}</form>
+
+    <div class="modal-fundo" id="modal-novo-lead" hidden>
+        <div class="modal-caixa">
+            <h2>Nova lead</h2>
+            <form id="form-novo-lead" class="acao">
+                {% csrf_token %}
+                <div>
+                    <label for="nl-nome">Nome</label>
+                    <input type="text" id="nl-nome" name="nome" required>
+                </div>
+                <div>
+                    <label for="nl-whatsapp">WhatsApp</label>
+                    <input type="text" id="nl-whatsapp" name="whatsapp" required placeholder="(11) 91234-5678">
+                </div>
+                <div>
+                    <label for="nl-telefone">Outro telefone</label>
+                    <input type="text" id="nl-telefone" name="telefone" placeholder="Opcional">
+                </div>
+                <div style="display:flex; gap:.75rem;">
+                    <div style="flex:1;">
+                        <label for="nl-cidade">Cidade</label>
+                        <input type="text" id="nl-cidade" name="cidade" placeholder="Ex.: São Paulo">
+                    </div>
+                    <div style="width:80px;">
+                        <label for="nl-estado">UF</label>
+                        <input type="text" id="nl-estado" name="estado" maxlength="2" style="text-transform:uppercase;">
+                    </div>
+                </div>
+                <div>
+                    <label for="nl-origem">Origem</label>
+                    <select id="nl-origem" name="origem" required>
+                        <option value="">Selecione…</option>
+                        {% for origem in origens %}
+                            <option value="{{ origem.pk }}">{{ origem.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <p id="novo-lead-erro" style="color:#8f2e45; font-size:.85rem;"></p>
+                <div style="display:flex; gap:.5rem;">
+                    <button class="btn" type="submit">Cadastrar lead</button>
+                    <button class="btn btn-secondary" type="button" id="novo-lead-cancelar">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const csrf = document.getElementById("csrf-form").querySelector("[name=csrfmiddlewaretoken]").value;
+
+        function post(url, dados) {
+            return fetch(url, {
+                method: "POST",
+                headers: { "X-CSRFToken": csrf },
+                body: dados,
+            }).then((r) => r.json().then((json) => ({ status: r.status, json })));
+        }
+
+        // ---- Novo lead ----
+        const modal = document.getElementById("modal-novo-lead");
+        const formNovo = document.getElementById("form-novo-lead");
+        const erroNovo = document.getElementById("novo-lead-erro");
+
+        document.getElementById("btn-novo-lead").addEventListener("click", function () {
+            formNovo.reset();
+            erroNovo.textContent = "";
+            modal.hidden = false;
+        });
+        document.getElementById("novo-lead-cancelar").addEventListener("click", function () {
+            modal.hidden = true;
+        });
+        modal.addEventListener("click", function (ev) {
+            if (ev.target === modal) modal.hidden = true;
+        });
+
+        formNovo.addEventListener("submit", function (ev) {
+            ev.preventDefault();
+            erroNovo.textContent = "";
+            post("{% url 'leads:criar_lead' %}", new FormData(formNovo)).then(({ status, json }) => {
+                if (status !== 200 || !json.ok) {
+                    const primeiraChave = json.errors ? Object.keys(json.errors)[0] : null;
+                    erroNovo.textContent = primeiraChave
+                        ? json.errors[primeiraChave][0].message
+                        : "Não foi possível cadastrar. Confira os campos.";
+                    return;
+                }
+                const coluna = document.querySelector('.kanban-col[data-etapa="' + json.etapa + '"] .kanban-col-cards');
+                if (coluna) {
+                    const placeholder = coluna.querySelector(".placeholder-vazio");
+                    if (placeholder) placeholder.remove();
+                    coluna.insertAdjacentHTML("afterbegin", json.html);
+                    ligarCard(coluna.querySelector(".lead-card"));
+                    atualizarContador(coluna.closest(".kanban-col"));
+                }
+                modal.hidden = true;
+            }).catch(function () {
+                erroNovo.textContent = "Erro de conexão. Tente novamente.";
+            });
+        });
+
+        // ---- Contadores por coluna ----
+        function atualizarContador(colunaEl) {
+            const contador = colunaEl.querySelector(".contador-coluna");
+            const qtd = colunaEl.querySelectorAll(".lead-card").length;
+            if (contador) contador.textContent = qtd;
+            const placeholder = colunaEl.querySelector(".placeholder-vazio");
+            if (qtd > 0 && placeholder) placeholder.remove();
+            if (qtd === 0 && !colunaEl.querySelector(".placeholder-vazio")) {
+                colunaEl.querySelector(".kanban-col-cards").insertAdjacentHTML(
+                    "beforeend", '<p class="meta placeholder-vazio">Nenhum lead nesta etapa.</p>'
+                );
+            }
+        }
+
+        // ---- Marcar como respondido ----
+        function ligarBotaoResponder(botao) {
+            botao.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                const leadId = botao.dataset.leadId;
+                botao.disabled = true;
+                post("/leads/" + leadId + "/responder-rapido/", new FormData()).then(({ status, json }) => {
+                    botao.disabled = false;
+                    if (status !== 200 || !json.ok) return;
+                    moverCardParaEtapa(leadId, json.etapa, json.html);
+                }).catch(function () {
+                    botao.disabled = false;
+                });
+            });
+        }
+
+        function moverCardParaEtapa(leadId, novaEtapa, html) {
+            const cardAtual = document.querySelector('.lead-card[data-lead-id="' + leadId + '"]');
+            const colunaOrigem = cardAtual ? cardAtual.closest(".kanban-col") : null;
+            const colunaDestino = document.querySelector('.kanban-col[data-etapa="' + novaEtapa + '"] .kanban-col-cards');
+            if (!colunaDestino) return;
+            if (cardAtual) cardAtual.remove();
+            const placeholder = colunaDestino.querySelector(".placeholder-vazio");
+            if (placeholder) placeholder.remove();
+            colunaDestino.insertAdjacentHTML("afterbegin", html);
+            ligarCard(colunaDestino.querySelector(".lead-card"));
+            if (colunaOrigem) atualizarContador(colunaOrigem);
+            atualizarContador(colunaDestino.closest(".kanban-col"));
+        }
+
+        // ---- Drag and drop ----
+        function ligarDragCard(card) {
+            card.addEventListener("dragstart", function (ev) {
+                card.classList.add("arrastando");
+                ev.dataTransfer.setData("text/plain", card.dataset.leadId);
+                ev.dataTransfer.effectAllowed = "move";
+            });
+            card.addEventListener("dragend", function () {
+                card.classList.remove("arrastando");
+            });
+        }
+
+        function ligarCard(card) {
+            if (!card) return;
+            ligarDragCard(card);
+            const botao = card.querySelector(".btn-respondido");
+            if (botao) ligarBotaoResponder(botao);
+        }
+
+        document.querySelectorAll(".lead-card").forEach(ligarCard);
+
+        document.querySelectorAll(".kanban-col").forEach(function (coluna) {
+            coluna.addEventListener("dragover", function (ev) {
+                ev.preventDefault();
+                ev.dataTransfer.dropEffect = "move";
+                coluna.classList.add("drop-alvo");
+            });
+            coluna.addEventListener("dragleave", function () {
+                coluna.classList.remove("drop-alvo");
+            });
+            coluna.addEventListener("drop", function (ev) {
+                ev.preventDefault();
+                coluna.classList.remove("drop-alvo");
+                const leadId = ev.dataTransfer.getData("text/plain");
+                const novaEtapa = coluna.dataset.etapa;
+                const card = document.querySelector('.lead-card[data-lead-id="' + leadId + '"]');
+                if (!card) return;
+                const colunaOrigem = card.closest(".kanban-col");
+                if (colunaOrigem === coluna) return;
+
+                post("/leads/" + leadId + "/mover/", new URLSearchParams({ etapa: novaEtapa })).then(({ status, json }) => {
+                    if (status !== 200 || !json.ok) return;
+                    const placeholder = coluna.querySelector(".placeholder-vazio");
+                    if (placeholder) placeholder.remove();
+                    coluna.querySelector(".kanban-col-cards").insertAdjacentElement("afterbegin", card);
+                    atualizarContador(colunaOrigem);
+                    atualizarContador(coluna);
+                });
+            });
+        });
+    })();
+    </script>
 {% endblock %}

@@ -2,19 +2,22 @@ from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
 from pacientes.models import Paciente
 
 from .forms import (
-    AgendarConsultaForm, EnviarWhatsAppForm, PausarCadenciaForm,
+    AgendarConsultaForm, EnviarWhatsAppForm, NovoLeadForm, PausarCadenciaForm,
     PerderLeadForm, RegistrarLigacaoForm, ResultadoContatoForm,
 )
-from .models import HistoricoLead, Lead, MensagemModelo
+from .models import HistoricoLead, Lead, MensagemModelo, Origem
 
 MENSAGENS_PADRAO = {
     MensagemModelo.Etapa.CONTATO_1: (
@@ -87,7 +90,55 @@ def kanban(request):
         for chave, status in status_por_filtro.items()
     }
 
-    return render(request, "leads/kanban.html", {"colunas": colunas, "contadores": contadores})
+    origens = Origem.objects.filter(organizacao=org, ativo=True)
+    return render(
+        request, "leads/kanban.html",
+        {"colunas": colunas, "contadores": contadores, "origens": origens},
+    )
+
+
+@login_required
+@require_POST
+def criar_lead(request):
+    """Cadastro rápido de lead direto no board (botão "+ Novo lead")."""
+    org = organizacao_do_usuario(request)
+    form = NovoLeadForm(request.POST, organizacao=org)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": form.errors.get_json_data()}, status=400)
+
+    lead = form.save(commit=False)
+    lead.organizacao = org
+    lead.status = Lead.Status.PENDENTE
+    lead.etapa = Lead.Etapa.NOVO
+    lead.save()
+    lead.registrar_historico(HistoricoLead.Tipo.ENTRADA, "Lead cadastrada manualmente pelo board", request.user)
+
+    html = render_to_string("leads/_lead_card.html", {"lead": lead}, request=request)
+    return JsonResponse({"ok": True, "html": html, "etapa": lead.etapa})
+
+
+@login_required
+@require_POST
+def mover_etapa(request, pk):
+    """Arrastar e soltar o card entre colunas do board."""
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    nova_etapa = request.POST.get("etapa")
+    if nova_etapa not in Lead.ETAPAS_KANBAN:
+        return JsonResponse({"ok": False, "erro": "Etapa inválida."}, status=400)
+    lead.mover_para_etapa(nova_etapa, responsavel=request.user)
+    return JsonResponse({"ok": True, "etapa": lead.etapa})
+
+
+@login_required
+@require_POST
+def marcar_respondido_rapido(request, pk):
+    """Botão rápido do card: avança a cadência sem abrir a tela de detalhe."""
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    lead.marcar_respondido(responsavel=request.user)
+    html = render_to_string("leads/_lead_card.html", {"lead": lead}, request=request)
+    return JsonResponse({"ok": True, "etapa": lead.etapa, "html": html})
 
 
 @login_required
