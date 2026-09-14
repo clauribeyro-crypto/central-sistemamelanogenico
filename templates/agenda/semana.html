@@ -25,47 +25,39 @@
         <a class="btn btn-secondary" href="?data={{ semana_seguinte }}{% if profissional_selecionado %}&profissional={{ profissional_selecionado.pk }}{% endif %}">Semana seguinte →</a>
     </form>
 
-    <p style="font-size:.82rem; color:var(--text-muted);">Clique num horário vazio para agendar uma consulta ou bloquear o horário (almoço, reunião, folga…){% if colunas_profissionais|length > 1 %} — cada profissional tem sua própria coluna, então um horário ocupado não bloqueia os outros{% endif %}. Clique num bloqueio já criado pra excluí-lo.</p>
+    <p style="font-size:.82rem; color:var(--text-muted);">Clique num horário livre para agendar uma consulta ou bloquear o horário (almoço, reunião, folga…) — cada card mostra o profissional responsável, e dá pra encaixar mais de um profissional no mesmo horário. Clique num bloqueio já criado pra excluí-lo.</p>
 
     <div class="card" style="overflow-x:auto;">
         <table class="agenda-semana">
             <thead>
                 <tr>
-                    <th style="width:70px;" rowspan="{% if colunas_profissionais|length > 1 %}2{% else %}1{% endif %}">Horário</th>
+                    <th style="width:70px;">Horário</th>
                     {% for dia in dias %}
-                        <th class="{% if dia == hoje %}hoje{% endif %}" colspan="{{ colunas_profissionais|length }}">{{ dia|date:"D d/m" }}</th>
+                        <th class="{% if dia == hoje %}hoje{% endif %}">{{ dia|date:"D d/m" }}</th>
                     {% endfor %}
                 </tr>
-                {% if colunas_profissionais|length > 1 %}
-                    <tr>
-                        {% for dia in dias %}
-                            {% for prof in colunas_profissionais %}
-                                <th class="subcoluna-profissional {% if dia == hoje %}hoje{% endif %}">{{ prof.nome }}</th>
-                            {% endfor %}
-                        {% endfor %}
-                    </tr>
-                {% endif %}
             </thead>
             <tbody>
                 {% for linha in linhas %}
                     <tr>
                         <td><strong>{{ linha.horario|time:"H:i" }}</strong></td>
                         {% for celula in linha.celulas %}
-                            {% for coluna in celula.colunas %}
-                                {% if coluna.itens %}
-                                    <td>
-                                        {% for item in coluna.itens %}
-                                            {% if item.tipo == "consulta" %}
-                                                {% include "agenda/_bloco_consulta.html" with consulta=item.obj %}
-                                            {% else %}
-                                                {% include "agenda/_bloco_bloqueio.html" with bloqueio=item.obj %}
-                                            {% endif %}
-                                        {% endfor %}
-                                    </td>
-                                {% else %}
-                                    <td class="slot-vazio" data-dia="{{ celula.dia|date:'Y-m-d' }}" data-horario="{{ linha.horario|time:'H:i' }}" data-profissional="{{ coluna.profissional.pk }}"></td>
-                                {% endif %}
-                            {% endfor %}
+                            {% if celula.itens %}
+                                <td>
+                                    {% for item in celula.itens %}
+                                        {% if item.tipo == "consulta" %}
+                                            {% include "agenda/_bloco_consulta.html" with consulta=item.obj %}
+                                        {% else %}
+                                            {% include "agenda/_bloco_bloqueio.html" with bloqueio=item.obj %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not celula.cheia %}
+                                        <div class="slot-vazio-parcial" data-dia="{{ celula.dia|date:'Y-m-d' }}" data-horario="{{ linha.horario|time:'H:i' }}">+ agendar</div>
+                                    {% endif %}
+                                </td>
+                            {% else %}
+                                <td class="slot-vazio" data-dia="{{ celula.dia|date:'Y-m-d' }}" data-horario="{{ linha.horario|time:'H:i' }}"></td>
+                            {% endif %}
                         {% endfor %}
                     </tr>
                 {% endfor %}
@@ -302,7 +294,7 @@
         tabAgendar.addEventListener("click", mostrarAbaAgendar);
         tabBloquear.addEventListener("click", mostrarAbaBloquear);
 
-        function abrirModal(dia, horario, profissionalId) {
+        function abrirModal(dia, horario) {
             form.reset();
             formBloquear.reset();
             erro.textContent = "";
@@ -311,12 +303,16 @@
             mostrarAbaAgendar();
             pacienteIdInput.value = "";
             resultadosDiv.hidden = true;
+            // Se um profissional específico estiver selecionado no filtro do
+            // topo, já vem pré-marcado; em "Agenda geral" fica em branco pra
+            // escolher na hora (mais de um profissional pode estar livre).
+            const profissionalFiltro = document.getElementById("profissional").value;
             document.getElementById("fr-data").value = dia;
             document.getElementById("fr-hora").value = horario;
-            document.getElementById("fr-profissional").value = profissionalId || "";
+            document.getElementById("fr-profissional").value = profissionalFiltro;
             document.getElementById("fb-data").value = dia;
             document.getElementById("fb-hora").value = horario;
-            document.getElementById("fb-profissional").value = profissionalId || "";
+            document.getElementById("fb-profissional").value = profissionalFiltro;
             const [ano, mes, diaNum] = dia.split("-");
             const quandoTexto = diaNum + "/" + mes + "/" + ano + " às " + horario;
             quando.textContent = quandoTexto;
@@ -328,9 +324,9 @@
             modal.hidden = true;
         }
 
-        document.querySelectorAll("td.slot-vazio").forEach(function (celula) {
+        document.querySelectorAll("td.slot-vazio, .slot-vazio-parcial").forEach(function (celula) {
             celula.addEventListener("click", function () {
-                abrirModal(celula.dataset.dia, celula.dataset.horario, celula.dataset.profissional);
+                abrirModal(celula.dataset.dia, celula.dataset.horario);
             });
         });
 
@@ -423,14 +419,9 @@
                             : "Não foi possível agendar. Confira os campos.";
                         return;
                     }
-                    const celula = document.querySelector(
-                        'td.slot-vazio[data-dia="' + json.dia + '"][data-horario="' + json.horario + '"]' +
-                        '[data-profissional="' + json.profissional + '"]'
-                    );
-                    if (celula) {
-                        celula.outerHTML = "<td>" + json.html + "</td>";
-                    }
-                    fecharModal();
+                    // A célula pode ter mais de um profissional agora — mais
+                    // simples recarregar do que remendar o HTML na mão.
+                    window.location.reload();
                 })
                 .catch(function () {
                     erro.textContent = "Erro de conexão. Tente novamente.";

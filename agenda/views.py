@@ -4,7 +4,6 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -80,18 +79,21 @@ def semana(request):
 
     horarios = _horarios_do_dia(org)
     ids_colunas = [prof.pk for prof in colunas_profissionais]
+    total_profissionais = len(ids_colunas)
 
-    # células[dia][horario][profissional_id] = lista de itens daquele
-    # profissional naquele slot — cada profissional tem sua própria coluna,
-    # então a agenda de um não bloqueia a do outro no mesmo horário.
-    celulas = {dia: {h: {pid: [] for pid in ids_colunas} for h in horarios} for dia in dias}
+    # células[dia][horario] = lista de itens de qualquer profissional naquele
+    # slot — uma coluna só por dia (sem dividir visualmente por profissional),
+    # mas dois profissionais ainda podem ter algo no mesmo horário: o card de
+    # cada item mostra o responsável, e a célula só para de ser clicável para
+    # criar mais um agendamento quando já tem um item por profissional ativo.
+    celulas = {dia: {h: [] for h in horarios} for dia in dias}
 
     for consulta in consultas_qs:
         data_hora_local = timezone.localtime(consulta.data_hora)
         dia = data_hora_local.date()
         if dia in celulas and consulta.profissional_id in ids_colunas:
             slot = _slot_de(horarios, data_hora_local.time())
-            celulas[dia][slot][consulta.profissional_id].append({"tipo": "consulta", "obj": consulta})
+            celulas[dia][slot].append({"tipo": "consulta", "obj": consulta})
 
     for bloqueio in bloqueios_qs:
         if bloqueio.profissional_id not in ids_colunas:
@@ -106,7 +108,7 @@ def semana(request):
                 hora_fim = fim_local.time() if fim_local.date() == dia_atual else horarios[-1]
                 for h in horarios:
                     if hora_ini <= h < hora_fim:
-                        celulas[dia_atual][h][bloqueio.profissional_id].append({"tipo": "bloqueio", "obj": bloqueio})
+                        celulas[dia_atual][h].append({"tipo": "bloqueio", "obj": bloqueio})
             dia_atual += datetime.timedelta(days=1)
 
     linhas = [
@@ -115,10 +117,8 @@ def semana(request):
             "celulas": [
                 {
                     "dia": dia,
-                    "colunas": [
-                        {"profissional": prof, "itens": celulas[dia][h][prof.pk]}
-                        for prof in colunas_profissionais
-                    ],
+                    "itens": celulas[dia][h],
+                    "cheia": len(celulas[dia][h]) >= total_profissionais,
                 }
                 for dia in dias
             ],
@@ -130,7 +130,6 @@ def semana(request):
         "dias": dias,
         "linhas": linhas,
         "profissionais": profissionais,
-        "colunas_profissionais": colunas_profissionais,
         "profissional_selecionado": profissional_selecionado,
         "tipos_consulta": TipoConsulta.objects.filter(organizacao=org, ativo=True),
         "motivos_bloqueio": HorarioBloqueado.Motivo.choices,
@@ -152,8 +151,7 @@ def semana(request):
 def criar_consulta_rapida(request):
     """
     Cria uma consulta a partir do formulário rápido aberto ao clicar num
-    horário vazio da grade semanal. Responde em JSON para a página atualizar
-    a célula sem recarregar.
+    horário vazio da grade semanal.
     """
     org = organizacao_do_usuario(request)
     form = ConsultaRapidaForm(request.POST, organizacao=org)
@@ -186,17 +184,10 @@ def criar_consulta_rapida(request):
         observacoes=form.cleaned_data["observacoes"],
     )
 
-    data_hora_local = timezone.localtime(consulta.data_hora)
-    html = render_to_string(
-        "agenda/_bloco_consulta.html", {"consulta": consulta}, request=request
-    )
-    return JsonResponse({
-        "ok": True,
-        "html": html,
-        "dia": data_hora_local.date().isoformat(),
-        "horario": _slot_de(_horarios_do_dia(org), data_hora_local.time()).strftime("%H:%M"),
-        "profissional": consulta.profissional_id,
-    })
+    # Como um horário agora pode ter itens de mais de um profissional
+    # empilhados na mesma célula, é mais simples recarregar a página do que
+    # tentar remendar a célula certa via JS.
+    return JsonResponse({"ok": True})
 
 
 @login_required
