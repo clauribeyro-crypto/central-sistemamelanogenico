@@ -129,9 +129,11 @@
                 <div class="card">
                     <h2>Resumo financeiro</h2>
                     <ul class="fila">
+                        <li><div class="nome">Valor vendido</div><span class="badge">R$ {{ valor_vendido|floatformat:2 }}</span></li>
                         <li><div class="nome">Recebido</div><span class="badge">R$ {{ recebido|floatformat:2 }}</span></li>
                         <li><div class="nome">A receber</div><span class="badge">R$ {{ a_receber|floatformat:2 }}</span></li>
                         <li><div class="nome">Custos</div><span class="badge">R$ {{ total_custos|floatformat:2 }}</span></li>
+                        <li><div class="nome">Resultado</div><span class="badge">R$ {{ resultado|floatformat:2 }}</span></li>
                     </ul>
 
                     {% if alertas %}
@@ -143,6 +145,31 @@
                 </div>
             </div>
         {% elif aba_atual == "anamnese" %}
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Anamnese</h2>
+                    <a class="btn" href="{% url 'prontuarios:anamnese' paciente.pk %}">
+                        {% if anamnese %}Editar anamnese{% else %}+ Preencher anamnese{% endif %}
+                    </a>
+                </div>
+                {% if anamnese %}
+                    <dl style="margin-top:1rem;">
+                        {% if anamnese.melasma_pele %}<dt><strong>Melasma / pele</strong></dt><dd>{{ anamnese.melasma_pele|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.intestino %}<dt><strong>Intestino</strong></dt><dd>{{ anamnese.intestino|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.estomago_digestao %}<dt><strong>Estômago / digestão</strong></dt><dd>{{ anamnese.estomago_digestao|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.figado_vesicula %}<dt><strong>Fígado / vesícula</strong></dt><dd>{{ anamnese.figado_vesicula|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.hormonal_ciclo %}<dt><strong>Hormonal / ciclo</strong></dt><dd>{{ anamnese.hormonal_ciclo|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.sono %}<dt><strong>Sono</strong></dt><dd>{{ anamnese.sono|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.alimentacao %}<dt><strong>Alimentação</strong></dt><dd>{{ anamnese.alimentacao|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.medicamentos %}<dt><strong>Medicamentos</strong></dt><dd>{{ anamnese.medicamentos|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.historico_saude %}<dt><strong>Histórico de saúde</strong></dt><dd>{{ anamnese.historico_saude|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.sinais_sintomas %}<dt><strong>Sinais e sintomas</strong></dt><dd>{{ anamnese.sinais_sintomas|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.observacoes_profissional %}<dt><strong>Observações do profissional</strong></dt><dd>{{ anamnese.observacoes_profissional|linebreaksbr }}</dd>{% endif %}
+                    </dl>
+                {% else %}
+                    <p style="margin-top:1rem;">Anamnese ainda não preenchida para esta paciente.</p>
+                {% endif %}
+            </div>
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
                     <h2 style="margin:0;">Prontuário — histórico de atendimentos</h2>
@@ -161,6 +188,55 @@
                     </ul>
                 {% else %}
                     <p style="margin-top:1rem;">Nenhum atendimento registrado ainda para esta paciente.</p>
+                {% endif %}
+            </div>
+        {% elif aba_atual == "modulacao" %}
+            {% for m in modulacoes %}
+                <div class="card">
+                    <h2>Modulação {{ m.numero }}{% if m.concluida %} <span class="badge">Concluída</span>{% endif %}</h2>
+                    <table>
+                        <thead><tr><th>Fase</th><th>Duração</th><th>Status</th><th>Resultado</th><th></th></tr></thead>
+                        <tbody>
+                        {% for f in m.fases.all %}
+                            <tr>
+                                <td>Fase {{ f.numero }}</td>
+                                <td>{{ f.duracao_semanas }} semana{{ f.duracao_semanas|pluralize }}</td>
+                                <td>{{ f.get_status_display }}</td>
+                                <td>{{ f.get_resultado_display|default:"—" }}</td>
+                                <td><a href="{% url 'programas:fase_detalhe' f.pk %}">Ver/editar ›</a></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% empty %}
+                <div class="card"><p>Este programa não prevê modulação.</p></div>
+            {% endfor %}
+        {% elif aba_atual == "feedbacks" %}
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Feedbacks</h2>
+                    <a class="btn" href="{% url 'programas:feedback_criar' acompanhamento.pk %}">+ Novo feedback</a>
+                </div>
+                {% if feedbacks %}
+                    <ul class="timeline" style="margin-top:1rem;">
+                        {% for f in feedbacks %}
+                            <li>
+                                <div class="quando">
+                                    {{ f.data_hora|date:"d/m/Y H:i" }}
+                                    {% if f.fase %} · Fase {{ f.fase.numero }}{% endif %}
+                                    {% if f.semana %} · Semana {{ f.semana }}{% endif %}
+                                    {% if f.precisou_alterar %} · <span class="badge">Plano alterado</span>{% endif %}
+                                </div>
+                                <strong>Relato:</strong> {{ f.relato|linebreaksbr }}<br>
+                                {% if f.observacao %}<strong>Observação:</strong> {{ f.observacao|linebreaksbr }}<br>{% endif %}
+                                {% if f.conduta %}<strong>Conduta:</strong> {{ f.conduta|linebreaksbr }}<br>{% endif %}
+                                <a href="{% url 'programas:feedback_editar' f.pk %}">Ver/editar ›</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="margin-top:1rem;">Nenhum feedback registrado ainda para esta paciente.</p>
                 {% endif %}
             </div>
         {% elif aba_atual == "consultas" %}
@@ -226,6 +302,7 @@
             </div>
         {% elif aba_atual == "financeiro" %}
             <div class="grid">
+                <div class="card stat"><div class="num">R$ {{ valor_vendido|floatformat:2 }}</div><div class="rotulo">Valor vendido</div></div>
                 <div class="card stat"><div class="num">R$ {{ recebido|floatformat:2 }}</div><div class="rotulo">Recebido</div></div>
                 <div class="card stat"><div class="num">R$ {{ a_receber|floatformat:2 }}</div><div class="rotulo">A receber</div></div>
                 <div class="card stat"><div class="num">R$ {{ total_custos|floatformat:2 }}</div><div class="rotulo">Custos</div></div>

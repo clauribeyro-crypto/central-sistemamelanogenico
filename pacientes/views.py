@@ -5,8 +5,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
-from financeiro.models import Pagamento
+from financeiro.models import Pagamento, Recebimento
 from programas.models import Acompanhamento, CustoAcompanhamento
+from prontuarios.models import Anamnese
 
 from .forms import IniciarProtocoloForm
 from .models import Paciente
@@ -22,7 +23,29 @@ ABAS = [
     ("financeiro", "Financeiro"),
     ("historico", "Histórico"),
 ]
-ABAS_PRONTAS = {"geral", "anamnese", "consultas", "produtos", "financeiro", "historico"}
+ABAS_PRONTAS = {"geral", "anamnese", "modulacao", "feedbacks", "consultas", "produtos", "financeiro", "historico"}
+
+
+def _financeiro_do_acompanhamento(acompanhamento):
+    """
+    Resumo financeiro do programa: recebido soma os recebimentos de verdade
+    (não só pagamentos já 100% quitados), pra não esconder entradas parciais —
+    mesmo bug já corrigido no relatório geral do Financeiro (financeiro/views.py).
+    """
+    recebido = Recebimento.objects.filter(
+        pagamento__acompanhamento=acompanhamento
+    ).aggregate(t=Sum("valor"))["t"] or 0
+    total_custos = CustoAcompanhamento.objects.filter(
+        acompanhamento=acompanhamento
+    ).aggregate(t=Sum("valor"))["t"] or 0
+    valor_vendido = acompanhamento.valor_contratado - acompanhamento.desconto
+    return {
+        "valor_vendido": valor_vendido,
+        "recebido": recebido,
+        "a_receber": valor_vendido - recebido,
+        "total_custos": total_custos,
+        "resultado": recebido - total_custos,
+    }
 
 
 @login_required
@@ -58,19 +81,21 @@ def ficha(request, pk):
     if acompanhamento and aba == "financeiro":
         pagamentos = Pagamento.objects.filter(acompanhamento=acompanhamento).order_by("-data_vencimento")
         custos = CustoAcompanhamento.objects.filter(acompanhamento=acompanhamento).order_by("-data")
-        recebido = pagamentos.filter(status=Pagamento.Status.PAGO).aggregate(t=Sum("valor"))["t"] or 0
-        total_custos = custos.aggregate(t=Sum("valor"))["t"] or 0
         contexto.update({
             "pagamentos": pagamentos,
             "custos": custos,
-            "recebido": recebido,
-            "a_receber": acompanhamento.valor_contratado - acompanhamento.desconto - recebido,
-            "total_custos": total_custos,
-            "resultado": recebido - total_custos,
+            **_financeiro_do_acompanhamento(acompanhamento),
         })
 
     if aba == "anamnese":
+        contexto["anamnese"] = Anamnese.objects.filter(paciente=paciente).first()
         contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
+
+    if acompanhamento and aba == "modulacao":
+        contexto["modulacoes"] = acompanhamento.modulacoes.prefetch_related("fases").order_by("numero")
+
+    if acompanhamento and aba == "feedbacks":
+        contexto["feedbacks"] = acompanhamento.feedbacks.select_related("fase").order_by("-data_hora")
 
     if aba == "consultas":
         if acompanhamento:
@@ -97,16 +122,7 @@ def ficha(request, pk):
         contexto["eventos"] = sorted(eventos, key=lambda e: e["data"])
 
     if acompanhamento and aba == "geral":
-        pagamentos = Pagamento.objects.filter(acompanhamento=acompanhamento)
-        recebido = pagamentos.filter(status=Pagamento.Status.PAGO).aggregate(t=Sum("valor"))["t"] or 0
-        custos_total = CustoAcompanhamento.objects.filter(
-            acompanhamento=acompanhamento
-        ).aggregate(t=Sum("valor"))["t"] or 0
-        contexto.update({
-            "recebido": recebido,
-            "a_receber": acompanhamento.valor_contratado - acompanhamento.desconto - recebido,
-            "total_custos": custos_total,
-        })
+        contexto.update(_financeiro_do_acompanhamento(acompanhamento))
 
     return render(request, "pacientes/ficha.html", contexto)
 

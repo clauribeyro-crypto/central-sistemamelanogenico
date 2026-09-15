@@ -70,7 +70,6 @@ class Acompanhamento(ModeloDaOrganizacao):
     desconto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     forma_pagamento = models.CharField(max_length=100, blank=True)
 
-    modulacao_concluida = models.BooleanField(default=False)
     observacoes = models.TextField(blank=True)
 
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -107,6 +106,8 @@ class Acompanhamento(ModeloDaOrganizacao):
             ConsultaPrevista.objects.create(acompanhamento=acompanhamento, numero=numero)
         for numero in range(1, programa.qtd_kits + 1):
             KitPrevisto.objects.create(acompanhamento=acompanhamento, numero=numero)
+        for numero in range(1, programa.qtd_modulacoes + 1):
+            Modulacao.iniciar(acompanhamento=acompanhamento, numero=numero)
 
         # Gera automaticamente a receita prevista (pendente) do plano fechado.
         from financeiro.models import Pagamento
@@ -127,9 +128,10 @@ class Acompanhamento(ModeloDaOrganizacao):
         """Monta a lista de etapas (diagnóstico → modulações → consultas/kits intercalados → finalização)."""
         etapas = [{"nome": "Consulta de diagnóstico", "concluida": True}]
 
-        for i in range(self.programa.qtd_modulacoes):
-            nome = "Modulação" if self.programa.qtd_modulacoes == 1 else f"Modulação {i + 1}"
-            etapas.append({"nome": nome, "concluida": self.modulacao_concluida})
+        modulacoes = list(self.modulacoes.order_by("numero"))
+        for m in modulacoes:
+            nome = "Modulação" if len(modulacoes) == 1 else f"Modulação {m.numero}"
+            etapas.append({"nome": nome, "concluida": m.concluida})
 
         consultas = list(self.consultas_previstas.order_by("numero"))
         kits = list(self.kits_previstos.order_by("numero"))
@@ -246,3 +248,142 @@ class CustoAcompanhamento(models.Model):
 
     def __str__(self):
         return f"{self.descricao} — R$ {self.valor}"
+
+
+# (numero da fase, duração em semanas) — sempre 3 fases: 1 + 3 + 2 = 6 semanas.
+FASES_PADRAO_SEMANAS = ((1, 1), (2, 3), (3, 2))
+
+
+class Modulacao(models.Model):
+    """
+    Uma modulação do acompanhamento (um programa pode ter mais de uma —
+    `Programa.qtd_modulacoes`). Sempre progressiva e 100% personalizada:
+    3 fases (1 + 3 + 2 semanas), cada uma com seu próprio plano e avaliação,
+    nunca um template copiado — ver `FaseModulacao`.
+    """
+
+    acompanhamento = models.ForeignKey(
+        Acompanhamento, on_delete=models.CASCADE, related_name="modulacoes"
+    )
+    numero = models.PositiveIntegerField()
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "modulação"
+        verbose_name_plural = "modulações"
+        ordering = ["numero"]
+        unique_together = ("acompanhamento", "numero")
+
+    def __str__(self):
+        return f"Modulação {self.numero} de {self.acompanhamento}"
+
+    @property
+    def concluida(self):
+        fases = list(self.fases.all())
+        return bool(fases) and all(f.status == FaseModulacao.Status.CONCLUIDA for f in fases)
+
+    @classmethod
+    def iniciar(cls, *, acompanhamento, numero):
+        """Cria a modulação já com suas 3 fases (plano/avaliação ficam em branco, a preencher depois)."""
+        modulacao = cls.objects.create(acompanhamento=acompanhamento, numero=numero)
+        for numero_fase, semanas in FASES_PADRAO_SEMANAS:
+            FaseModulacao.objects.create(
+                modulacao=modulacao, numero=numero_fase, duracao_semanas=semanas
+            )
+        return modulacao
+
+
+class FaseModulacao(models.Model):
+    """
+    Uma das 3 fases de uma modulação. O plano e a avaliação de cada fase
+    ficam gravados permanentemente — nunca são sobrescritos por uma fase
+    seguinte, e a avaliação de uma fase (o que precisa ser trabalhado)
+    é o que embasa o plano da próxima.
+    """
+
+    class Status(models.TextChoices):
+        PENDENTE = "PENDENTE", "Pendente"
+        EM_ANDAMENTO = "EM_ANDAMENTO", "Em andamento"
+        CONCLUIDA = "CONCLUIDA", "Concluída"
+
+    class Resultado(models.TextChoices):
+        MELHOROU = "MELHOROU", "Melhorou"
+        PERMANECE = "PERMANECE", "Permanece"
+        PIOROU = "PIOROU", "Piorou"
+
+    modulacao = models.ForeignKey(Modulacao, on_delete=models.CASCADE, related_name="fases")
+    numero = models.PositiveIntegerField(help_text="1, 2 ou 3.")
+    duracao_semanas = models.PositiveIntegerField()
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.PENDENTE)
+
+    data_inicio = models.DateField(blank=True, null=True)
+    data_fim_prevista = models.DateField(blank=True, null=True)
+
+    plano = models.TextField(blank=True, help_text="O que foi prescrito pra essa fase.")
+
+    resultado = models.CharField(max_length=15, choices=Resultado.choices, blank=True)
+    principais_melhoras = models.TextField(blank=True)
+    o_que_trabalhar = models.TextField(
+        blank=True, help_text="Alimenta o plano da próxima fase."
+    )
+    avaliado_em = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = "fase da modulação"
+        verbose_name_plural = "fases da modulação"
+        ordering = ["numero"]
+        unique_together = ("modulacao", "numero")
+
+    def __str__(self):
+        return f"Fase {self.numero} da {self.modulacao}"
+
+    def iniciar_fase(self, *, plano, data_inicio=None):
+        self.plano = plano
+        self.data_inicio = data_inicio or timezone.localdate()
+        self.data_fim_prevista = self.data_inicio + datetime.timedelta(weeks=self.duracao_semanas)
+        self.status = self.Status.EM_ANDAMENTO
+        self.save(update_fields=["plano", "data_inicio", "data_fim_prevista", "status"])
+
+    def concluir_com_avaliacao(self, *, resultado, principais_melhoras="", o_que_trabalhar=""):
+        self.resultado = resultado
+        self.principais_melhoras = principais_melhoras
+        self.o_que_trabalhar = o_que_trabalhar
+        self.avaliado_em = timezone.now()
+        self.status = self.Status.CONCLUIDA
+        self.save(update_fields=[
+            "resultado", "principais_melhoras", "o_que_trabalhar", "avaliado_em", "status",
+        ])
+
+
+class Feedback(models.Model):
+    """Registro de um retorno da paciente durante o acompanhamento (ex.: check-in por WhatsApp)."""
+
+    acompanhamento = models.ForeignKey(
+        Acompanhamento, on_delete=models.CASCADE, related_name="feedbacks"
+    )
+    fase = models.ForeignKey(
+        FaseModulacao, on_delete=models.SET_NULL, related_name="feedbacks",
+        blank=True, null=True, help_text="Fase da modulação a que esse feedback se refere, se houver.",
+    )
+    data_hora = models.DateTimeField(default=timezone.now)
+    semana = models.PositiveIntegerField(
+        blank=True, null=True, help_text="Semana da fase a que o relato se refere, se houver."
+    )
+
+    relato = models.TextField("relato da paciente")
+    observacao = models.TextField("observação do profissional", blank=True)
+    conduta = models.TextField(blank=True)
+    precisou_alterar = models.BooleanField(
+        "precisou alterar o plano por causa desse feedback?", default=False
+    )
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "feedback"
+        verbose_name_plural = "feedbacks"
+        ordering = ["-data_hora"]
+
+    def __str__(self):
+        return f"Feedback de {self.acompanhamento.paciente} em {self.data_hora:%d/%m/%Y %H:%M}"
