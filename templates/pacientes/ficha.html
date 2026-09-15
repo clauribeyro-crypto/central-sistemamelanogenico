@@ -190,6 +190,28 @@
                     <p style="margin-top:1rem;">Nenhum atendimento registrado ainda para esta paciente.</p>
                 {% endif %}
             </div>
+        {% elif aba_atual == "modulacao" %}
+            {% for m in modulacoes %}
+                <div class="card">
+                    <h2>Modulação {{ m.numero }}{% if m.concluida %} <span class="badge">Concluída</span>{% endif %}</h2>
+                    <table>
+                        <thead><tr><th>Fase</th><th>Duração</th><th>Status</th><th>Resultado</th><th></th></tr></thead>
+                        <tbody>
+                        {% for f in m.fases.all %}
+                            <tr>
+                                <td>Fase {{ f.numero }}</td>
+                                <td>{{ f.duracao_semanas }} semana{{ f.duracao_semanas|pluralize }}</td>
+                                <td>{{ f.get_status_display }}</td>
+                                <td>{{ f.get_resultado_display|default:"—" }}</td>
+                                <td><a href="{% url 'programas:fase_detalhe' f.pk %}">Ver/editar ›</a></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% empty %}
+                <div class="card"><p>Este programa não prevê modulação.</p></div>
+            {% endfor %}
         {% elif aba_atual == "consultas" %}
             {% if acompanhamento %}
                 <div class="card">

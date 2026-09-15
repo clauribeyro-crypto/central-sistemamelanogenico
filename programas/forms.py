@@ -2,7 +2,7 @@ from django import forms
 
 from agenda.models import TipoConsulta
 
-from .models import Programa
+from .models import FaseModulacao, Programa
 
 
 class TipoConsultaForm(forms.ModelForm):
@@ -29,3 +29,29 @@ class ProgramaForm(forms.ModelForm):
         widgets = {
             "nome": forms.TextInput(attrs={"placeholder": "Ex.: Programa de 3 meses"}),
         }
+
+
+class PlanoFaseForm(forms.ModelForm):
+    class Meta:
+        model = FaseModulacao
+        fields = ["plano", "data_inicio"]
+        widgets = {
+            "plano": forms.Textarea(attrs={"rows": 6}),
+            "data_inicio": forms.DateInput(attrs={"type": "date"}),
+        }
+
+
+class AvaliacaoFaseForm(forms.ModelForm):
+    class Meta:
+        model = FaseModulacao
+        fields = ["resultado", "principais_melhoras", "o_que_trabalhar"]
+        widgets = {
+            "principais_melhoras": forms.Textarea(attrs={"rows": 3}),
+            "o_que_trabalhar": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # blank=True no modelo é só pra permitir fase ainda não avaliada — ao
+        # concluir a fase, escolher o resultado é obrigatório.
+        self.fields["resultado"].required = True

@@ -23,7 +23,7 @@ ABAS = [
     ("financeiro", "Financeiro"),
     ("historico", "Histórico"),
 ]
-ABAS_PRONTAS = {"geral", "anamnese", "consultas", "produtos", "financeiro", "historico"}
+ABAS_PRONTAS = {"geral", "anamnese", "modulacao", "consultas", "produtos", "financeiro", "historico"}
 
 
 def _financeiro_do_acompanhamento(acompanhamento):
@@ -90,6 +90,9 @@ def ficha(request, pk):
     if aba == "anamnese":
         contexto["anamnese"] = Anamnese.objects.filter(paciente=paciente).first()
         contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
+
+    if acompanhamento and aba == "modulacao":
+        contexto["modulacoes"] = acompanhamento.modulacoes.prefetch_related("fases").order_by("numero")
 
     if aba == "consultas":
         if acompanhamento:

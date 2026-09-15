@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Fase {{ fase.numero }} da modulação · {{ paciente.nome }}{% endblock %}
+{% block content %}
+    <p>
+        <a href="{% url 'pacientes:ficha' paciente.pk %}?aba=modulacao">← Voltar à modulação</a>
+    </p>
+
+    <div class="card">
+        <h1>Fase {{ fase.numero }} — {{ paciente.nome }}</h1>
+        <p style="color:var(--text-muted);">
+            Duração prevista: {{ fase.duracao_semanas }} semana{{ fase.duracao_semanas|pluralize }} ·
+            Status: {{ fase.get_status_display }}
+            {% if fase.data_inicio %} · Início: {{ fase.data_inicio|date:"d/m/Y" }}{% endif %}
+            {% if fase.data_fim_prevista %} · Fim previsto: {{ fase.data_fim_prevista|date:"d/m/Y" }}{% endif %}
+        </p>
+    </div>
+
+    {% if fase_anterior and fase_anterior.status == "CONCLUIDA" %}
+        <div class="card">
+            <h2>O que ficou da fase {{ fase_anterior.numero }}</h2>
+            {% if fase_anterior.principais_melhoras %}<p><strong>Principais melhoras:</strong> {{ fase_anterior.principais_melhoras|linebreaksbr }}</p>{% endif %}
+            {% if fase_anterior.o_que_trabalhar %}<p><strong>O que precisa ser trabalhado agora:</strong> {{ fase_anterior.o_que_trabalhar|linebreaksbr }}</p>{% endif %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Plano da fase</h2>
+        {% if fase.status != "PENDENTE" and not pode_editar_plano %}
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                Só um administrador da clínica pode editar o plano dessa fase já iniciada.
+            </p>
+        {% endif %}
+        <form method="post" class="acao">
+            {% csrf_token %}
+            <input type="hidden" name="form" value="plano">
+            {% for field in form_plano %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            {% if pode_editar_plano %}
+                <button class="btn" type="submit">{% if fase.status == "PENDENTE" %}Iniciar fase{% else %}Salvar plano{% endif %}</button>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>Avaliação da fase</h2>
+        {% if fase.status == "PENDENTE" %}
+            <p style="font-size:.85rem; color:var(--text-muted);">Defina o plano acima antes de registrar a avaliação.</p>
+        {% else %}
+            {% if fase.status == "CONCLUIDA" and not pode_editar_avaliacao %}
+                <p style="font-size:.85rem; color:var(--text-muted);">
+                    Só um administrador da clínica pode editar a avaliação dessa fase já concluída.
+                </p>
+            {% endif %}
+            <form method="post" class="acao">
+                {% csrf_token %}
+                <input type="hidden" name="form" value="avaliacao">
+                {% for field in form_avaliacao %}
+                    <div>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endfor %}
+                {% if pode_editar_avaliacao %}
+                    <button class="btn" type="submit">{% if fase.status == "CONCLUIDA" %}Salvar avaliação{% else %}Concluir fase{% endif %}</button>
+                {% endif %}
+            </form>
+            {% if fase.avaliado_em %}
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.5rem;">Avaliado em {{ fase.avaliado_em|date:"d/m/Y H:i" }}</p>
+            {% endif %}
+        {% endif %}
+    </div>
+{% endblock %}

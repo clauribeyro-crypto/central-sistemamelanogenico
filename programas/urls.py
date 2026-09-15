@@ -15,4 +15,5 @@ urlpatterns = [
         views.mudar_status_acompanhamento,
         name="mudar_status_acompanhamento",
     ),
+    path("fases/<int:pk>/", views.fase_detalhe, name="fase_detalhe"),
 ]
