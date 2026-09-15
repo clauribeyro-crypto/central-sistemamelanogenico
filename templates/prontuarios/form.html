@@ -7,6 +7,11 @@
     </p>
     <div class="card">
         <h1>{% if atendimento %}Editar atendimento{% else %}Novo atendimento{% endif %} — {{ paciente.nome }}</h1>
+        {% if atendimento and not pode_editar %}
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                Só um administrador da clínica pode editar um atendimento já salvo — você pode conferir o que foi registrado, mas não alterar.
+            </p>
+        {% endif %}
         <form method="post" class="acao">
             {% csrf_token %}
             {% for field in form %}
@@ -17,7 +22,9 @@
                     {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
                 </div>
             {% endfor %}
-            <button class="btn" type="submit">{% if atendimento %}Salvar alterações{% else %}Registrar atendimento{% endif %}</button>
+            {% if not atendimento or pode_editar %}
+                <button class="btn" type="submit">{% if atendimento %}Salvar alterações{% else %}Registrar atendimento{% endif %}</button>
+            {% endif %}
         </form>
     </div>
 {% endblock %}

@@ -1,4 +1,8 @@
+import functools
+
+from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
 
 
 def organizacao_do_usuario(request):
@@ -21,3 +25,41 @@ def organizacao_do_usuario(request):
             "organização em /admin/."
         )
     return organizacao
+
+
+def usuario_e_administrador(request):
+    """
+    Quem pode editar um registro do histórico clínico já criado (fase da
+    modulação, avaliação, anamnese, foto de evolução, atendimento) — não é
+    qualquer profissional logado, só quem administra a clínica. Reaproveita
+    o `is_staff` que o Django já tem pronto em vez de criar um campo novo:
+    marque essa caixinha no cadastro do usuário (em /admin/) para quem deve
+    poder editar esses registros.
+
+    Ações do dia a dia (agenda, leads, financeiro) não passam por aqui —
+    essa checagem é só para edição de histórico clínico já registrado.
+    """
+    return request.user.is_authenticated and request.user.is_staff
+
+
+def administrador_obrigatorio(view_func):
+    """
+    Decorator para views de edição de histórico clínico: bloqueia quem não
+    é administrador da clínica (ver `usuario_e_administrador`), com uma
+    mensagem clara em vez de um erro genérico. Combine com @login_required
+    (nessa ordem: @login_required em cima, @administrador_obrigatorio embaixo)
+    — este decorator presume que request.user já está autenticado.
+    """
+    @functools.wraps(view_func)
+    def view_decorada(request, *args, **kwargs):
+        if not usuario_e_administrador(request):
+            messages.error(
+                request,
+                "Só um administrador da clínica pode editar esse registro já salvo.",
+            )
+            proximo = request.META.get("HTTP_REFERER")
+            if proximo:
+                return redirect(proximo)
+            return redirect("core:home")
+        return view_func(request, *args, **kwargs)
+    return view_decorada
