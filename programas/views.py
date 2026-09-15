@@ -122,7 +122,8 @@ def mudar_status_acompanhamento(request, pk):
 
     novo_status, mensagem = ACOES_STATUS[acao]
     acompanhamento.status = novo_status
-    acompanhamento.save(update_fields=["status"])
+    acompanhamento.status_atualizado_em = timezone.now()
+    acompanhamento.save(update_fields=["status", "status_atualizado_em"])
     messages.success(request, mensagem)
 
     if acao in ("renovar", "migrar"):

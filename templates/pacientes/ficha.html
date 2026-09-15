@@ -28,66 +28,73 @@
         </div>
     </div>
 
-    {% if not acompanhamento %}
+    {% if not acompanhamento and not tem_algum_acompanhamento %}
         <div class="card">
             <p>Esta paciente ainda não tem um programa de acompanhamento ativo.</p>
             <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar protocolo de acompanhamento</a>
         </div>
     {% else %}
-        <div class="card">
-            <div class="jornada">
-                {% for etapa in jornada %}
-                    <div class="jornada-etapa {% if etapa.concluida %}concluida{% elif etapa.atual %}atual{% endif %}">
-                        <div class="circulo">{% if etapa.concluida %}✓{% else %}{{ forloop.counter }}{% endif %}</div>
-                        <div class="rotulo">{{ etapa.nome }}</div>
-                    </div>
-                    {% if not forloop.last %}
-                        <div class="jornada-linha {% if etapa.concluida %}concluida{% endif %}"></div>
-                    {% endif %}
-                {% endfor %}
+        {% if acompanhamento %}
+            <div class="card">
+                <div class="jornada">
+                    {% for etapa in jornada %}
+                        <div class="jornada-etapa {% if etapa.concluida %}concluida{% elif etapa.atual %}atual{% endif %}">
+                            <div class="circulo">{% if etapa.concluida %}✓{% else %}{{ forloop.counter }}{% endif %}</div>
+                            <div class="rotulo">{{ etapa.nome }}</div>
+                        </div>
+                        {% if not forloop.last %}
+                            <div class="jornada-linha {% if etapa.concluida %}concluida{% endif %}"></div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
             </div>
-        </div>
 
-        <div class="card">
-            <h2 style="margin-top:0;">Continuidade do acompanhamento</h2>
-            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
-                Dias restantes: {{ acompanhamento.dias_restantes }}
-            </p>
-            <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
-                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
-                      onsubmit="return confirm('Finalizar este acompanhamento?');">
-                    {% csrf_token %}
-                    <input type="hidden" name="acao" value="finalizar">
-                    <button class="btn btn-secondary" type="submit">Finalizar acompanhamento</button>
-                </form>
-                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
-                      onsubmit="return confirm('Renovar? Isso encerra o acompanhamento atual e leva direto pra iniciar o próximo, na mesma ficha.');">
-                    {% csrf_token %}
-                    <input type="hidden" name="acao" value="renovar">
-                    <button class="btn" type="submit">Renovar</button>
-                </form>
-                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
-                      onsubmit="return confirm('Migrar para outro programa? Isso encerra o acompanhamento atual e leva direto pra iniciar o novo, na mesma ficha.');">
-                    {% csrf_token %}
-                    <input type="hidden" name="acao" value="migrar">
-                    <button class="btn" type="submit">Migrar para outro programa</button>
-                </form>
-                {% if acompanhamento.status != "MANUTENCAO" %}
-                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+            <div class="card">
+                <h2 style="margin-top:0;">Continuidade do acompanhamento</h2>
+                <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+                    Dias restantes: {{ acompanhamento.dias_restantes }}
+                </p>
+                <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                          onsubmit="return confirm('Finalizar este acompanhamento?');">
                         {% csrf_token %}
-                        <input type="hidden" name="acao" value="manutencao">
-                        <button class="btn btn-secondary" type="submit">Colocar em manutenção</button>
+                        <input type="hidden" name="acao" value="finalizar">
+                        <button class="btn btn-secondary" type="submit">Finalizar acompanhamento</button>
                     </form>
-                {% endif %}
-                {% if acompanhamento.status != "AGUARDANDO_DECISAO" %}
-                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                          onsubmit="return confirm('Renovar? Isso encerra o acompanhamento atual e leva direto pra iniciar o próximo, na mesma ficha.');">
                         {% csrf_token %}
-                        <input type="hidden" name="acao" value="aguardando_decisao">
-                        <button class="btn btn-secondary" type="submit">Aguardando decisão</button>
+                        <input type="hidden" name="acao" value="renovar">
+                        <button class="btn" type="submit">Renovar</button>
                     </form>
-                {% endif %}
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                          onsubmit="return confirm('Migrar para outro programa? Isso encerra o acompanhamento atual e leva direto pra iniciar o novo, na mesma ficha.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="migrar">
+                        <button class="btn" type="submit">Migrar para outro programa</button>
+                    </form>
+                    {% if acompanhamento.status != "MANUTENCAO" %}
+                        <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="manutencao">
+                            <button class="btn btn-secondary" type="submit">Colocar em manutenção</button>
+                        </form>
+                    {% endif %}
+                    {% if acompanhamento.status != "AGUARDANDO_DECISAO" %}
+                        <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="acao" value="aguardando_decisao">
+                            <button class="btn btn-secondary" type="submit">Aguardando decisão</button>
+                        </form>
+                    {% endif %}
+                </div>
             </div>
-        </div>
+        {% else %}
+            <div class="card">
+                <p>Esta paciente não tem um acompanhamento ativo no momento — o histórico dos programas anteriores continua abaixo.</p>
+                <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar novo protocolo de acompanhamento</a>
+            </div>
+        {% endif %}
 
         <div class="tabs">
             {% for slug, label in abas %}
