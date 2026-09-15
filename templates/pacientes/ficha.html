@@ -129,9 +129,11 @@
                 <div class="card">
                     <h2>Resumo financeiro</h2>
                     <ul class="fila">
+                        <li><div class="nome">Valor vendido</div><span class="badge">R$ {{ valor_vendido|floatformat:2 }}</span></li>
                         <li><div class="nome">Recebido</div><span class="badge">R$ {{ recebido|floatformat:2 }}</span></li>
                         <li><div class="nome">A receber</div><span class="badge">R$ {{ a_receber|floatformat:2 }}</span></li>
                         <li><div class="nome">Custos</div><span class="badge">R$ {{ total_custos|floatformat:2 }}</span></li>
+                        <li><div class="nome">Resultado</div><span class="badge">R$ {{ resultado|floatformat:2 }}</span></li>
                     </ul>
 
                     {% if alertas %}
@@ -226,6 +228,7 @@
             </div>
         {% elif aba_atual == "financeiro" %}
             <div class="grid">
+                <div class="card stat"><div class="num">R$ {{ valor_vendido|floatformat:2 }}</div><div class="rotulo">Valor vendido</div></div>
                 <div class="card stat"><div class="num">R$ {{ recebido|floatformat:2 }}</div><div class="rotulo">Recebido</div></div>
                 <div class="card stat"><div class="num">R$ {{ a_receber|floatformat:2 }}</div><div class="rotulo">A receber</div></div>
                 <div class="card stat"><div class="num">R$ {{ total_custos|floatformat:2 }}</div><div class="rotulo">Custos</div></div>
