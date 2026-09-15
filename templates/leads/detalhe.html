@@ -18,6 +18,12 @@
         {% if lead.observacoes %}<p><em>{{ lead.observacoes }}</em></p>{% endif %}
         {% if lead.paciente %}
             <p>✅ Vinculado ao paciente <strong>{{ lead.paciente }}</strong></p>
+            <p>
+                <a class="btn btn-secondary" href="{% url 'pacientes:ficha' lead.paciente.pk %}">Ver ficha da paciente</a>
+                {% if not lead.paciente.acompanhamento_atual %}
+                    <a class="btn" href="{% url 'pacientes:iniciar_protocolo' lead.paciente.pk %}">Iniciar protocolo de acompanhamento</a>
+                {% endif %}
+            </p>
         {% endif %}
     </div>
 

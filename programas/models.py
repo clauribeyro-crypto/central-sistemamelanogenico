@@ -65,6 +65,9 @@ class Acompanhamento(ModeloDaOrganizacao):
     data_inicio = models.DateField(default=timezone.localdate)
     data_termino_prevista = models.DateField()
     status = models.CharField(max_length=25, choices=Status.choices, default=Status.EM_ACOMPANHAMENTO)
+    status_atualizado_em = models.DateTimeField(
+        blank=True, null=True, help_text="Quando o status mudou pela última vez (pra linha do tempo)."
+    )
 
     valor_contratado = models.DecimalField(max_digits=10, decimal_places=2)
     desconto = models.DecimalField(max_digits=10, decimal_places=2, default=0)

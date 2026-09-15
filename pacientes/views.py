@@ -6,7 +6,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento, Recebimento
-from programas.models import Acompanhamento, CustoAcompanhamento
+from leads.models import HistoricoLead
+from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao
 from prontuarios.models import Anamnese
 
 from .forms import IniciarProtocoloForm
@@ -71,6 +72,7 @@ def ficha(request, pk):
     contexto = {
         "paciente": paciente,
         "acompanhamento": acompanhamento,
+        "tem_algum_acompanhamento": paciente.acompanhamentos.exists(),
         "abas": ABAS,
         "aba_atual": aba,
         "aba_pronta": aba in ABAS_PRONTAS,
@@ -93,6 +95,9 @@ def ficha(request, pk):
 
     if acompanhamento and aba == "modulacao":
         contexto["modulacoes"] = acompanhamento.modulacoes.prefetch_related("fases").order_by("numero")
+        contexto["resumo_evolucao"] = FaseModulacao.objects.filter(
+            modulacao__acompanhamento=acompanhamento, status=FaseModulacao.Status.CONCLUIDA
+        ).select_related("modulacao").order_by("modulacao__numero", "numero")
 
     if acompanhamento and aba == "feedbacks":
         contexto["feedbacks"] = acompanhamento.feedbacks.select_related("fase").order_by("-data_hora")
@@ -111,14 +116,64 @@ def ficha(request, pk):
     if acompanhamento and aba == "produtos":
         contexto["kits"] = acompanhamento.kits_previstos.order_by("numero")
 
-    if acompanhamento and aba == "historico":
-        eventos = [{"data": acompanhamento.data_inicio, "texto": f"Início do acompanhamento — {acompanhamento.programa.nome}"}]
-        for c in acompanhamento.consultas_previstas.select_related("consulta"):
-            if c.status == c.Status.REALIZADA and c.consulta:
-                eventos.append({"data": c.consulta.data_hora.date(), "texto": f"Consulta {c.numero} realizada"})
-        for k in acompanhamento.kits_previstos.all():
-            if k.status == k.Status.ENVIADO and k.data_envio:
-                eventos.append({"data": k.data_envio, "texto": f"Kit {k.numero} enviado"})
+    if aba == "historico":
+        eventos = []
+
+        # Lado do lead: só os marcos (entrada e agendamento), não o log de
+        # cada tentativa de contato da cadência — isso já vive na tela de Leads.
+        for lead in paciente.leads.all():
+            for h in lead.historico.filter(
+                tipo__in=[HistoricoLead.Tipo.ENTRADA, HistoricoLead.Tipo.AGENDAMENTO]
+            ):
+                eventos.append({"data": h.data_hora.date(), "texto": h.descricao})
+
+        # Cobre todos os acompanhamentos já feitos por essa paciente, não só o
+        # atual — se ela finalizou um programa e ainda não começou outro, a
+        # linha do tempo continua mostrando a jornada completa.
+        todos_acompanhamentos = list(paciente.acompanhamentos.all())
+        for acomp in todos_acompanhamentos:
+            eventos.append({
+                "data": acomp.data_inicio,
+                "texto": f"Início do acompanhamento — {acomp.programa.nome}",
+            })
+            if acomp.status_atualizado_em and acomp.status != Acompanhamento.Status.EM_ACOMPANHAMENTO:
+                eventos.append({
+                    "data": acomp.status_atualizado_em.date(),
+                    "texto": f"Acompanhamento — {acomp.get_status_display()}",
+                })
+            for k in acomp.kits_previstos.all():
+                if k.status == k.Status.ENVIADO and k.data_envio:
+                    eventos.append({"data": k.data_envio, "texto": f"Kit {k.numero} enviado"})
+            for f in FaseModulacao.objects.filter(
+                modulacao__acompanhamento=acomp, status=FaseModulacao.Status.CONCLUIDA
+            ).select_related("modulacao"):
+                eventos.append({
+                    "data": f.avaliado_em.date(),
+                    "texto": (
+                        f"Fase {f.numero} da Modulação {f.modulacao.numero} concluída "
+                        f"— {f.get_resultado_display()}"
+                    ),
+                })
+
+        # Todas as consultas realizadas na Agenda — inclui a de diagnóstico e a
+        # de venda (antes do programa existir), não só as previstas no programa.
+        numero_por_consulta_id = {}
+        for acomp in todos_acompanhamentos:
+            numero_por_consulta_id.update({
+                cp.consulta_id: cp.numero
+                for cp in acomp.consultas_previstas.all()
+                if cp.consulta_id
+            })
+        consultas_realizadas = Consulta.objects.filter(
+            organizacao=org, paciente=paciente, status=Consulta.Status.REALIZADA
+        ).select_related("tipo_consulta")
+        for c in consultas_realizadas:
+            if c.pk in numero_por_consulta_id:
+                texto = f"Consulta {numero_por_consulta_id[c.pk]} do programa realizada"
+            else:
+                texto = f"Consulta ({c.tipo_consulta}) realizada"
+            eventos.append({"data": c.data_hora.date(), "texto": texto})
+
         contexto["eventos"] = sorted(eventos, key=lambda e: e["data"])
 
     if acompanhamento and aba == "geral":

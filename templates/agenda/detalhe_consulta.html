@@ -21,6 +21,10 @@
         <p style="font-size:.82rem;"><a href="/admin/agenda/consulta/{{ consulta.pk }}/change/">Editar profissional, tipo, data ou duração (administração) ›</a></p>
 
         <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem;">
+            <a class="btn btn-secondary" href="{% url 'pacientes:ficha' consulta.paciente.pk %}">Ver ficha da paciente</a>
+            {% if not consulta.paciente.acompanhamento_atual %}
+                <a class="btn" href="{% url 'pacientes:iniciar_protocolo' consulta.paciente.pk %}">Iniciar protocolo de acompanhamento</a>
+            {% endif %}
             {% if consulta.status != "CANCELADA" and consulta.status != "REALIZADA" %}
                 <form method="post" onsubmit="return confirm('Cancelar esta consulta? O lançamento financeiro pendente vinculado (se houver) também será cancelado.');">
                     {% csrf_token %}
