@@ -74,6 +74,9 @@ def home(request):
         key=lambda item: item["lead"].entrou_em,
     )
 
+    limite_parado = timezone.now() - datetime.timedelta(days=org.dias_lead_parado)
+    leads_parados = leads_ativos.filter(atualizado_em__lte=limite_parado).order_by("atualizado_em")
+
     alertas_acompanhamentos = []
     for acomp in Acompanhamento.objects.filter(
         organizacao=org, status__in=Acompanhamento.STATUS_ATIVOS
@@ -89,6 +92,12 @@ def home(request):
         "contato_4": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_4).count(),
         "retomar_hoje": leads_pausados_hoje.count(),
         "atrasados": [lead for lead in leads_ativos if lead.esta_atrasado],
+        "leads_parados": [
+            {"lead": lead, "dias": (hoje - timezone.localtime(lead.atualizado_em).date()).days}
+            for lead in leads_parados[:12]
+        ],
+        "total_leads_parados": leads_parados.count(),
+        "dias_lead_parado": org.dias_lead_parado,
         "fila": fila[:12],
         "alertas_acompanhamentos": alertas_acompanhamentos[:10],
         "consultas_hoje": Consulta.objects.filter(

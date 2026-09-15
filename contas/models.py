@@ -24,6 +24,14 @@ class Organizacao(models.Model):
         help_text="Intervalo entre horários na grade da agenda (em minutos).",
     )
 
+    dias_lead_parado = models.PositiveIntegerField(
+        default=3,
+        help_text=(
+            "Quantos dias sem nenhuma atualização de status fazem um lead "
+            "aparecer no card \"Leads parados\" da tela inicial."
+        ),
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
