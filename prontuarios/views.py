@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from contas.utils import organizacao_do_usuario
+from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
 
 from .forms import AtendimentoForm
@@ -74,13 +74,26 @@ def criar(request, paciente_pk):
 
 @login_required
 def editar(request, pk):
+    """
+    Ver um atendimento já registrado é livre pra qualquer profissional
+    logado — só a ação de salvar uma alteração nele é que fica restrita a
+    quem administra a clínica (ver `usuario_e_administrador`), porque isso
+    já é histórico clínico, diferente de criar um atendimento novo.
+    """
     org = organizacao_do_usuario(request)
     atendimento = get_object_or_404(
         Atendimento.objects.select_related("paciente"), pk=pk, organizacao=org
     )
     paciente = atendimento.paciente
+    pode_editar = usuario_e_administrador(request)
 
     if request.method == "POST":
+        if not pode_editar:
+            messages.error(
+                request,
+                "Só um administrador da clínica pode editar um atendimento já salvo.",
+            )
+            return redirect("prontuarios:editar", pk=atendimento.pk)
         form = AtendimentoForm(
             request.POST, instance=atendimento, organizacao=org, paciente=paciente
         )
@@ -90,6 +103,10 @@ def editar(request, pk):
             return redirect(_redirecionar_apos_salvar(paciente))
     else:
         form = AtendimentoForm(instance=atendimento, organizacao=org, paciente=paciente)
+        if not pode_editar:
+            for field in form.fields.values():
+                field.disabled = True
     return render(request, "prontuarios/form.html", {
         "paciente": paciente, "form": form, "atendimento": atendimento,
+        "pode_editar": pode_editar,
     })

@@ -48,6 +48,47 @@
             </div>
         </div>
 
+        <div class="card">
+            <h2 style="margin-top:0;">Continuidade do acompanhamento</h2>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+                Dias restantes: {{ acompanhamento.dias_restantes }}
+            </p>
+            <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                      onsubmit="return confirm('Finalizar este acompanhamento?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="finalizar">
+                    <button class="btn btn-secondary" type="submit">Finalizar acompanhamento</button>
+                </form>
+                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                      onsubmit="return confirm('Renovar? Isso encerra o acompanhamento atual e leva direto pra iniciar o próximo, na mesma ficha.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="renovar">
+                    <button class="btn" type="submit">Renovar</button>
+                </form>
+                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                      onsubmit="return confirm('Migrar para outro programa? Isso encerra o acompanhamento atual e leva direto pra iniciar o novo, na mesma ficha.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="migrar">
+                    <button class="btn" type="submit">Migrar para outro programa</button>
+                </form>
+                {% if acompanhamento.status != "MANUTENCAO" %}
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="manutencao">
+                        <button class="btn btn-secondary" type="submit">Colocar em manutenção</button>
+                    </form>
+                {% endif %}
+                {% if acompanhamento.status != "AGUARDANDO_DECISAO" %}
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="aguardando_decisao">
+                        <button class="btn btn-secondary" type="submit">Aguardando decisão</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
         <div class="tabs">
             {% for slug, label in abas %}
                 <a class="{% if slug == aba_atual %}ativo{% endif %}" href="?aba={{ slug }}">{{ label }}</a>
@@ -120,6 +161,55 @@
                     </ul>
                 {% else %}
                     <p style="margin-top:1rem;">Nenhum atendimento registrado ainda para esta paciente.</p>
+                {% endif %}
+            </div>
+        {% elif aba_atual == "consultas" %}
+            {% if acompanhamento %}
+                <div class="card">
+                    <h2>Consultas previstas do programa</h2>
+                    {% if consultas_previstas %}
+                        <table>
+                            <thead><tr><th>#</th><th>Status</th><th>Data</th><th>Profissional</th><th></th></tr></thead>
+                            <tbody>
+                            {% for cp in consultas_previstas %}
+                                <tr>
+                                    <td>Consulta {{ cp.numero }}</td>
+                                    <td>{{ cp.get_status_display }}</td>
+                                    <td>{{ cp.consulta.data_hora|date:"d/m/Y H:i"|default:"—" }}</td>
+                                    <td>{{ cp.consulta.profissional|default:"—" }}</td>
+                                    <td>
+                                        {% if cp.consulta %}
+                                            <a href="{% url 'agenda:detalhe_consulta' cp.consulta.pk %}">Ver ›</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>Este programa não prevê nenhuma consulta.</p>
+                    {% endif %}
+                </div>
+            {% endif %}
+            <div class="card">
+                <h2>Todas as consultas na Agenda</h2>
+                {% if consultas_agenda %}
+                    <table>
+                        <thead><tr><th>Data</th><th>Tipo</th><th>Profissional</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                        {% for c in consultas_agenda %}
+                            <tr>
+                                <td>{{ c.data_hora|date:"d/m/Y H:i" }}</td>
+                                <td><span class="badge" style="background:{{ c.tipo_consulta.cor }}22; color:{{ c.tipo_consulta.cor }};">{{ c.tipo_consulta }}</span></td>
+                                <td>{{ c.profissional }}</td>
+                                <td>{{ c.get_status_display }}</td>
+                                <td><a href="{% url 'agenda:detalhe_consulta' c.pk %}">Ver ›</a></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>Nenhuma consulta registrada na Agenda para esta paciente ainda.</p>
                 {% endif %}
             </div>
         {% elif aba_atual == "produtos" %}

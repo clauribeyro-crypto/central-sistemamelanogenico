@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 
+from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento
 from programas.models import Acompanhamento, CustoAcompanhamento
@@ -15,12 +16,13 @@ ABAS = [
     ("anamnese", "Anamnese"),
     ("modulacao", "Modulação"),
     ("feedbacks", "Feedbacks"),
+    ("consultas", "Consultas"),
     ("fotos", "Fotos"),
     ("produtos", "Produtos"),
     ("financeiro", "Financeiro"),
     ("historico", "Histórico"),
 ]
-ABAS_PRONTAS = {"geral", "anamnese", "produtos", "financeiro", "historico"}
+ABAS_PRONTAS = {"geral", "anamnese", "consultas", "produtos", "financeiro", "historico"}
 
 
 @login_required
@@ -69,6 +71,17 @@ def ficha(request, pk):
 
     if aba == "anamnese":
         contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
+
+    if aba == "consultas":
+        if acompanhamento:
+            contexto["consultas_previstas"] = acompanhamento.consultas_previstas.select_related(
+                "consulta__profissional", "consulta__tipo_consulta"
+            ).order_by("numero")
+        contexto["consultas_agenda"] = Consulta.objects.filter(
+            organizacao=org, paciente=paciente
+        ).exclude(status=Consulta.Status.CANCELADA).select_related(
+            "profissional", "tipo_consulta"
+        ).order_by("-data_hora")
 
     if acompanhamento and aba == "produtos":
         contexto["kits"] = acompanhamento.kits_previstos.order_by("numero")
