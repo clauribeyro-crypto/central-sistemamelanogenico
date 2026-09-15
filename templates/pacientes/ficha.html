@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load anamnese_extras %}
 {% block title %}{{ paciente.nome }} · Ficha da paciente{% endblock %}
 {% block content %}
     <p><a href="{% url 'pacientes:lista' %}">← Voltar</a></p>
@@ -28,13 +29,7 @@
         </div>
     </div>
 
-    {% if not acompanhamento and not tem_algum_acompanhamento %}
-        <div class="card">
-            <p>Esta paciente ainda não tem um programa de acompanhamento ativo.</p>
-            <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar protocolo de acompanhamento</a>
-        </div>
-    {% else %}
-        {% if acompanhamento %}
+    {% if acompanhamento %}
             <div class="card">
                 <div class="jornada">
                     {% for etapa in jornada %}
@@ -91,8 +86,13 @@
             </div>
         {% else %}
             <div class="card">
-                <p>Esta paciente não tem um acompanhamento ativo no momento — o histórico dos programas anteriores continua abaixo.</p>
-                <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar novo protocolo de acompanhamento</a>
+                {% if tem_algum_acompanhamento %}
+                    <p>Esta paciente não tem um acompanhamento ativo no momento — o histórico dos programas anteriores continua abaixo.</p>
+                    <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar novo protocolo de acompanhamento</a>
+                {% else %}
+                    <p>Esta paciente ainda não tem um programa de acompanhamento — as abas de anamnese, documentos e consultas já funcionam normalmente.</p>
+                    <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar protocolo de acompanhamento</a>
+                {% endif %}
             </div>
         {% endif %}
 
@@ -154,25 +154,65 @@
         {% elif aba_atual == "anamnese" %}
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Link de anamnese</h2>
+                </div>
+                {% if link_anamnese_ativo %}
+                    <p style="font-size:.85rem; color:var(--text-muted); margin-top:.5rem;">Envie esse link pra paciente preencher a própria anamnese, sem precisar de login:</p>
+                    <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+                        <input type="text" readonly value="{{ link_anamnese_url }}" id="link-anamnese-url" style="flex:1; min-width:220px; padding:.5rem; border-radius:8px; border:1px solid #ddd6ea;">
+                        <button type="button" class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('link-anamnese-url').value); this.textContent='Copiado!';">Copiar link</button>
+                        <form method="post" action="{% url 'prontuarios:link_anamnese_desativar' link_anamnese_ativo.pk %}" onsubmit="return confirm('Desativar esse link? Ele para de funcionar pra paciente.');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-secondary" style="color:#8f2e45;">Desativar</button>
+                        </form>
+                    </div>
+                {% else %}
+                    <form method="post" action="{% url 'prontuarios:link_anamnese_criar' paciente.pk %}" style="margin-top:.5rem;">
+                        {% csrf_token %}
+                        <button class="btn" type="submit">Gerar link de anamnese</button>
+                    </form>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
                     <h2 style="margin:0;">Anamnese</h2>
                     <a class="btn" href="{% url 'prontuarios:anamnese' paciente.pk %}">
                         {% if anamnese %}Editar anamnese{% else %}+ Preencher anamnese{% endif %}
                     </a>
                 </div>
                 {% if anamnese %}
-                    <dl style="margin-top:1rem;">
-                        {% if anamnese.melasma_pele %}<dt><strong>Melasma / pele</strong></dt><dd>{{ anamnese.melasma_pele|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.intestino %}<dt><strong>Intestino</strong></dt><dd>{{ anamnese.intestino|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.estomago_digestao %}<dt><strong>Estômago / digestão</strong></dt><dd>{{ anamnese.estomago_digestao|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.figado_vesicula %}<dt><strong>Fígado / vesícula</strong></dt><dd>{{ anamnese.figado_vesicula|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.hormonal_ciclo %}<dt><strong>Hormonal / ciclo</strong></dt><dd>{{ anamnese.hormonal_ciclo|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.sono %}<dt><strong>Sono</strong></dt><dd>{{ anamnese.sono|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.alimentacao %}<dt><strong>Alimentação</strong></dt><dd>{{ anamnese.alimentacao|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.medicamentos %}<dt><strong>Medicamentos</strong></dt><dd>{{ anamnese.medicamentos|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.historico_saude %}<dt><strong>Histórico de saúde</strong></dt><dd>{{ anamnese.historico_saude|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.sinais_sintomas %}<dt><strong>Sinais e sintomas</strong></dt><dd>{{ anamnese.sinais_sintomas|linebreaksbr }}</dd>{% endif %}
-                        {% if anamnese.observacoes_profissional %}<dt><strong>Observações do profissional</strong></dt><dd>{{ anamnese.observacoes_profissional|linebreaksbr }}</dd>{% endif %}
-                    </dl>
+                    {% if anamnese.satisfacoes_preenchidas %}
+                        <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:1rem 0 .5rem;">Satisfação (0 a 10)</p>
+                        <div class="grid">
+                            {% for rotulo, nota in anamnese.satisfacoes_preenchidas %}
+                                <div class="card stat" style="margin-bottom:0; border-left: 4px solid {% if nota >= 7 %}#3f9c6d{% elif nota >= 4 %}#d1a12e{% else %}#b3435c{% endif %};">
+                                    <div class="num">{{ nota }}/10</div>
+                                    <div class="rotulo">{{ rotulo }}</div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    {% if anamnese.foto_rosto %}
+                        <p style="margin-top:1rem;"><a href="{{ anamnese.foto_rosto.url }}" target="_blank"><img src="{{ anamnese.foto_rosto.url }}" alt="Foto do rosto" style="max-width:140px; border-radius:8px;"></a></p>
+                    {% endif %}
+                    {% for secao in secoes_anamnese %}
+                        {% if secao.titulo != "Foto" %}
+                            <details style="margin-top:1rem;">
+                                <summary style="cursor:pointer; font-weight:600; color:var(--accent-soft-text);">{{ secao.titulo }}</summary>
+                                <dl style="margin-top:.5rem;">
+                                    {% for nome_campo in secao.campos %}
+                                        {% with valor=anamnese|get_attr:nome_campo %}
+                                            {% if valor %}
+                                                <dt><strong>{{ anamnese|get_verbose_name:nome_campo|capfirst }}</strong></dt>
+                                                <dd>{{ valor|linebreaksbr }}</dd>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endfor %}
+                                </dl>
+                            </details>
+                        {% endif %}
+                    {% endfor %}
                 {% else %}
                     <p style="margin-top:1rem;">Anamnese ainda não preenchida para esta paciente.</p>
                 {% endif %}
@@ -504,5 +544,4 @@
                 </ul>
             </div>
         {% endif %}
-    {% endif %}
 {% endblock %}

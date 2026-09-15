@@ -1,0 +1,80 @@
+{% load anamnese_extras %}<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Anamnese · {{ paciente.nome }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f7f4fb; --card-bg: #ffffff; --accent: #7c5cbf; --accent-soft: #efe8fb;
+            --accent-soft-text: #5b3a94; --text: #2b2635; --text-muted: #766f85;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            margin: 0; background: var(--bg); color: var(--text);
+        }
+        h1, h2 { font-family: "Playfair Display", Georgia, serif; font-weight: 600; margin: 0 0 .3rem; }
+        .topo { max-width: 640px; margin: 0 auto; padding: 2rem 1.2rem 0; text-align: center; }
+        .topo p { color: var(--text-muted); font-size: .92rem; }
+        form { max-width: 640px; margin: 0 auto; padding: 0 1.2rem 3rem; }
+        .card {
+            background: var(--card-bg); border-radius: 14px; padding: 1.2rem 1.3rem;
+            box-shadow: 0 1px 3px rgba(43,38,53,.06); margin-bottom: 1.1rem;
+        }
+        .card h2 { font-size: 1.05rem; color: var(--accent-soft-text); }
+        .campo { margin-bottom: .85rem; }
+        .campo label { display: block; font-size: .85rem; color: var(--text-muted); margin-bottom: .3rem; }
+        .campo input, .campo textarea, .campo select {
+            width: 100%; padding: .55rem .6rem; border-radius: 8px; border: 1px solid #ddd6ea;
+            font-size: 1rem; font-family: inherit; background: #fff; color: var(--text);
+        }
+        .campo textarea { min-height: 4.5rem; resize: vertical; }
+        .satisfacao { background: var(--accent-soft); border-radius: 10px; padding: .9rem 1rem; margin-top: 1rem; }
+        .satisfacao label { color: var(--accent-soft-text); font-weight: 600; }
+        .satisfacao input { max-width: 100px; font-size: 1.2rem; text-align: center; font-weight: 700; }
+        .btn-enviar {
+            display: block; width: 100%; padding: .9rem; border: none; border-radius: 10px;
+            background: var(--accent); color: #fff; font-size: 1.05rem; font-weight: 600; cursor: pointer;
+        }
+        .btn-enviar:hover { background: #6a4aa8; }
+        .erro { color: #8f2e45; font-size: .82rem; margin-top: .25rem; }
+    </style>
+</head>
+<body>
+    <div class="topo">
+        <h1>Anamnese</h1>
+        <p>Olá, {{ paciente.nome }}! Preencha com calma — pode deixar em branco o que não souber ou não se aplicar. Suas respostas vão direto pra sua ficha na clínica.</p>
+    </div>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {% for secao in secoes %}
+            <div class="card">
+                <h2>{{ secao.titulo }}</h2>
+                {% for nome_campo in secao.campos %}
+                    {% with bf=form|get_field:nome_campo %}
+                        <div class="campo">
+                            <label for="{{ bf.id_for_label }}">{{ bf.label }}</label>
+                            {{ bf }}
+                            {% for error in bf.errors %}<div class="erro">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endwith %}
+                {% endfor %}
+                {% if secao.satisfacao %}
+                    {% with bf=form|get_field:secao.satisfacao %}
+                        <div class="satisfacao">
+                            <label for="{{ bf.id_for_label }}">{{ bf.label|capfirst }}</label>
+                            {{ bf }}
+                            {% for error in bf.errors %}<div class="erro">{{ error }}</div>{% endfor %}
+                        </div>
+                    {% endwith %}
+                {% endif %}
+            </div>
+        {% endfor %}
+        <button class="btn-enviar" type="submit">Enviar anamnese</button>
+    </form>
+</body>
+</html>

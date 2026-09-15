@@ -2,13 +2,14 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
 from leads.models import HistoricoLead
 from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao, FotoEvolucao
-from prontuarios.models import Anamnese, Documento
+from prontuarios.models import SECOES_ANAMNESE, Anamnese, Documento
 
 from .forms import IniciarProtocoloForm, PacienteRapidoForm
 from .models import Paciente
@@ -121,6 +122,14 @@ def ficha(request, pk):
 
     if aba == "anamnese":
         contexto["anamnese"] = Anamnese.objects.filter(paciente=paciente).first()
+        contexto["secoes_anamnese"] = SECOES_ANAMNESE
+        contexto["link_anamnese_ativo"] = paciente.links_anamnese.filter(
+            ativo=True, preenchido_em__isnull=True
+        ).order_by("-criado_em").first()
+        if contexto["link_anamnese_ativo"]:
+            contexto["link_anamnese_url"] = request.build_absolute_uri(
+                reverse("prontuarios:anamnese_publica", args=[contexto["link_anamnese_ativo"].token])
+            )
         contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
 
     if acompanhamento and aba == "modulacao":
