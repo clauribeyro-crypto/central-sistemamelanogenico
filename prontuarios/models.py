@@ -1,9 +1,25 @@
+from django.conf import settings
 from django.db import models
 
 from agenda.models import Consulta
 from contas.models import ModeloDaOrganizacao
 from pacientes.models import Paciente
 from profissionais.models import Profissional
+
+
+def _storage_documento():
+    """
+    Exames/documentos podem ser PDF, não só imagem — usa o backend "raw" do
+    Cloudinary quando configurado (variáveis CLOUDINARY_*), senão cai pro
+    disco local (dev sem Cloudinary configurado).
+    """
+    if settings.CLOUDINARY_STORAGE.get("CLOUD_NAME"):
+        from cloudinary_storage.storage import RawMediaCloudinaryStorage
+
+        return RawMediaCloudinaryStorage()
+    from django.core.files.storage import default_storage
+
+    return default_storage
 
 
 class Atendimento(ModeloDaOrganizacao):
@@ -83,3 +99,30 @@ class Anamnese(ModeloDaOrganizacao):
 
     def __str__(self):
         return f"Anamnese de {self.paciente}"
+
+
+class Documento(ModeloDaOrganizacao):
+    """Exame, laudo ou outro documento anexado à paciente (não ligado a um acompanhamento específico)."""
+
+    class Tipo(models.TextChoices):
+        EXAME = "EXAME", "Exame"
+        DOCUMENTO = "DOCUMENTO", "Documento"
+        OUTRO = "OUTRO", "Outro"
+
+    paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, related_name="documentos")
+    nome = models.CharField(max_length=200)
+    tipo = models.CharField(max_length=20, choices=Tipo.choices, default=Tipo.EXAME)
+    arquivo = models.FileField(upload_to="documentos/%Y/%m/", storage=_storage_documento)
+    observacoes = models.TextField(blank=True)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "exame/documento"
+        verbose_name_plural = "exames/documentos"
+        ordering = ["-criado_em"]
+
+    def __str__(self):
+        return f"{self.nome} ({self.get_tipo_display()}) — {self.paciente}"

@@ -1,5 +1,6 @@
 import datetime
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -390,3 +391,40 @@ class Feedback(models.Model):
 
     def __str__(self):
         return f"Feedback de {self.acompanhamento.paciente} em {self.data_hora:%d/%m/%Y %H:%M}"
+
+
+class FotoEvolucao(models.Model):
+    """
+    Foto de evolução da paciente — 3 ângulos x 3 momentos (início/meio/final)
+    do acompanhamento, acompanhando o ritmo real das consultas do programa
+    (não travado nas fases da modulação). Nunca sobrescreve uma foto
+    anterior: cada envio é um novo registro, o histórico completo fica.
+    """
+
+    class Angulo(models.TextChoices):
+        FRONTAL = "FRONTAL", "Frontal"
+        LATERAL_DIREITA = "LATERAL_DIREITA", "Lateral direita"
+        LATERAL_ESQUERDA = "LATERAL_ESQUERDA", "Lateral esquerda"
+
+    class Momento(models.TextChoices):
+        INICIO = "INICIO", "Início"
+        MEIO = "MEIO", "Meio"
+        FINAL = "FINAL", "Final"
+
+    acompanhamento = models.ForeignKey(Acompanhamento, on_delete=models.CASCADE, related_name="fotos")
+    angulo = models.CharField(max_length=20, choices=Angulo.choices)
+    momento = models.CharField(max_length=10, choices=Momento.choices)
+    imagem = models.ImageField(upload_to="fotos_evolucao/%Y/%m/")
+    data = models.DateField(default=timezone.localdate)
+    enviada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "foto de evolução"
+        verbose_name_plural = "fotos de evolução"
+        ordering = ["angulo", "momento", "-criado_em"]
+
+    def __str__(self):
+        return f"{self.get_angulo_display()} · {self.get_momento_display()} — {self.acompanhamento}"

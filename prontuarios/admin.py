@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from contas.admin import OrganizacaoAdminMixin
 
-from .models import Atendimento
+from .models import Atendimento, Documento
 
 
 @admin.register(Atendimento)
@@ -23,3 +23,11 @@ class AtendimentoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
             ),
         }),
     )
+
+
+@admin.register(Documento)
+class DocumentoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
+    list_display = ("nome", "paciente", "tipo", "criado_em")
+    list_filter = ("tipo",)
+    search_fields = ("nome", "paciente__nome")
+    autocomplete_fields = ("paciente",)

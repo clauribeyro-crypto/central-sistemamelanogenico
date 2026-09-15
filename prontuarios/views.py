@@ -4,12 +4,13 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
 
-from .forms import AnamneseForm, AtendimentoForm
-from .models import Anamnese, Atendimento
+from .forms import AnamneseForm, AtendimentoForm, DocumentoForm
+from .models import Anamnese, Atendimento, Documento
 
 
 @login_required
@@ -146,3 +147,38 @@ def anamnese(request, paciente_pk):
     return render(request, "prontuarios/anamnese_form.html", {
         "paciente": paciente, "form": form, "anamnese": instancia, "pode_editar": pode_editar,
     })
+
+
+@login_required
+def documento_criar(request, paciente_pk):
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    if request.method == "POST":
+        form = DocumentoForm(request.POST, request.FILES)
+        if form.is_valid():
+            documento = form.save(commit=False)
+            documento.organizacao = org
+            documento.paciente = paciente
+            documento.enviado_por = request.user
+            documento.save()
+            messages.success(request, "Documento enviado.")
+        else:
+            messages.error(request, "Não deu pra enviar o documento — confira o formulário.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=documentos")
+
+
+@login_required
+@require_POST
+def documento_excluir(request, pk):
+    """Excluir um documento já enviado exige administrador — anexar um novo é livre."""
+    org = organizacao_do_usuario(request)
+    documento = get_object_or_404(
+        Documento.objects.select_related("paciente"), pk=pk, organizacao=org
+    )
+    paciente = documento.paciente
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só um administrador da clínica pode excluir um documento.")
+        return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=documentos")
+    documento.delete()
+    messages.success(request, "Documento excluído.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=documentos")

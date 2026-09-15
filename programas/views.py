@@ -8,8 +8,15 @@ from django.views.decorators.http import require_POST
 from agenda.models import TipoConsulta
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 
-from .forms import AvaliacaoFaseForm, FeedbackForm, PlanoFaseForm, ProgramaForm, TipoConsultaForm
-from .models import Acompanhamento, Feedback, FaseModulacao, Programa
+from .forms import (
+    AvaliacaoFaseForm,
+    FeedbackForm,
+    FotoEvolucaoForm,
+    PlanoFaseForm,
+    ProgramaForm,
+    TipoConsultaForm,
+)
+from .models import Acompanhamento, Feedback, FaseModulacao, FotoEvolucao, Programa
 
 
 @login_required
@@ -263,3 +270,40 @@ def feedback_editar(request, pk):
     return render(request, "programas/feedback_form.html", {
         "paciente": acompanhamento.paciente, "form": form, "feedback": feedback, "pode_editar": pode_editar,
     })
+
+
+@login_required
+def foto_criar(request, acompanhamento_pk):
+    org = organizacao_do_usuario(request)
+    acompanhamento = get_object_or_404(
+        Acompanhamento.objects.select_related("paciente"), pk=acompanhamento_pk, organizacao=org
+    )
+    if request.method == "POST":
+        form = FotoEvolucaoForm(request.POST, request.FILES)
+        if form.is_valid():
+            foto = form.save(commit=False)
+            foto.acompanhamento = acompanhamento
+            foto.enviada_por = request.user
+            foto.save()
+            messages.success(request, "Foto enviada.")
+        else:
+            messages.error(request, "Não deu pra enviar a foto — confira o formulário.")
+    return redirect(f"{reverse('pacientes:ficha', args=[acompanhamento.paciente.pk])}?aba=fotos")
+
+
+@login_required
+@require_POST
+def foto_excluir(request, pk):
+    """Excluir uma foto de evolução já enviada exige administrador — subir uma nova é livre."""
+    org = organizacao_do_usuario(request)
+    foto = get_object_or_404(
+        FotoEvolucao.objects.select_related("acompanhamento__paciente"),
+        pk=pk, acompanhamento__organizacao=org,
+    )
+    paciente = foto.acompanhamento.paciente
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só um administrador da clínica pode excluir uma foto de evolução.")
+        return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=fotos")
+    foto.delete()
+    messages.success(request, "Foto excluída.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=fotos")

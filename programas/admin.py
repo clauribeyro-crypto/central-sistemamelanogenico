@@ -8,6 +8,7 @@ from .models import (
     CustoAcompanhamento,
     Feedback,
     FaseModulacao,
+    FotoEvolucao,
     KitPrevisto,
     Modulacao,
     Programa,
@@ -71,3 +72,10 @@ class FeedbackAdmin(admin.ModelAdmin):
     list_filter = ("precisou_alterar",)
     search_fields = ("acompanhamento__paciente__nome", "relato")
     date_hierarchy = "data_hora"
+
+
+@admin.register(FotoEvolucao)
+class FotoEvolucaoAdmin(admin.ModelAdmin):
+    list_display = ("acompanhamento", "angulo", "momento", "data")
+    list_filter = ("angulo", "momento")
+    search_fields = ("acompanhamento__paciente__nome",)

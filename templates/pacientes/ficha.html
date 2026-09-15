@@ -313,6 +313,137 @@
                     <p>Nenhuma consulta registrada na Agenda para esta paciente ainda.</p>
                 {% endif %}
             </div>
+        {% elif aba_atual == "fotos" %}
+            {% if not acompanhamento %}
+                <div class="card"><p>Sem acompanhamento ativo no momento — não há como vincular novas fotos de evolução.</p></div>
+            {% else %}
+                <div class="card">
+                    <h2>Fotos de evolução</h2>
+                    <p style="font-size:.85rem; color:var(--text-muted);">3 ângulos × 3 momentos do programa (início/meio/final). Cada envio é um registro novo — fotos antigas nunca são substituídas.</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ângulo</th>
+                                {% for col in grade_fotos.0.colunas %}<th>{{ col.momento_label }}</th>{% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for linha in grade_fotos %}
+                            <tr>
+                                <td>{{ linha.angulo_label }}</td>
+                                {% for col in linha.colunas %}
+                                    <td>
+                                        {% if col.foto %}
+                                            <a href="{{ col.foto.imagem.url }}" target="_blank"><img src="{{ col.foto.imagem.url }}" alt="{{ linha.angulo_label }} · {{ col.momento_label }}" style="max-width:100px; max-height:100px; border-radius:6px;"></a>
+                                            <div style="font-size:.7rem; color:var(--text-muted);">{{ col.foto.data|date:"d/m/Y" }}</div>
+                                        {% else %}
+                                            <span style="color:var(--text-muted); font-size:.8rem;">sem foto</span>
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <h2>Enviar nova foto</h2>
+                    <form method="post" action="{% url 'programas:foto_criar' acompanhamento.pk %}" enctype="multipart/form-data" class="acao">
+                        {% csrf_token %}
+                        <div><label>Ângulo</label>
+                            <select name="angulo" required>
+                                <option value="FRONTAL">Frontal</option>
+                                <option value="LATERAL_DIREITA">Lateral direita</option>
+                                <option value="LATERAL_ESQUERDA">Lateral esquerda</option>
+                            </select>
+                        </div>
+                        <div><label>Momento</label>
+                            <select name="momento" required>
+                                <option value="INICIO">Início</option>
+                                <option value="MEIO">Meio</option>
+                                <option value="FINAL">Final</option>
+                            </select>
+                        </div>
+                        <div><label>Data</label><input type="date" name="data" required></div>
+                        <div><label>Imagem</label><input type="file" name="imagem" accept="image/*" required></div>
+                        <button class="btn" type="submit">Enviar foto</button>
+                    </form>
+                </div>
+
+                {% if fotos_todas %}
+                    <div class="card">
+                        <h2>Todas as fotos enviadas</h2>
+                        <table>
+                            <thead><tr><th>Ângulo</th><th>Momento</th><th>Data</th><th></th></tr></thead>
+                            <tbody>
+                            {% for f in fotos_todas %}
+                                <tr>
+                                    <td>{{ f.get_angulo_display }}</td>
+                                    <td>{{ f.get_momento_display }}</td>
+                                    <td>{{ f.data|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <a href="{{ f.imagem.url }}" target="_blank">Ver</a>
+                                        {% if usuario_e_administrador %}
+                                            · <form method="post" action="{% url 'programas:foto_excluir' f.pk %}" style="display:inline;" onsubmit="return confirm('Excluir esta foto?');">
+                                                {% csrf_token %}
+                                                <button type="submit" style="background:none;border:none;color:#8f2e45;text-decoration:underline;cursor:pointer;padding:0;">Excluir</button>
+                                            </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% elif aba_atual == "documentos" %}
+            <div class="card">
+                <h2>Exames / documentos</h2>
+                {% if documentos %}
+                    <table>
+                        <thead><tr><th>Nome</th><th>Tipo</th><th>Enviado em</th><th></th></tr></thead>
+                        <tbody>
+                        {% for d in documentos %}
+                            <tr>
+                                <td>{{ d.nome }}</td>
+                                <td>{{ d.get_tipo_display }}</td>
+                                <td>{{ d.criado_em|date:"d/m/Y H:i" }}</td>
+                                <td>
+                                    <a href="{{ d.arquivo.url }}" target="_blank">Baixar</a>
+                                    {% if usuario_e_administrador %}
+                                        · <form method="post" action="{% url 'prontuarios:documento_excluir' d.pk %}" style="display:inline;" onsubmit="return confirm('Excluir este documento?');">
+                                            {% csrf_token %}
+                                            <button type="submit" style="background:none;border:none;color:#8f2e45;text-decoration:underline;cursor:pointer;padding:0;">Excluir</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>Nenhum exame ou documento anexado ainda.</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <h2>Anexar novo</h2>
+                <form method="post" action="{% url 'prontuarios:documento_criar' paciente.pk %}" enctype="multipart/form-data" class="acao">
+                    {% csrf_token %}
+                    <div><label>Nome</label><input type="text" name="nome" required></div>
+                    <div><label>Tipo</label>
+                        <select name="tipo" required>
+                            <option value="EXAME">Exame</option>
+                            <option value="DOCUMENTO">Documento</option>
+                            <option value="OUTRO">Outro</option>
+                        </select>
+                    </div>
+                    <div><label>Arquivo</label><input type="file" name="arquivo" required></div>
+                    <div><label>Observações</label><textarea name="observacoes" rows="2"></textarea></div>
+                    <button class="btn" type="submit">Anexar</button>
+                </form>
+            </div>
         {% elif aba_atual == "produtos" %}
             <div class="card">
                 <h2>Produtos / kits</h2>
