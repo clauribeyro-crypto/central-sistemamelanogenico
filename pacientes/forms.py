@@ -2,6 +2,16 @@ from django import forms
 
 from programas.models import Programa
 
+from .models import Paciente
+
+
+class PacienteRapidoForm(forms.ModelForm):
+    """Cadastro rápido — só o essencial pra já abrir a ficha e seguir o atendimento."""
+
+    class Meta:
+        model = Paciente
+        fields = ["nome", "telefone", "cidade"]
+
 
 class IniciarProtocoloForm(forms.Form):
     programa = forms.ModelChoiceField(queryset=Programa.objects.none(), label="Programa")

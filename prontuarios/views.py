@@ -10,7 +10,7 @@ from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
 
 from .forms import AnamneseForm, AtendimentoForm, DocumentoForm
-from .models import Anamnese, Atendimento, Documento
+from .models import SECOES_ANAMNESE, Anamnese, Atendimento, Documento, LinkAnamnese
 
 
 @login_required
@@ -131,7 +131,7 @@ def anamnese(request, paciente_pk):
                 request, "Só um administrador da clínica pode editar a anamnese já salva."
             )
             return redirect("prontuarios:anamnese", paciente_pk=paciente.pk)
-        form = AnamneseForm(request.POST, instance=instancia)
+        form = AnamneseForm(request.POST, request.FILES, instance=instancia)
         if form.is_valid():
             registro = form.save(commit=False)
             registro.organizacao = org
@@ -146,6 +146,65 @@ def anamnese(request, paciente_pk):
                 field.disabled = True
     return render(request, "prontuarios/anamnese_form.html", {
         "paciente": paciente, "form": form, "anamnese": instancia, "pode_editar": pode_editar,
+        "secoes": SECOES_ANAMNESE,
+    })
+
+
+@login_required
+@require_POST
+def link_anamnese_criar(request, paciente_pk):
+    """Gera um link público novo pra paciente preencher a anamnese sem login."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    LinkAnamnese.objects.create(paciente=paciente, criado_por=request.user)
+    messages.success(request, "Link de anamnese gerado — copie e envie pra paciente.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=anamnese")
+
+
+@login_required
+@require_POST
+def link_anamnese_desativar(request, pk):
+    org = organizacao_do_usuario(request)
+    link = get_object_or_404(
+        LinkAnamnese.objects.select_related("paciente"), pk=pk, paciente__organizacao=org
+    )
+    link.ativo = False
+    link.save(update_fields=["ativo"])
+    messages.success(request, "Link de anamnese desativado.")
+    return redirect(f"{reverse('pacientes:ficha', args=[link.paciente.pk])}?aba=anamnese")
+
+
+def anamnese_publica(request, token):
+    """
+    Tela pública (sem login) que a paciente abre pelo link gerado na Ficha
+    dela pra preencher a própria anamnese. Preenchimento novo sempre
+    atualiza o registro atual da paciente (não versiona, igual a edição
+    interna) e desativa o link em seguida — cada link serve pra um envio.
+    """
+    link = get_object_or_404(LinkAnamnese.objects.select_related("paciente"), token=token)
+    paciente = link.paciente
+
+    if not link.disponivel:
+        return render(request, "prontuarios/anamnese_publica_indisponivel.html", {
+            "ja_preenchida": link.preenchido_em is not None,
+        })
+
+    instancia = Anamnese.objects.filter(paciente=paciente).first()
+
+    if request.method == "POST":
+        form = AnamneseForm(request.POST, request.FILES, instance=instancia)
+        if form.is_valid():
+            registro = form.save(commit=False)
+            registro.organizacao = paciente.organizacao
+            registro.paciente = paciente
+            registro.save()
+            link.marcar_preenchido()
+            return render(request, "prontuarios/anamnese_publica_sucesso.html", {"paciente": paciente})
+    else:
+        form = AnamneseForm(instance=instancia)
+
+    return render(request, "prontuarios/anamnese_publica.html", {
+        "paciente": paciente, "form": form, "secoes": SECOES_ANAMNESE,
     })
 
 
