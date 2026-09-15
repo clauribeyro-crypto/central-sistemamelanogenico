@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento, Recebimento
-from programas.models import Acompanhamento, CustoAcompanhamento
+from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao
 from prontuarios.models import Anamnese
 
 from .forms import IniciarProtocoloForm
@@ -93,6 +93,9 @@ def ficha(request, pk):
 
     if acompanhamento and aba == "modulacao":
         contexto["modulacoes"] = acompanhamento.modulacoes.prefetch_related("fases").order_by("numero")
+        contexto["resumo_evolucao"] = FaseModulacao.objects.filter(
+            modulacao__acompanhamento=acompanhamento, status=FaseModulacao.Status.CONCLUIDA
+        ).select_related("modulacao").order_by("modulacao__numero", "numero")
 
     if acompanhamento and aba == "feedbacks":
         contexto["feedbacks"] = acompanhamento.feedbacks.select_related("fase").order_by("-data_hora")

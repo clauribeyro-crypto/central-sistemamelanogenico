@@ -191,6 +191,24 @@
                 {% endif %}
             </div>
         {% elif aba_atual == "modulacao" %}
+            {% if resumo_evolucao %}
+                <div class="card">
+                    <h2>Resumo de evolução</h2>
+                    <ul class="timeline">
+                        {% for f in resumo_evolucao %}
+                            <li>
+                                <div class="quando">
+                                    Modulação {{ f.modulacao.numero }} · Fase {{ f.numero }}
+                                    {% if f.data_inicio and f.data_fim_prevista %} ({{ f.data_inicio|date:"d/m" }}–{{ f.data_fim_prevista|date:"d/m/Y" }}){% endif %}
+                                    · <strong>{{ f.get_resultado_display }}</strong>
+                                </div>
+                                {% if f.principais_melhoras %}<strong>Principais melhoras:</strong> {{ f.principais_melhoras|linebreaksbr }}<br>{% endif %}
+                                {% if f.o_que_trabalhar %}<strong>O que foi trabalhado a seguir:</strong> {{ f.o_que_trabalhar|linebreaksbr }}{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
             {% for m in modulacoes %}
                 <div class="card">
                     <h2>Modulação {{ m.numero }}{% if m.concluida %} <span class="badge">Concluída</span>{% endif %}</h2>
