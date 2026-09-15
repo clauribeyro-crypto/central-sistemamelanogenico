@@ -32,6 +32,10 @@
             <div class="num">{{ atrasados|length }}</div>
             <div class="rotulo">Tarefas atrasadas</div>
         </div>
+        <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none;">
+            <div class="num">{{ total_leads_parados }}</div>
+            <div class="rotulo">Leads parados (sem atualização há {{ dias_lead_parado }}+ dias)</div>
+        </a>
     </div>
 
     <div class="grid-2-1">
@@ -125,6 +129,27 @@
                         <td><a href="{% url 'leads:detalhe' lead.pk %}">{{ lead.nome }}</a></td>
                         <td>{{ lead.get_etapa_display }}</td>
                         <td>{{ lead.proxima_acao_em|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
+    {% if leads_parados %}
+        <div class="card">
+            <h2>💤 Leads parados</h2>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+                Sem nenhuma atualização de status há {{ dias_lead_parado }} dias ou mais, não importa a etapa em que estão.
+            </p>
+            <table>
+                <thead><tr><th>Lead</th><th>Etapa atual</th><th>Sem atualização há</th></tr></thead>
+                <tbody>
+                {% for item in leads_parados %}
+                    <tr>
+                        <td><a href="{% url 'leads:detalhe' item.lead.pk %}">{{ item.lead.nome }}</a></td>
+                        <td>{{ item.lead.get_etapa_display }}</td>
+                        <td>{{ item.dias }} dia{{ item.dias|pluralize }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
