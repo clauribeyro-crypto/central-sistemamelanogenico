@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -41,20 +41,21 @@ def relatorio(request):
     else:
         data_fim = hoje
 
-    pagamentos = Pagamento.objects.filter(
+    pagamentos_vencendo_no_periodo = Pagamento.objects.filter(
         organizacao=org, data_vencimento__gte=data_inicio, data_vencimento__lte=data_fim
     )
 
-    # "Recebido" é sempre baseado nos recebimentos de fato lançados no
-    # período (não no status do lançamento inteiro) — assim uma entrada
-    # parcial já conta como recebida mesmo que o lançamento como um todo
-    # ainda esteja "Parcial" (e não "Pago").
+    # "Recebido" é sempre baseado na data em que o dinheiro de fato entrou
+    # (a data do recebimento), não na data de vencimento do lançamento —
+    # senão uma entrada paga adiantado pra uma consulta futura (vencimento
+    # fora do período) ficaria de fora do total recebido, mesmo já tendo
+    # sido recebida dentro do período selecionado.
     recebimentos_no_periodo = Recebimento.objects.filter(
-        organizacao=org, pagamento__in=pagamentos, data__gte=data_inicio, data__lte=data_fim,
+        organizacao=org, data__gte=data_inicio, data__lte=data_fim,
     )
     total_pago = recebimentos_no_periodo.aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
 
-    pagamentos_em_aberto = pagamentos.filter(
+    pagamentos_em_aberto = pagamentos_vencendo_no_periodo.filter(
         status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL]
     )
     total_pendente = sum((p.saldo_pendente for p in pagamentos_em_aberto), Decimal("0.00"))
@@ -71,6 +72,16 @@ def relatorio(request):
         .values("pagamento__consulta__profissional__nome")
         .annotate(total=Sum("valor"))
         .order_by("-total")
+    )
+
+    # A tabela mostra tanto quem vence no período quanto quem recebeu algo
+    # no período (mesmo com vencimento fora dele) — assim todo valor que
+    # entra nos totais acima tem uma linha clicável pra conferir de onde veio.
+    ids_com_recebimento_no_periodo = recebimentos_no_periodo.values_list("pagamento_id", flat=True)
+    pagamentos = (
+        Pagamento.objects.filter(organizacao=org)
+        .filter(Q(pk__in=pagamentos_vencendo_no_periodo) | Q(pk__in=ids_com_recebimento_no_periodo))
+        .distinct()
     )
 
     contexto = {
