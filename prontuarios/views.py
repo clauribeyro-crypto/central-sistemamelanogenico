@@ -8,8 +8,8 @@ from django.utils import timezone
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
 
-from .forms import AtendimentoForm
-from .models import Atendimento
+from .forms import AnamneseForm, AtendimentoForm
+from .models import Anamnese, Atendimento
 
 
 @login_required
@@ -109,4 +109,40 @@ def editar(request, pk):
     return render(request, "prontuarios/form.html", {
         "paciente": paciente, "form": form, "atendimento": atendimento,
         "pode_editar": pode_editar,
+    })
+
+
+@login_required
+def anamnese(request, paciente_pk):
+    """
+    Levantamento estruturado de saúde — um registro por paciente. Preencher
+    pela primeira vez é livre pra qualquer profissional logado; alterar uma
+    anamnese já preenchida exige administrador (mesma regra do Atendimento).
+    """
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    instancia = Anamnese.objects.filter(paciente=paciente).first()
+    pode_editar = instancia is None or usuario_e_administrador(request)
+
+    if request.method == "POST":
+        if not pode_editar:
+            messages.error(
+                request, "Só um administrador da clínica pode editar a anamnese já salva."
+            )
+            return redirect("prontuarios:anamnese", paciente_pk=paciente.pk)
+        form = AnamneseForm(request.POST, instance=instancia)
+        if form.is_valid():
+            registro = form.save(commit=False)
+            registro.organizacao = org
+            registro.paciente = paciente
+            registro.save()
+            messages.success(request, "Anamnese salva.")
+            return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=anamnese")
+    else:
+        form = AnamneseForm(instance=instancia)
+        if not pode_editar:
+            for field in form.fields.values():
+                field.disabled = True
+    return render(request, "prontuarios/anamnese_form.html", {
+        "paciente": paciente, "form": form, "anamnese": instancia, "pode_editar": pode_editar,
     })

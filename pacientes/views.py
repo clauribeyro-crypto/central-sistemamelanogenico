@@ -7,6 +7,7 @@ from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento, Recebimento
 from programas.models import Acompanhamento, CustoAcompanhamento
+from prontuarios.models import Anamnese
 
 from .forms import IniciarProtocoloForm
 from .models import Paciente
@@ -87,6 +88,7 @@ def ficha(request, pk):
         })
 
     if aba == "anamnese":
+        contexto["anamnese"] = Anamnese.objects.filter(paciente=paciente).first()
         contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
 
     if aba == "consultas":

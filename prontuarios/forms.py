@@ -3,11 +3,17 @@ from django import forms
 from agenda.models import Consulta
 from profissionais.models import Profissional
 
-from .models import Atendimento
+from .models import Anamnese, Atendimento
 
 CAMPOS_TEXTO_LONGO = (
     "queixa_principal", "historico_atual", "exame_fisico",
     "diagnostico", "conduta", "prescricao", "observacoes",
+)
+
+CAMPOS_ANAMNESE = (
+    "melasma_pele", "intestino", "estomago_digestao", "figado_vesicula",
+    "hormonal_ciclo", "sono", "alimentacao", "medicamentos",
+    "historico_saude", "sinais_sintomas", "observacoes_profissional",
 )
 
 
@@ -44,3 +50,10 @@ class AtendimentoForm(forms.ModelForm):
         ).order_by("-data_hora")
         self.fields["consulta"].required = False
         self.fields["consulta"].help_text = "Opcional — vincule à consulta agendada que originou este atendimento."
+
+
+class AnamneseForm(forms.ModelForm):
+    class Meta:
+        model = Anamnese
+        fields = list(CAMPOS_ANAMNESE)
+        widgets = {campo: forms.Textarea(attrs={"rows": 3}) for campo in CAMPOS_ANAMNESE}

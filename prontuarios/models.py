@@ -48,3 +48,38 @@ class Atendimento(ModeloDaOrganizacao):
 
     def __str__(self):
         return f"Atendimento de {self.paciente} em {self.data_hora:%d/%m/%Y %H:%M}"
+
+
+class Anamnese(ModeloDaOrganizacao):
+    """
+    Levantamento estruturado de saúde da paciente, preenchido uma vez no
+    início do acompanhamento (e ajustado ao longo do tratamento, sempre por
+    um administrador — ver `usuario_e_administrador`). Um registro por
+    paciente, não por atendimento avulso.
+    """
+
+    paciente = models.OneToOneField(
+        Paciente, on_delete=models.PROTECT, related_name="anamnese"
+    )
+
+    melasma_pele = models.TextField("melasma / pele", blank=True)
+    intestino = models.TextField(blank=True)
+    estomago_digestao = models.TextField("estômago / digestão", blank=True)
+    figado_vesicula = models.TextField("fígado / vesícula", blank=True)
+    hormonal_ciclo = models.TextField("hormonal / ciclo", blank=True)
+    sono = models.TextField(blank=True)
+    alimentacao = models.TextField(blank=True)
+    medicamentos = models.TextField(blank=True)
+    historico_saude = models.TextField("histórico de saúde", blank=True)
+    sinais_sintomas = models.TextField("sinais e sintomas", blank=True)
+    observacoes_profissional = models.TextField("observações do profissional", blank=True)
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "anamnese"
+        verbose_name_plural = "anamneses"
+
+    def __str__(self):
+        return f"Anamnese de {self.paciente}"

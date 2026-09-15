@@ -147,6 +147,31 @@
         {% elif aba_atual == "anamnese" %}
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Anamnese</h2>
+                    <a class="btn" href="{% url 'prontuarios:anamnese' paciente.pk %}">
+                        {% if anamnese %}Editar anamnese{% else %}+ Preencher anamnese{% endif %}
+                    </a>
+                </div>
+                {% if anamnese %}
+                    <dl style="margin-top:1rem;">
+                        {% if anamnese.melasma_pele %}<dt><strong>Melasma / pele</strong></dt><dd>{{ anamnese.melasma_pele|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.intestino %}<dt><strong>Intestino</strong></dt><dd>{{ anamnese.intestino|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.estomago_digestao %}<dt><strong>Estômago / digestão</strong></dt><dd>{{ anamnese.estomago_digestao|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.figado_vesicula %}<dt><strong>Fígado / vesícula</strong></dt><dd>{{ anamnese.figado_vesicula|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.hormonal_ciclo %}<dt><strong>Hormonal / ciclo</strong></dt><dd>{{ anamnese.hormonal_ciclo|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.sono %}<dt><strong>Sono</strong></dt><dd>{{ anamnese.sono|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.alimentacao %}<dt><strong>Alimentação</strong></dt><dd>{{ anamnese.alimentacao|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.medicamentos %}<dt><strong>Medicamentos</strong></dt><dd>{{ anamnese.medicamentos|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.historico_saude %}<dt><strong>Histórico de saúde</strong></dt><dd>{{ anamnese.historico_saude|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.sinais_sintomas %}<dt><strong>Sinais e sintomas</strong></dt><dd>{{ anamnese.sinais_sintomas|linebreaksbr }}</dd>{% endif %}
+                        {% if anamnese.observacoes_profissional %}<dt><strong>Observações do profissional</strong></dt><dd>{{ anamnese.observacoes_profissional|linebreaksbr }}</dd>{% endif %}
+                    </dl>
+                {% else %}
+                    <p style="margin-top:1rem;">Anamnese ainda não preenchida para esta paciente.</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
                     <h2 style="margin:0;">Prontuário — histórico de atendimentos</h2>
                     <a class="btn" href="{% url 'prontuarios:criar' paciente.pk %}">+ Novo atendimento</a>
                 </div>
