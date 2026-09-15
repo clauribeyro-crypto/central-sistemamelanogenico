@@ -48,6 +48,47 @@
             </div>
         </div>
 
+        <div class="card">
+            <h2 style="margin-top:0;">Continuidade do acompanhamento</h2>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+                Dias restantes: {{ acompanhamento.dias_restantes }}
+            </p>
+            <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                      onsubmit="return confirm('Finalizar este acompanhamento?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="finalizar">
+                    <button class="btn btn-secondary" type="submit">Finalizar acompanhamento</button>
+                </form>
+                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                      onsubmit="return confirm('Renovar? Isso encerra o acompanhamento atual e leva direto pra iniciar o próximo, na mesma ficha.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="renovar">
+                    <button class="btn" type="submit">Renovar</button>
+                </form>
+                <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                      onsubmit="return confirm('Migrar para outro programa? Isso encerra o acompanhamento atual e leva direto pra iniciar o novo, na mesma ficha.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="migrar">
+                    <button class="btn" type="submit">Migrar para outro programa</button>
+                </form>
+                {% if acompanhamento.status != "MANUTENCAO" %}
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="manutencao">
+                        <button class="btn btn-secondary" type="submit">Colocar em manutenção</button>
+                    </form>
+                {% endif %}
+                {% if acompanhamento.status != "AGUARDANDO_DECISAO" %}
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="aguardando_decisao">
+                        <button class="btn btn-secondary" type="submit">Aguardando decisão</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+
         <div class="tabs">
             {% for slug, label in abas %}
                 <a class="{% if slug == aba_atual %}ativo{% endif %}" href="?aba={{ slug }}">{{ label }}</a>

@@ -1,12 +1,13 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from agenda.models import TipoConsulta
 from contas.utils import organizacao_do_usuario
 
 from .forms import ProgramaForm, TipoConsultaForm
-from .models import Programa
+from .models import Acompanhamento, Programa
 
 
 @login_required
@@ -84,3 +85,44 @@ def plano_editar(request, pk):
     else:
         form = ProgramaForm(instance=plano)
     return render(request, "programas/plano_form.html", {"form": form, "plano": plano})
+
+
+ACOES_STATUS = {
+    "finalizar": (Acompanhamento.Status.FINALIZADO, "Acompanhamento finalizado."),
+    "manutencao": (Acompanhamento.Status.MANUTENCAO, "Acompanhamento movido para manutenção."),
+    "aguardando_decisao": (
+        Acompanhamento.Status.AGUARDANDO_DECISAO,
+        "Acompanhamento marcado como aguardando decisão da paciente.",
+    ),
+    "renovar": (Acompanhamento.Status.RENOVADO, "Acompanhamento marcado como renovado."),
+    "migrar": (Acompanhamento.Status.MIGRADO, "Acompanhamento marcado como migrado para outro programa."),
+}
+
+
+@login_required
+@require_POST
+def mudar_status_acompanhamento(request, pk):
+    """
+    Ações de fim/continuidade de programa (Doc 1 §11): finalizar, colocar em
+    manutenção, marcar aguardando decisão, ou renovar/migrar — nesses dois
+    últimos casos, encerra o acompanhamento atual com o status certo e manda
+    direto pra tela de iniciar um novo (mesma paciente, sem cadastro novo,
+    o histórico do acompanhamento anterior continua na ficha).
+    """
+    org = organizacao_do_usuario(request)
+    acompanhamento = get_object_or_404(
+        Acompanhamento.objects.select_related("paciente"), pk=pk, organizacao=org
+    )
+    acao = request.POST.get("acao")
+    if acao not in ACOES_STATUS:
+        messages.error(request, "Ação inválida.")
+        return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)
+
+    novo_status, mensagem = ACOES_STATUS[acao]
+    acompanhamento.status = novo_status
+    acompanhamento.save(update_fields=["status"])
+    messages.success(request, mensagem)
+
+    if acao in ("renovar", "migrar"):
+        return redirect("pacientes:iniciar_protocolo", pk=acompanhamento.paciente.pk)
+    return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)

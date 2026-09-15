@@ -10,4 +10,9 @@ urlpatterns = [
     path("tipos/<int:pk>/editar/", views.tipo_editar, name="tipo_editar"),
     path("planos/novo/", views.plano_criar, name="plano_criar"),
     path("planos/<int:pk>/editar/", views.plano_editar, name="plano_editar"),
+    path(
+        "acompanhamentos/<int:pk>/status/",
+        views.mudar_status_acompanhamento,
+        name="mudar_status_acompanhamento",
+    ),
 ]
