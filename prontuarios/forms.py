@@ -3,7 +3,7 @@ from django import forms
 from agenda.models import Consulta
 from profissionais.models import Profissional
 
-from .models import Anamnese, Atendimento
+from .models import Anamnese, Atendimento, Documento
 
 CAMPOS_TEXTO_LONGO = (
     "queixa_principal", "historico_atual", "exame_fisico",
@@ -57,3 +57,10 @@ class AnamneseForm(forms.ModelForm):
         model = Anamnese
         fields = list(CAMPOS_ANAMNESE)
         widgets = {campo: forms.Textarea(attrs={"rows": 3}) for campo in CAMPOS_ANAMNESE}
+
+
+class DocumentoForm(forms.ModelForm):
+    class Meta:
+        model = Documento
+        fields = ["nome", "tipo", "arquivo", "observacoes"]
+        widgets = {"observacoes": forms.Textarea(attrs={"rows": 2})}

@@ -2,7 +2,7 @@ from django import forms
 
 from agenda.models import TipoConsulta
 
-from .models import Feedback, FaseModulacao, Programa
+from .models import Feedback, FaseModulacao, FotoEvolucao, Programa
 
 
 class TipoConsultaForm(forms.ModelForm):
@@ -78,3 +78,10 @@ class FeedbackForm(forms.ModelForm):
             modulacao__acompanhamento=acompanhamento
         ).order_by("modulacao__numero", "numero")
         self.fields["fase"].required = False
+
+
+class FotoEvolucaoForm(forms.ModelForm):
+    class Meta:
+        model = FotoEvolucao
+        fields = ["angulo", "momento", "imagem", "data"]
+        widgets = {"data": forms.DateInput(attrs={"type": "date"})}

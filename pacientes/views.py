@@ -4,11 +4,11 @@ from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 
 from agenda.models import Consulta
-from contas.utils import organizacao_do_usuario
+from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
 from leads.models import HistoricoLead
-from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao
-from prontuarios.models import Anamnese
+from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao, FotoEvolucao
+from prontuarios.models import Anamnese, Documento
 
 from .forms import IniciarProtocoloForm
 from .models import Paciente
@@ -20,11 +20,15 @@ ABAS = [
     ("feedbacks", "Feedbacks"),
     ("consultas", "Consultas"),
     ("fotos", "Fotos"),
+    ("documentos", "Exames/Documentos"),
     ("produtos", "Produtos"),
     ("financeiro", "Financeiro"),
     ("historico", "Histórico"),
 ]
-ABAS_PRONTAS = {"geral", "anamnese", "modulacao", "feedbacks", "consultas", "produtos", "financeiro", "historico"}
+ABAS_PRONTAS = {
+    "geral", "anamnese", "modulacao", "feedbacks", "consultas", "fotos",
+    "documentos", "produtos", "financeiro", "historico",
+}
 
 
 def _financeiro_do_acompanhamento(acompanhamento):
@@ -73,6 +77,7 @@ def ficha(request, pk):
         "paciente": paciente,
         "acompanhamento": acompanhamento,
         "tem_algum_acompanhamento": paciente.acompanhamentos.exists(),
+        "usuario_e_administrador": usuario_e_administrador(request),
         "abas": ABAS,
         "aba_atual": aba,
         "aba_pronta": aba in ABAS_PRONTAS,
@@ -101,6 +106,29 @@ def ficha(request, pk):
 
     if acompanhamento and aba == "feedbacks":
         contexto["feedbacks"] = acompanhamento.feedbacks.select_related("fase").order_by("-data_hora")
+
+    if acompanhamento and aba == "fotos":
+        fotos = list(acompanhamento.fotos.order_by("angulo", "momento", "-criado_em"))
+        mais_recente_por_combo = {}
+        for f in fotos:
+            chave = (f.angulo, f.momento)
+            if chave not in mais_recente_por_combo:
+                mais_recente_por_combo[chave] = f
+        contexto["grade_fotos"] = [
+            {
+                "angulo": angulo,
+                "angulo_label": angulo_label,
+                "colunas": [
+                    {"momento": momento, "momento_label": momento_label, "foto": mais_recente_por_combo.get((angulo, momento))}
+                    for momento, momento_label in FotoEvolucao.Momento.choices
+                ],
+            }
+            for angulo, angulo_label in FotoEvolucao.Angulo.choices
+        ]
+        contexto["fotos_todas"] = fotos
+
+    if aba == "documentos":
+        contexto["documentos"] = paciente.documentos.order_by("-criado_em")
 
     if aba == "consultas":
         if acompanhamento:

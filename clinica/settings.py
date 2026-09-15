@@ -62,6 +62,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "cloudinary_storage",
+    "cloudinary",
     "contas",
     "leads",
     "core",
@@ -180,14 +182,30 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
-# Arquivos enviados pelos usuários (fotos de prova social, etc.)
+# Arquivos enviados pelos usuários (fotos de prova social, fotos de evolução,
+# exames/documentos). O Railway apaga o disco do container a cada deploy, então
+# em produção isso precisa ir pro Cloudinary — configurável por variáveis de
+# ambiente. Sem essas variáveis (ex.: rodando localmente), cai de volta no
+# disco local, sem exigir uma conta Cloudinary pra desenvolver.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": os.environ.get("CLOUDINARY_CLOUD_NAME", ""),
+    "API_KEY": os.environ.get("CLOUDINARY_API_KEY", ""),
+    "API_SECRET": os.environ.get("CLOUDINARY_API_SECRET", ""),
+}
+
+if CLOUDINARY_STORAGE["CLOUD_NAME"]:
+    STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
