@@ -212,6 +212,33 @@
             {% empty %}
                 <div class="card"><p>Este programa não prevê modulação.</p></div>
             {% endfor %}
+        {% elif aba_atual == "feedbacks" %}
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Feedbacks</h2>
+                    <a class="btn" href="{% url 'programas:feedback_criar' acompanhamento.pk %}">+ Novo feedback</a>
+                </div>
+                {% if feedbacks %}
+                    <ul class="timeline" style="margin-top:1rem;">
+                        {% for f in feedbacks %}
+                            <li>
+                                <div class="quando">
+                                    {{ f.data_hora|date:"d/m/Y H:i" }}
+                                    {% if f.fase %} · Fase {{ f.fase.numero }}{% endif %}
+                                    {% if f.semana %} · Semana {{ f.semana }}{% endif %}
+                                    {% if f.precisou_alterar %} · <span class="badge">Plano alterado</span>{% endif %}
+                                </div>
+                                <strong>Relato:</strong> {{ f.relato|linebreaksbr }}<br>
+                                {% if f.observacao %}<strong>Observação:</strong> {{ f.observacao|linebreaksbr }}<br>{% endif %}
+                                {% if f.conduta %}<strong>Conduta:</strong> {{ f.conduta|linebreaksbr }}<br>{% endif %}
+                                <a href="{% url 'programas:feedback_editar' f.pk %}">Ver/editar ›</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="margin-top:1rem;">Nenhum feedback registrado ainda para esta paciente.</p>
+                {% endif %}
+            </div>
         {% elif aba_atual == "consultas" %}
             {% if acompanhamento %}
                 <div class="card">

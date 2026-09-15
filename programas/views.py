@@ -1,13 +1,15 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from agenda.models import TipoConsulta
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 
-from .forms import AvaliacaoFaseForm, PlanoFaseForm, ProgramaForm, TipoConsultaForm
-from .models import Acompanhamento, FaseModulacao, Programa
+from .forms import AvaliacaoFaseForm, FeedbackForm, PlanoFaseForm, ProgramaForm, TipoConsultaForm
+from .models import Acompanhamento, Feedback, FaseModulacao, Programa
 
 
 @login_required
@@ -205,4 +207,58 @@ def fase_detalhe(request, pk):
         "form_avaliacao": form_avaliacao,
         "pode_editar_plano": pode_editar_plano,
         "pode_editar_avaliacao": pode_editar_avaliacao,
+    })
+
+
+@login_required
+def feedback_criar(request, acompanhamento_pk):
+    org = organizacao_do_usuario(request)
+    acompanhamento = get_object_or_404(
+        Acompanhamento.objects.select_related("paciente"), pk=acompanhamento_pk, organizacao=org
+    )
+    if request.method == "POST":
+        form = FeedbackForm(request.POST, acompanhamento=acompanhamento)
+        if form.is_valid():
+            feedback = form.save(commit=False)
+            feedback.acompanhamento = acompanhamento
+            feedback.save()
+            messages.success(request, "Feedback registrado.")
+            return redirect(f"{reverse('pacientes:ficha', args=[acompanhamento.paciente.pk])}?aba=feedbacks")
+    else:
+        form = FeedbackForm(
+            acompanhamento=acompanhamento,
+            initial={"data_hora": timezone.localtime().strftime("%Y-%m-%dT%H:%M")},
+        )
+    return render(request, "programas/feedback_form.html", {
+        "paciente": acompanhamento.paciente, "form": form, "feedback": None,
+    })
+
+
+@login_required
+def feedback_editar(request, pk):
+    """Registrar um feedback novo é livre; editar um já salvo exige administrador."""
+    org = organizacao_do_usuario(request)
+    feedback = get_object_or_404(
+        Feedback.objects.select_related("acompanhamento__paciente"),
+        pk=pk, acompanhamento__organizacao=org,
+    )
+    acompanhamento = feedback.acompanhamento
+    pode_editar = usuario_e_administrador(request)
+
+    if request.method == "POST":
+        if not pode_editar:
+            messages.error(request, "Só um administrador da clínica pode editar um feedback já salvo.")
+            return redirect("programas:feedback_editar", pk=feedback.pk)
+        form = FeedbackForm(request.POST, instance=feedback, acompanhamento=acompanhamento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Feedback atualizado.")
+            return redirect(f"{reverse('pacientes:ficha', args=[acompanhamento.paciente.pk])}?aba=feedbacks")
+    else:
+        form = FeedbackForm(instance=feedback, acompanhamento=acompanhamento)
+        if not pode_editar:
+            for field in form.fields.values():
+                field.disabled = True
+    return render(request, "programas/feedback_form.html", {
+        "paciente": acompanhamento.paciente, "form": form, "feedback": feedback, "pode_editar": pode_editar,
     })

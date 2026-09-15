@@ -6,6 +6,7 @@ from .models import (
     Acompanhamento,
     ConsultaPrevista,
     CustoAcompanhamento,
+    Feedback,
     FaseModulacao,
     KitPrevisto,
     Modulacao,
@@ -62,3 +63,11 @@ class ModulacaoAdmin(admin.ModelAdmin):
     list_display = ("acompanhamento", "numero", "concluida")
     search_fields = ("acompanhamento__paciente__nome",)
     inlines = [FaseModulacaoInline]
+
+
+@admin.register(Feedback)
+class FeedbackAdmin(admin.ModelAdmin):
+    list_display = ("acompanhamento", "data_hora", "precisou_alterar")
+    list_filter = ("precisou_alterar",)
+    search_fields = ("acompanhamento__paciente__nome", "relato")
+    date_hierarchy = "data_hora"

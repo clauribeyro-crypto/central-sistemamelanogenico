@@ -353,3 +353,37 @@ class FaseModulacao(models.Model):
         self.save(update_fields=[
             "resultado", "principais_melhoras", "o_que_trabalhar", "avaliado_em", "status",
         ])
+
+
+class Feedback(models.Model):
+    """Registro de um retorno da paciente durante o acompanhamento (ex.: check-in por WhatsApp)."""
+
+    acompanhamento = models.ForeignKey(
+        Acompanhamento, on_delete=models.CASCADE, related_name="feedbacks"
+    )
+    fase = models.ForeignKey(
+        FaseModulacao, on_delete=models.SET_NULL, related_name="feedbacks",
+        blank=True, null=True, help_text="Fase da modulação a que esse feedback se refere, se houver.",
+    )
+    data_hora = models.DateTimeField(default=timezone.now)
+    semana = models.PositiveIntegerField(
+        blank=True, null=True, help_text="Semana da fase a que o relato se refere, se houver."
+    )
+
+    relato = models.TextField("relato da paciente")
+    observacao = models.TextField("observação do profissional", blank=True)
+    conduta = models.TextField(blank=True)
+    precisou_alterar = models.BooleanField(
+        "precisou alterar o plano por causa desse feedback?", default=False
+    )
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "feedback"
+        verbose_name_plural = "feedbacks"
+        ordering = ["-data_hora"]
+
+    def __str__(self):
+        return f"Feedback de {self.acompanhamento.paciente} em {self.data_hora:%d/%m/%Y %H:%M}"
