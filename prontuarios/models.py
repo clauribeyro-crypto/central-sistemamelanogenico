@@ -437,6 +437,27 @@ class Anamnese(ModeloDaOrganizacao):
             if getattr(self, campo) is not None
         ]
 
+    @property
+    def secoes_preenchidas(self):
+        """
+        [{"titulo": ..., "itens": [(rótulo, valor), ...]}, ...] só das seções
+        (e campos) já respondidos — pra mostrar tudo de uma vez, sem precisar
+        clicar em nada, tanto na Ficha da Paciente quanto na versão pra
+        imprimir/exportar.
+        """
+        secoes = []
+        for secao in SECOES_ANAMNESE:
+            if secao["titulo"] == "Foto":
+                continue
+            itens = [
+                (self._meta.get_field(campo).verbose_name.capitalize(), valor)
+                for campo in secao["campos"]
+                if (valor := getattr(self, campo))
+            ]
+            if itens:
+                secoes.append({"titulo": secao["titulo"], "itens": itens})
+        return secoes
+
 
 class LinkAnamnese(models.Model):
     """

@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load anamnese_extras %}
 {% block title %}{{ paciente.nome }} · Ficha da paciente{% endblock %}
 {% block content %}
     <p><a href="{% url 'pacientes:lista' %}">← Voltar</a></p>
@@ -177,9 +176,14 @@
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
                     <h2 style="margin:0;">Anamnese</h2>
-                    <a class="btn" href="{% url 'prontuarios:anamnese' paciente.pk %}">
-                        {% if anamnese %}Editar anamnese{% else %}+ Preencher anamnese{% endif %}
-                    </a>
+                    <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                        {% if anamnese %}
+                            <a class="btn btn-secondary" href="{% url 'prontuarios:anamnese_imprimir' paciente.pk %}" target="_blank">Imprimir / Exportar PDF</a>
+                        {% endif %}
+                        <a class="btn" href="{% url 'prontuarios:anamnese' paciente.pk %}">
+                            {% if anamnese %}Editar anamnese{% else %}+ Preencher anamnese{% endif %}
+                        </a>
+                    </div>
                 </div>
                 {% if anamnese %}
                     {% if anamnese.satisfacoes_preenchidas %}
@@ -196,22 +200,14 @@
                     {% if anamnese.foto_rosto %}
                         <p style="margin-top:1rem;"><a href="{{ anamnese.foto_rosto.url }}" target="_blank"><img src="{{ anamnese.foto_rosto.url }}" alt="Foto do rosto" style="max-width:140px; border-radius:8px;"></a></p>
                     {% endif %}
-                    {% for secao in secoes_anamnese %}
-                        {% if secao.titulo != "Foto" %}
-                            <details style="margin-top:1rem;">
-                                <summary style="cursor:pointer; font-weight:600; color:var(--accent-soft-text);">{{ secao.titulo }}</summary>
-                                <dl style="margin-top:.5rem;">
-                                    {% for nome_campo in secao.campos %}
-                                        {% with valor=anamnese|get_attr:nome_campo %}
-                                            {% if valor %}
-                                                <dt><strong>{{ anamnese|get_verbose_name:nome_campo|capfirst }}</strong></dt>
-                                                <dd>{{ valor|linebreaksbr }}</dd>
-                                            {% endif %}
-                                        {% endwith %}
-                                    {% endfor %}
-                                </dl>
-                            </details>
-                        {% endif %}
+                    {% for secao in anamnese.secoes_preenchidas %}
+                        <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:1.25rem 0 .5rem;">{{ secao.titulo }}</p>
+                        <dl>
+                            {% for rotulo, valor in secao.itens %}
+                                <dt><strong>{{ rotulo }}</strong></dt>
+                                <dd>{{ valor|linebreaksbr }}</dd>
+                            {% endfor %}
+                        </dl>
                     {% endfor %}
                 {% else %}
                     <p style="margin-top:1rem;">Anamnese ainda não preenchida para esta paciente.</p>

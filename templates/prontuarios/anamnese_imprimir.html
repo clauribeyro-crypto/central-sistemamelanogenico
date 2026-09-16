@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Anamnese · {{ paciente.nome }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f7f4fb; --card-bg: #ffffff; --accent: #7c5cbf; --accent-soft: #efe8fb;
+            --accent-soft-text: #5b3a94; --text: #2b2635; --text-muted: #766f85;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            margin: 0; background: var(--bg); color: var(--text);
+        }
+        h1, h2 { font-family: "Playfair Display", Georgia, serif; font-weight: 600; margin: 0 0 .3rem; }
+        .pagina { max-width: 720px; margin: 0 auto; padding: 2rem 1.2rem 3rem; }
+        .topo { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; margin-bottom: 1.2rem; }
+        .topo p { color: var(--text-muted); font-size: .85rem; margin: .2rem 0 0; }
+        .btn-imprimir {
+            border: none; border-radius: 8px; background: var(--accent); color: #fff;
+            padding: .6rem 1rem; font-size: .9rem; font-weight: 600; cursor: pointer;
+        }
+        .btn-imprimir:hover { background: #6a4aa8; }
+        .foto { text-align: center; margin-bottom: 1.2rem; }
+        .foto img { max-width: 160px; border-radius: 10px; }
+        .satisfacoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .7rem; margin-bottom: 1.5rem; }
+        .satisfacao-item {
+            background: var(--card-bg); border-radius: 10px; padding: .8rem 1rem;
+            box-shadow: 0 1px 3px rgba(43,38,53,.06);
+        }
+        .satisfacao-item .nota { font-family: "Playfair Display", Georgia, serif; font-size: 1.6rem; font-weight: 700; }
+        .satisfacao-item .rotulo { font-size: .78rem; color: var(--text-muted); margin-top: .2rem; }
+        .card { background: var(--card-bg); border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(43,38,53,.06); }
+        .card h2 { font-size: 1rem; color: var(--accent-soft-text); }
+        dl { margin: .5rem 0 0; }
+        dt { font-size: .8rem; color: var(--text-muted); margin-top: .5rem; }
+        dd { margin: 0 0 0 0; font-size: .95rem; }
+        @media print {
+            body { background: #fff; }
+            .no-print { display: none !important; }
+            .card { box-shadow: none; border: 1px solid #e5e0ee; break-inside: avoid; }
+            .satisfacao-item { box-shadow: none; border: 1px solid #e5e0ee; }
+        }
+    </style>
+</head>
+<body>
+    <div class="pagina">
+        <div class="topo">
+            <div>
+                <h1>Anamnese</h1>
+                <p>{{ paciente.nome }}{% if anamnese.idade %} · {{ anamnese.idade }} anos{% endif %} · atualizada em {{ anamnese.atualizado_em|date:"d/m/Y H:i" }}</p>
+            </div>
+            <button class="btn-imprimir no-print" onclick="window.print();">Imprimir / Salvar PDF</button>
+        </div>
+
+        {% if anamnese.foto_rosto %}
+            <div class="foto"><img src="{{ anamnese.foto_rosto.url }}" alt="Foto do rosto"></div>
+        {% endif %}
+
+        {% if anamnese.satisfacoes_preenchidas %}
+            <div class="satisfacoes">
+                {% for rotulo, nota in anamnese.satisfacoes_preenchidas %}
+                    <div class="satisfacao-item" style="border-left: 4px solid {% if nota >= 7 %}#3f9c6d{% elif nota >= 4 %}#d1a12e{% else %}#b3435c{% endif %};">
+                        <div class="nota">{{ nota }}/10</div>
+                        <div class="rotulo">{{ rotulo }}</div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {% for secao in anamnese.secoes_preenchidas %}
+            <div class="card">
+                <h2>{{ secao.titulo }}</h2>
+                <dl>
+                    {% for rotulo, valor in secao.itens %}
+                        <dt>{{ rotulo }}</dt>
+                        <dd>{{ valor|linebreaksbr }}</dd>
+                    {% endfor %}
+                </dl>
+            </div>
+        {% endfor %}
+    </div>
+</body>
+</html>

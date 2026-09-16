@@ -9,7 +9,7 @@ from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
 from leads.models import HistoricoLead
 from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao, FotoEvolucao
-from prontuarios.models import SECOES_ANAMNESE, Anamnese, Documento
+from prontuarios.models import Anamnese, Documento
 
 from .forms import IniciarProtocoloForm, PacienteRapidoForm
 from .models import Paciente
@@ -122,7 +122,6 @@ def ficha(request, pk):
 
     if aba == "anamnese":
         contexto["anamnese"] = Anamnese.objects.filter(paciente=paciente).first()
-        contexto["secoes_anamnese"] = SECOES_ANAMNESE
         contexto["link_anamnese_ativo"] = paciente.links_anamnese.filter(
             ativo=True, preenchido_em__isnull=True
         ).order_by("-criado_em").first()
