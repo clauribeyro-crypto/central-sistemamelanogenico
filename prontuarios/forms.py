@@ -25,13 +25,26 @@ _CAMPOS_TEXTAREA = (
 )
 _CAMPOS_SATISFACAO = [campo for campo, _ in SATISFACOES]
 
-# Ordem completa dos campos do check-in, achatando as 4 seções — mesma lógica
-# de CAMPOS_ANAMNESE, usada pelo form e pelos templates (público e manual).
-CAMPOS_CHECKIN = [campo for secao in SECOES_CHECKIN for campo in secao["campos"]]
+# Ordem completa dos campos do check-in, achatando as 4 seções (campos
+# específicos + melhora + observação) — mesma lógica de CAMPOS_ANAMNESE,
+# usada pelo form e pelos templates (público e manual).
+CAMPOS_CHECKIN = [
+    campo
+    for secao in SECOES_CHECKIN
+    for campo in secao["campos"] + [secao["melhora"], secao["observacao"]]
+]
 _CAMPOS_ESCALA_CHECKIN = (
     "distensao_abdominal", "plenitude_pos_comer", "dor_desconforto",
     "energia_acordar", "energia_apos_almoco", "energia_fim_dia", "qualidade_sono",
+    "melhora_intestino", "melhora_digestao", "melhora_energia", "melhora_sono",
 )
+_CAMPOS_OBSERVACAO_CHECKIN = (
+    "observacao_intestino", "observacao_digestao", "observacao_energia", "observacao_sono",
+)
+# Lista de seleção em vez de campo numérico — em alguns celulares o teclado
+# numérico do input type="number" trava ou não abre; escolher de uma lista
+# de 0 a 10 funciona em qualquer aparelho, sem precisar digitar nada.
+_ESCALA_CHOICES = [("", "—")] + [(i, str(i)) for i in range(11)]
 
 
 class AtendimentoForm(forms.ModelForm):
@@ -89,8 +102,12 @@ class RegistroEvolucaoForm(forms.ModelForm):
         fields = CAMPOS_CHECKIN
         widgets = {
             **{
-                campo: forms.NumberInput(attrs={"min": 0, "max": 10})
+                campo: forms.Select(choices=_ESCALA_CHOICES)
                 for campo in _CAMPOS_ESCALA_CHECKIN
+            },
+            **{
+                campo: forms.Textarea(attrs={"rows": 2})
+                for campo in _CAMPOS_OBSERVACAO_CHECKIN
             },
             "vezes_acordou_noite": forms.NumberInput(attrs={"min": 0}),
         }

@@ -299,23 +299,31 @@
                                 <div style="font-size:.88rem; margin-top:.35rem;">
                                     {% if r.evacuou %}<strong>Evacuou:</strong> {{ r.get_evacuou_display }} · {% endif %}
                                     {% if r.fezes_endurecidas %}<strong>Fezes endurecidas:</strong> {{ r.get_fezes_endurecidas_display }} · {% endif %}
-                                    {% if r.evacuacao_completa %}<strong>Evacuação completa:</strong> {{ r.get_evacuacao_completa_display }}{% endif %}
+                                    {% if r.evacuacao_completa %}<strong>Evacuação completa:</strong> {{ r.get_evacuacao_completa_display }} · {% endif %}
+                                    {% if r.melhora_intestino != None %}<strong>Melhora do intestino:</strong> {{ r.melhora_intestino }}/10{% endif %}
+                                    {% if r.observacao_intestino %}<br><span style="color:var(--text-muted);">Obs.: {{ r.observacao_intestino }}</span>{% endif %}
                                 </div>
                                 <div style="font-size:.88rem;">
                                     {% if r.distensao_abdominal != None %}<strong>Distensão:</strong> {{ r.distensao_abdominal }}/10 · {% endif %}
                                     {% if r.plenitude_pos_comer != None %}<strong>Plenitude:</strong> {{ r.plenitude_pos_comer }}/10 · {% endif %}
                                     {% if r.arrotos %}<strong>Arrotos:</strong> {{ r.get_arrotos_display }} · {% endif %}
-                                    {% if r.dor_desconforto != None %}<strong>Dor/desconforto:</strong> {{ r.dor_desconforto }}/10{% endif %}
+                                    {% if r.dor_desconforto != None %}<strong>Dor/desconforto:</strong> {{ r.dor_desconforto }}/10 · {% endif %}
+                                    {% if r.melhora_digestao != None %}<strong>Melhora da digestão:</strong> {{ r.melhora_digestao }}/10{% endif %}
+                                    {% if r.observacao_digestao %}<br><span style="color:var(--text-muted);">Obs.: {{ r.observacao_digestao }}</span>{% endif %}
                                 </div>
                                 <div style="font-size:.88rem;">
                                     {% if r.energia_acordar != None %}<strong>Energia ao acordar:</strong> {{ r.energia_acordar }}/10 · {% endif %}
                                     {% if r.energia_apos_almoco != None %}<strong>Após o almoço:</strong> {{ r.energia_apos_almoco }}/10 · {% endif %}
-                                    {% if r.energia_fim_dia != None %}<strong>Fim do dia:</strong> {{ r.energia_fim_dia }}/10{% endif %}
+                                    {% if r.energia_fim_dia != None %}<strong>Fim do dia:</strong> {{ r.energia_fim_dia }}/10 · {% endif %}
+                                    {% if r.melhora_energia != None %}<strong>Melhora da energia:</strong> {{ r.melhora_energia }}/10{% endif %}
+                                    {% if r.observacao_energia %}<br><span style="color:var(--text-muted);">Obs.: {{ r.observacao_energia }}</span>{% endif %}
                                 </div>
                                 <div style="font-size:.88rem;">
                                     {% if r.qualidade_sono != None %}<strong>Qualidade do sono:</strong> {{ r.qualidade_sono }}/10 · {% endif %}
                                     {% if r.vezes_acordou_noite != None %}<strong>Vezes que acordou:</strong> {{ r.vezes_acordou_noite }}{% endif %}
                                     {% if r.horarios_acordou %} ({{ r.horarios_acordou }}){% endif %}
+                                    {% if r.melhora_sono != None %} · <strong>Melhora do sono:</strong> {{ r.melhora_sono }}/10{% endif %}
+                                    {% if r.observacao_sono %}<br><span style="color:var(--text-muted);">Obs.: {{ r.observacao_sono }}</span>{% endif %}
                                 </div>
                                 {% if usuario_e_administrador %}
                                     <form method="post" action="{% url 'prontuarios:checkin_excluir' r.pk %}" style="margin-top:.35rem;" onsubmit="return confirm('Excluir este registro?');">

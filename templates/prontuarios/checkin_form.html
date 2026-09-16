@@ -21,6 +21,20 @@
                         </div>
                     {% endwith %}
                 {% endfor %}
+                {% with bf=form|get_field:secao.melhora %}
+                    <div>
+                        <label for="{{ bf.id_for_label }}"><strong>{{ bf.label|capfirst }}</strong></label>
+                        {{ bf }}
+                        {% for error in bf.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endwith %}
+                {% with bf=form|get_field:secao.observacao %}
+                    <div>
+                        <label for="{{ bf.id_for_label }}">Observação</label>
+                        {{ bf }}
+                        {% for error in bf.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endwith %}
             </div>
         {% endfor %}
         <button class="btn" type="submit">Registrar</button>
