@@ -28,10 +28,13 @@
         .card h2 { font-size: 1.05rem; color: var(--accent-soft-text); }
         .campo { margin-bottom: .85rem; }
         .campo label { display: block; font-size: .85rem; color: var(--text-muted); margin-bottom: .3rem; }
-        .campo input, .campo select {
+        .campo input, .campo select, .campo textarea {
             width: 100%; padding: .55rem .6rem; border-radius: 8px; border: 1px solid #ddd6ea;
             font-size: 1rem; font-family: inherit; background: #fff; color: var(--text);
         }
+        .campo textarea { min-height: 3.5rem; resize: vertical; }
+        .melhora { background: var(--accent-soft); border-radius: 10px; padding: .9rem 1rem; margin-top: 1rem; }
+        .melhora label { color: var(--accent-soft-text); font-weight: 600; }
         .btn-enviar {
             display: block; width: 100%; padding: .9rem; border: none; border-radius: 10px;
             background: var(--accent); color: #fff; font-size: 1.05rem; font-weight: 600; cursor: pointer;
@@ -59,6 +62,20 @@
                         </div>
                     {% endwith %}
                 {% endfor %}
+                {% with bf=form|get_field:secao.melhora %}
+                    <div class="melhora">
+                        <label for="{{ bf.id_for_label }}">{{ bf.label|capfirst }}</label>
+                        {{ bf }}
+                        {% for error in bf.errors %}<div class="erro">{{ error }}</div>{% endfor %}
+                    </div>
+                {% endwith %}
+                {% with bf=form|get_field:secao.observacao %}
+                    <div class="campo" style="margin-top:.85rem;">
+                        <label for="{{ bf.id_for_label }}">Observação</label>
+                        {{ bf }}
+                        {% for error in bf.errors %}<div class="erro">{{ error }}</div>{% endfor %}
+                    </div>
+                {% endwith %}
             </div>
         {% endfor %}
         <button class="btn-enviar" type="submit">Enviar check-in</button>

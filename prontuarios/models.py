@@ -512,14 +512,36 @@ def _campo_escala(label):
     )
 
 
+def _campo_melhora(tema):
+    return models.PositiveSmallIntegerField(
+        f"de 0 a 10, o quanto você sentiu que {tema} melhorou hoje?",
+        null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+    )
+
+
 # Mesma lógica de SECOES_ANAMNESE: uma única estrutura organiza os campos do
 # check-in diário nas 4 seções da entrevista, usada pelo form e pelos
-# templates (público e o de lançamento manual pelo profissional).
+# templates (público e o de lançamento manual pelo profissional). Toda seção
+# tem uma pergunta de melhora (0-10) e uma caixa de observação livre no final,
+# além dos campos específicos dela.
 SECOES_CHECKIN = [
-    {"titulo": "Intestino", "campos": ["evacuou", "fezes_endurecidas", "evacuacao_completa"]},
-    {"titulo": "Digestão", "campos": ["distensao_abdominal", "plenitude_pos_comer", "arrotos", "dor_desconforto"]},
-    {"titulo": "Energia", "campos": ["energia_acordar", "energia_apos_almoco", "energia_fim_dia"]},
-    {"titulo": "Sono", "campos": ["qualidade_sono", "vezes_acordou_noite", "horarios_acordou"]},
+    {
+        "titulo": "Intestino", "campos": ["evacuou", "fezes_endurecidas", "evacuacao_completa"],
+        "melhora": "melhora_intestino", "observacao": "observacao_intestino",
+    },
+    {
+        "titulo": "Digestão", "campos": ["distensao_abdominal", "plenitude_pos_comer", "arrotos", "dor_desconforto"],
+        "melhora": "melhora_digestao", "observacao": "observacao_digestao",
+    },
+    {
+        "titulo": "Energia", "campos": ["energia_acordar", "energia_apos_almoco", "energia_fim_dia"],
+        "melhora": "melhora_energia", "observacao": "observacao_energia",
+    },
+    {
+        "titulo": "Sono", "campos": ["qualidade_sono", "vezes_acordou_noite", "horarios_acordou"],
+        "melhora": "melhora_sono", "observacao": "observacao_sono",
+    },
 ]
 
 
@@ -552,17 +574,23 @@ class RegistroEvolucao(ModeloDaOrganizacao):
     evacuacao_completa = models.CharField(
         "sensação de evacuação completa?", max_length=3, choices=SimNao.choices, blank=True
     )
+    melhora_intestino = _campo_melhora("o intestino")
+    observacao_intestino = models.TextField("observação (intestino)", blank=True)
 
     # Digestão
     distensao_abdominal = _campo_escala("distensão abdominal")
     plenitude_pos_comer = _campo_escala("plenitude após comer")
     arrotos = models.CharField("arrotos?", max_length=3, choices=SimNao.choices, blank=True)
     dor_desconforto = _campo_escala("dor ou desconforto")
+    melhora_digestao = _campo_melhora("a digestão")
+    observacao_digestao = models.TextField("observação (digestão)", blank=True)
 
     # Energia
     energia_acordar = _campo_escala("energia ao acordar")
     energia_apos_almoco = _campo_escala("energia após o almoço")
     energia_fim_dia = _campo_escala("energia no final do dia")
+    melhora_energia = _campo_melhora("a energia")
+    observacao_energia = models.TextField("observação (energia)", blank=True)
 
     # Sono
     qualidade_sono = _campo_escala("qualidade do sono")
@@ -570,6 +598,8 @@ class RegistroEvolucao(ModeloDaOrganizacao):
         "quantas vezes acordou durante a noite?", null=True, blank=True
     )
     horarios_acordou = models.CharField("em quais horários?", max_length=255, blank=True)
+    melhora_sono = _campo_melhora("o sono")
+    observacao_sono = models.TextField("observação (sono)", blank=True)
 
     criado_em = models.DateTimeField(auto_now_add=True)
 
