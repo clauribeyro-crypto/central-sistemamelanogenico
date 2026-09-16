@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django import forms
 
-from .models import Pagamento, Recebimento
+from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, Recebimento
 
 
 class PagamentoForm(forms.ModelForm):
@@ -51,3 +51,32 @@ class RecebimentoForm(forms.ModelForm):
                 f"Esse valor é maior que o saldo pendente (R$ {self.pagamento.saldo_pendente:.2f})."
             )
         return valor
+
+
+class BancoForm(forms.ModelForm):
+    class Meta:
+        model = Banco
+        fields = ["nome", "ativo"]
+
+
+class CategoriaFinanceiraForm(forms.ModelForm):
+    class Meta:
+        model = CategoriaFinanceira
+        fields = ["nome", "grupo", "ativo"]
+
+
+class LancamentoForm(forms.ModelForm):
+    data = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
+
+    class Meta:
+        model = Lancamento
+        fields = ["data", "descricao", "categoria", "banco", "valor", "status", "observacoes"]
+        widgets = {"observacoes": forms.Textarea(attrs={"rows": 2})}
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["categoria"].queryset = CategoriaFinanceira.objects.filter(
+            organizacao=organizacao, ativo=True
+        )
+        self.fields["banco"].queryset = Banco.objects.filter(organizacao=organizacao, ativo=True)
+        self.fields["banco"].required = False

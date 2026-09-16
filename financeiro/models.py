@@ -125,6 +125,92 @@ class Pagamento(ModeloDaOrganizacao):
         self.save(update_fields=["status", "forma_pagamento", "data_pagamento", "atualizado_em"])
 
 
+class Banco(ModeloDaOrganizacao):
+    """Conta bancária/carteira, só pra identificar de onde saiu ou entrou o dinheiro num lançamento."""
+
+    nome = models.CharField(max_length=100)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "banco"
+        verbose_name_plural = "bancos"
+        ordering = ["nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["organizacao", "nome"], name="banco_unico_por_organizacao"),
+        ]
+
+    def __str__(self):
+        return self.nome
+
+
+class CategoriaFinanceira(ModeloDaOrganizacao):
+    """
+    Categoria de um lançamento (Marketing, Taxas e tarifas, Venda de
+    serviço...), agrupada num dos 5 grupos do Controle Financeiro — o grupo
+    é o que decide se a categoria soma como receita ou despesa nos totais.
+    """
+
+    class Grupo(models.TextChoices):
+        RECEITA_OPERACIONAL = "RECEITA_OPERACIONAL", "Receita Operacional"
+        CUSTO_VARIAVEL = "CUSTO_VARIAVEL", "Custo Variável"
+        CUSTO_FIXO = "CUSTO_FIXO", "Custo Fixo"
+        DESPESA_NAO_OPERACIONAL = "DESPESA_NAO_OPERACIONAL", "Despesa Não Operacional"
+        RECEITA_NAO_OPERACIONAL = "RECEITA_NAO_OPERACIONAL", "Receita Não Operacional"
+
+    GRUPOS_RECEITA = (Grupo.RECEITA_OPERACIONAL, Grupo.RECEITA_NAO_OPERACIONAL)
+
+    nome = models.CharField(max_length=100)
+    grupo = models.CharField(max_length=30, choices=Grupo.choices)
+    ativo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "categoria financeira"
+        verbose_name_plural = "categorias financeiras"
+        ordering = ["grupo", "nome"]
+        constraints = [
+            models.UniqueConstraint(fields=["organizacao", "nome"], name="categoria_financeira_unica_por_organizacao"),
+        ]
+
+    def __str__(self):
+        return f"{self.nome} ({self.get_grupo_display()})"
+
+    @property
+    def eh_receita(self):
+        return self.grupo in self.GRUPOS_RECEITA
+
+
+class Lancamento(ModeloDaOrganizacao):
+    """
+    Lançamento manual do Controle Financeiro geral da empresa — custos,
+    despesas e receitas não ligadas a uma paciente específica (isso continua
+    sendo lançado no Financeiro da própria ficha da paciente, via Pagamento/
+    Recebimento, e entra somado nos totais do Controle Financeiro sem precisar
+    lançar de novo aqui).
+    """
+
+    class Status(models.TextChoices):
+        PREVISTO = "PREVISTO", "Previsto"
+        REALIZADO = "REALIZADO", "Realizado"
+
+    data = models.DateField()
+    descricao = models.CharField(max_length=255)
+    categoria = models.ForeignKey(CategoriaFinanceira, on_delete=models.PROTECT, related_name="lancamentos")
+    banco = models.ForeignKey(Banco, on_delete=models.PROTECT, related_name="lancamentos", blank=True, null=True)
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.REALIZADO)
+    observacoes = models.TextField(blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "lançamento"
+        verbose_name_plural = "lançamentos"
+        ordering = ["-data", "-criado_em"]
+        indexes = [models.Index(fields=["organizacao", "data"])]
+
+    def __str__(self):
+        return f"{self.descricao} — R$ {self.valor} ({self.data:%d/%m/%Y})"
+
+
 class Recebimento(ModeloDaOrganizacao):
     """
     Um recebimento parcial (ou único, se for o caso) dentro de um lançamento
