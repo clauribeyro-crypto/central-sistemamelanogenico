@@ -151,6 +151,17 @@ def anamnese(request, paciente_pk):
 
 
 @login_required
+def anamnese_imprimir(request, paciente_pk):
+    """Versão limpa da anamnese, com tudo já expandido — pra imprimir ou salvar como PDF pelo navegador."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    instancia = get_object_or_404(Anamnese, paciente=paciente)
+    return render(request, "prontuarios/anamnese_imprimir.html", {
+        "paciente": paciente, "anamnese": instancia,
+    })
+
+
+@login_required
 @require_POST
 def link_anamnese_criar(request, paciente_pk):
     """Gera um link público novo pra paciente preencher a anamnese sem login."""
