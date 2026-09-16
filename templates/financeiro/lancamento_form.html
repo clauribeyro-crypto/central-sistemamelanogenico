@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo }} · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'financeiro:painel' %}?aba=lancamentos">← Voltar</a></p>
+    <div class="card">
+        <h1>{{ titulo }}</h1>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">{% if lancamento %}Salvar alterações{% else %}Criar lançamento{% endif %}</button>
+        </form>
+    </div>
+{% endblock %}

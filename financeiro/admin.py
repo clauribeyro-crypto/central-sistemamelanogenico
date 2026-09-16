@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from contas.admin import OrganizacaoAdminMixin
 
-from .models import Pagamento, Recebimento, Servico
+from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, Recebimento, Servico
 
 
 @admin.register(Servico)
@@ -39,3 +39,26 @@ class PagamentoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
                 instancia.organizacao = form.instance.organizacao
             instancia.save()
         formset.save_m2m()
+
+
+@admin.register(Banco)
+class BancoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
+    list_display = ("nome", "ativo")
+    list_filter = ("ativo",)
+    search_fields = ("nome",)
+
+
+@admin.register(CategoriaFinanceira)
+class CategoriaFinanceiraAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
+    list_display = ("nome", "grupo", "ativo")
+    list_filter = ("grupo", "ativo")
+    search_fields = ("nome",)
+
+
+@admin.register(Lancamento)
+class LancamentoAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
+    list_display = ("descricao", "categoria", "banco", "valor", "status", "data")
+    list_filter = ("status", "categoria__grupo", "banco")
+    search_fields = ("descricao",)
+    autocomplete_fields = ("categoria", "banco")
+    date_hierarchy = "data"

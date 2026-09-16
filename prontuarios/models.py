@@ -172,8 +172,12 @@ SECOES_ANAMNESE = [
     {
         "titulo": "Alimentação",
         "campos": [
-            "cafe_da_manha", "almoco", "cafe_da_tarde", "jantar", "desejo_doces_carboidratos",
-            "digestao_proteinas", "preferencia_carne", "ingestao_agua",
+            "horario_cafe_da_manha", "cafe_da_manha",
+            "horario_almoco", "almoco",
+            "horario_cafe_da_tarde", "faz_cafe_da_tarde", "cafe_da_tarde",
+            "horario_jantar", "jantar",
+            "faz_ceia", "horario_ceia", "ceia",
+            "desejo_doces_carboidratos", "digestao_proteinas", "preferencia_carne", "ingestao_agua",
         ],
         "satisfacao": None,
     },
@@ -361,10 +365,18 @@ class Anamnese(ModeloDaOrganizacao):
     cabelo_branco_precoce = _campo("cabelo branco precoce")
 
     # 11. Alimentação
-    cafe_da_manha = _campo("café da manhã (preferências e horário)", max_length=255)
-    almoco = _campo("almoço (preferências e horário)", max_length=255)
-    cafe_da_tarde = _campo("café da tarde (preferências e horário)", max_length=255)
-    jantar = _campo("jantar (preferências e horário)", max_length=255)
+    horario_cafe_da_manha = _campo("horário do café da manhã", max_length=50)
+    cafe_da_manha = _campo("o que consome no café da manhã", max_length=255)
+    horario_almoco = _campo("horário do almoço", max_length=50)
+    almoco = _campo("o que consome no almoço", max_length=255)
+    horario_cafe_da_tarde = _campo("horário do café da tarde", max_length=50)
+    faz_cafe_da_tarde = _campo("faz café da tarde?", max_length=50)
+    cafe_da_tarde = _campo("o que consome no café da tarde", max_length=255)
+    horario_jantar = _campo("horário do jantar", max_length=50)
+    jantar = _campo("o que consome no jantar", max_length=255)
+    faz_ceia = _campo("faz ceia?", max_length=50)
+    horario_ceia = _campo("horário da ceia", max_length=50)
+    ceia = _campo("o que consome na ceia", max_length=255)
     desejo_doces_carboidratos = _campo("desejo por doces/carboidratos")
     digestao_proteinas = _campo("digestão de proteínas")
     preferencia_carne = _campo("preferência de carne (branca/vermelha)", max_length=100)
