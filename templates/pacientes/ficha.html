@@ -589,10 +589,26 @@
             <div class="card">
                 <h2>Produtos / kits</h2>
                 <table>
-                    <thead><tr><th>Kit</th><th>Status</th><th>Data de envio</th></tr></thead>
+                    <thead><tr><th>Kit</th><th>Status</th><th>Data de envio</th><th>Produtos</th><th></th></tr></thead>
                     <tbody>
                     {% for k in kits %}
-                        <tr><td>Kit {{ k.numero }}</td><td>{{ k.get_status_display }}</td><td>{{ k.data_envio|date:"d/m/Y"|default:"—" }}</td></tr>
+                        <tr>
+                            <td>Kit {{ k.numero }}</td>
+                            <td>{{ k.get_status_display }}</td>
+                            <td>{{ k.data_envio|date:"d/m/Y"|default:"—" }}</td>
+                            <td>
+                                {% for item in k.itens.all %}
+                                    {{ item.quantidade }}x {{ item.produto.nome }}{% if not forloop.last %}, {% endif %}
+                                {% empty %}
+                                    <span style="color:var(--text-muted);">—</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% if k.status == "PENDENTE" %}
+                                    <a href="{% url 'programas:kit_montar' k.pk %}">Montar/Enviar kit ›</a>
+                                {% endif %}
+                            </td>
+                        </tr>
                     {% endfor %}
                     </tbody>
                 </table>

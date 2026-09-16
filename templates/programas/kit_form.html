@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Montar Kit {{ kit.numero }} · {{ paciente.nome }}{% endblock %}
+{% block content %}
+    <p><a href="{% url 'pacientes:ficha' paciente.pk %}?aba=produtos">← Voltar à ficha da paciente</a></p>
+    <div class="card">
+        <h1>Montar Kit {{ kit.numero }} — {{ paciente.nome }}</h1>
+        <p style="font-size:.85rem; color:var(--text-muted);">Escolha os produtos e quantidades desse kit. Ao confirmar, o estoque de cada produto é atualizado e o kit é marcado como enviado.</p>
+    </div>
+    <div class="card" style="max-width:640px;">
+        <form method="post" id="form-kit">
+            {% csrf_token %}
+            <div id="linhas-kit">
+                <div class="linha-kit" style="display:flex; gap:.5rem; margin-bottom:.75rem; align-items:flex-end;">
+                    <div style="flex:2;">
+                        <label>Produto</label>
+                        <select name="produto">
+                            <option value="">Selecione…</option>
+                            {% for p in produtos %}
+                                <option value="{{ p.pk }}">{{ p.nome }} ({{ p.estoque_atual }} em estoque)</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="flex:1;">
+                        <label>Quantidade</label>
+                        <input type="number" name="quantidade" min="1" value="1">
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-remover-linha" style="flex:0;">Remover</button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary" id="btn-adicionar-linha" style="margin-bottom:1rem;">+ Adicionar produto</button>
+            <div>
+                <button class="btn" type="submit">Confirmar e marcar como enviado</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+    (function () {
+        const linhas = document.getElementById("linhas-kit");
+        document.getElementById("btn-adicionar-linha").addEventListener("click", function () {
+            const primeira = linhas.querySelector(".linha-kit");
+            const nova = primeira.cloneNode(true);
+            nova.querySelectorAll("select, input").forEach(function (campo) {
+                if (campo.tagName === "SELECT") campo.value = "";
+                else campo.value = "1";
+            });
+            linhas.appendChild(nova);
+        });
+        linhas.addEventListener("click", function (ev) {
+            if (!ev.target.classList.contains("btn-remover-linha")) return;
+            if (linhas.querySelectorAll(".linha-kit").length > 1) {
+                ev.target.closest(".linha-kit").remove();
+            }
+        });
+    })();
+    </script>
+{% endblock %}

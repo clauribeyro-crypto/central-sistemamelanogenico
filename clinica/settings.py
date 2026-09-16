@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     "programas",
     "prontuarios",
     "financeiro",
+    "estoque",
 ]
 
 AUTH_USER_MODEL = "contas.Usuario"

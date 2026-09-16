@@ -1,3 +1,5 @@
+import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
@@ -7,6 +9,7 @@ from django.views.decorators.http import require_POST
 
 from agenda.models import TipoConsulta
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
+from estoque.models import Produto, Recompra
 
 from .forms import (
     AvaliacaoFaseForm,
@@ -16,7 +19,7 @@ from .forms import (
     ProgramaForm,
     TipoConsultaForm,
 )
-from .models import Acompanhamento, Feedback, FaseModulacao, FotoEvolucao, Programa
+from .models import Acompanhamento, Feedback, FaseModulacao, FotoEvolucao, KitPrevisto, KitProdutoItem, Programa
 
 
 @login_required
@@ -307,3 +310,72 @@ def foto_excluir(request, pk):
     foto.delete()
     messages.success(request, "Foto excluída.")
     return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=fotos")
+
+
+@login_required
+def kit_montar(request, pk):
+    """
+    Escolhe os produtos que compõem esse kit e marca como enviado — dá baixa
+    no estoque de cada produto escolhido e, quando o produto tem uma duração
+    estimada, já agenda a próxima recompra da paciente pra esse produto.
+    """
+    org = organizacao_do_usuario(request)
+    kit = get_object_or_404(
+        KitPrevisto.objects.select_related("acompanhamento__paciente"),
+        pk=pk, acompanhamento__organizacao=org,
+    )
+    paciente = kit.acompanhamento.paciente
+
+    if kit.status == KitPrevisto.Status.ENVIADO:
+        messages.error(request, "Esse kit já foi enviado.")
+        return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=produtos")
+
+    produtos_disponiveis = Produto.objects.filter(organizacao=org, ativo=True).order_by("nome")
+
+    if request.method == "POST":
+        produto_ids = request.POST.getlist("produto")
+        quantidades = request.POST.getlist("quantidade")
+        itens, erro = [], None
+        for produto_id, quantidade_str in zip(produto_ids, quantidades):
+            if not produto_id or not quantidade_str:
+                continue
+            produto = produtos_disponiveis.filter(pk=produto_id).first()
+            try:
+                quantidade = int(quantidade_str)
+            except ValueError:
+                quantidade = 0
+            if not produto or quantidade <= 0:
+                continue
+            if quantidade > produto.estoque_atual:
+                erro = (
+                    f'Estoque insuficiente de "{produto.nome}" — '
+                    f"disponível: {produto.estoque_atual}, pedido: {quantidade}."
+                )
+                break
+            itens.append((produto, quantidade))
+
+        if not erro and not itens:
+            erro = "Escolha ao menos um produto pro kit."
+
+        if erro:
+            messages.error(request, erro)
+        else:
+            hoje = timezone.localdate()
+            for produto, quantidade in itens:
+                KitProdutoItem.objects.create(kit_previsto=kit, produto=produto, quantidade=quantidade)
+                produto.estoque_atual -= quantidade
+                produto.save(update_fields=["estoque_atual"])
+                if produto.duracao_estimada_dias:
+                    Recompra.objects.create(
+                        organizacao=org, paciente=paciente, produto=produto,
+                        data_prevista=hoje + datetime.timedelta(days=produto.duracao_estimada_dias),
+                    )
+            kit.status = KitPrevisto.Status.ENVIADO
+            kit.data_envio = hoje
+            kit.save(update_fields=["status", "data_envio"])
+            messages.success(request, f"Kit {kit.numero} montado e marcado como enviado.")
+            return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=produtos")
+
+    return render(request, "programas/kit_form.html", {
+        "paciente": paciente, "kit": kit, "produtos": produtos_disponiveis,
+    })
