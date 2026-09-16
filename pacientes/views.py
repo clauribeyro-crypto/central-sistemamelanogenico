@@ -220,7 +220,7 @@ def ficha(request, pk):
         ).order_by("-data_hora")
 
     if acompanhamento and aba == "produtos":
-        contexto["kits"] = acompanhamento.kits_previstos.order_by("numero")
+        contexto["kits"] = acompanhamento.kits_previstos.prefetch_related("itens__produto").order_by("numero")
 
     if aba == "historico":
         eventos = []

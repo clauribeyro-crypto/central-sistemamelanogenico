@@ -237,6 +237,25 @@ class KitPrevisto(models.Model):
         return f"Kit {self.numero} de {self.acompanhamento}"
 
 
+class KitProdutoItem(models.Model):
+    """
+    Um produto (do estoque) dentro de um kit já montado/enviado — a
+    composição não é fixa por plano, é escolhida na hora de montar o kit
+    (ver `programas.views.kit_montar`), que também dá baixa no estoque.
+    """
+
+    kit_previsto = models.ForeignKey(KitPrevisto, on_delete=models.CASCADE, related_name="itens")
+    produto = models.ForeignKey("estoque.Produto", on_delete=models.PROTECT, related_name="+")
+    quantidade = models.PositiveIntegerField(default=1)
+
+    class Meta:
+        verbose_name = "produto do kit"
+        verbose_name_plural = "produtos do kit"
+
+    def __str__(self):
+        return f"{self.quantidade}x {self.produto} — {self.kit_previsto}"
+
+
 class CustoAcompanhamento(models.Model):
     acompanhamento = models.ForeignKey(
         Acompanhamento, on_delete=models.CASCADE, related_name="custos"

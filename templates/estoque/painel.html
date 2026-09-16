@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Produtos & Estoque · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Produtos &amp; Estoque</h1>
+
+    <div class="tabs">
+        <a class="{% if aba_atual == 'geral' %}ativo{% endif %}" href="?aba=geral">Visão geral</a>
+        <a class="{% if aba_atual == 'estoque' %}ativo{% endif %}" href="?aba=estoque">Estoque atual</a>
+        <a class="{% if aba_atual == 'producao' %}ativo{% endif %}" href="?aba=producao">Produção pendente</a>
+        <a class="{% if aba_atual == 'recompras' %}ativo{% endif %}" href="?aba=recompras">Recompras das pacientes</a>
+    </div>
+
+    {% if aba_atual == "geral" %}
+        <div class="grid">
+            <div class="card stat"><div class="num">{{ produtos_criticos_baixos|length }}</div><div class="rotulo">Itens com estoque baixo/crítico</div></div>
+            <div class="card stat"><div class="num">{{ unidades_em_producao }}</div><div class="rotulo">Unidades em produção</div></div>
+            <div class="card stat"><div class="num">{{ recompras_proximas|length }}</div><div class="rotulo">Recompras próximas do prazo</div></div>
+            <div class="card stat"><div class="num">{{ recompras_atrasadas|length }}</div><div class="rotulo">Recompras atrasadas</div></div>
+        </div>
+
+        <div class="grid-2col" style="align-items:start;">
+            <div class="card">
+                <h2>Produtos acabando</h2>
+                {% if produtos_criticos_baixos %}
+                    <ul class="fila">
+                        {% for p in produtos_criticos_baixos %}
+                            <li>
+                                <div class="nome">{{ p.nome }}</div>
+                                <span class="badge {% if p.nivel_estoque == 'CRITICO' %}badge-atrasado{% else %}badge-parcial{% endif %}">{{ p.estoque_atual }} un</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>Nenhum produto com estoque baixo no momento.</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <h2>Em produção / manipulação</h2>
+                {% if producoes_pendentes %}
+                    <ul class="fila">
+                        {% for pr in producoes_pendentes %}
+                            <li>
+                                <div>
+                                    <div class="nome">{{ pr.produto.nome }}</div>
+                                    <div class="meta">{{ pr.quantidade }} un · previsão {{ pr.previsao_conclusao|date:"d/m"|default:"—" }}</div>
+                                </div>
+                                <span class="badge badge-neutro">{{ pr.get_status_display }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>Nenhuma produção pendente no momento.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Recompras que precisam de atenção</h2>
+            {% if recompras_proximas or recompras_atrasadas %}
+                <ul class="fila">
+                    {% for r in recompras_atrasadas %}
+                        <li>
+                            <div>
+                                <div class="nome">{{ r.paciente.nome }}</div>
+                                <div class="meta">{{ r.produto.nome }} · previsão {{ r.data_prevista|date:"d/m" }}</div>
+                            </div>
+                            <span class="badge badge-atrasado">Atrasada</span>
+                        </li>
+                    {% endfor %}
+                    {% for r in recompras_proximas %}
+                        <li>
+                            <div>
+                                <div class="nome">{{ r.paciente.nome }}</div>
+                                <div class="meta">{{ r.produto.nome }} · previsão {{ r.data_prevista|date:"d/m" }}</div>
+                            </div>
+                            <span class="badge badge-parcial">Próxima do prazo</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>Nenhuma recompra precisando de atenção no momento.</p>
+            {% endif %}
+        </div>
+
+    {% elif aba_atual == "estoque" %}
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <p style="color:var(--text-muted); margin:0;">Estoque em nível único — cada produto pronto, sem controle de insumos separado.</p>
+            <a class="btn" href="{% url 'estoque:produto_criar' %}">+ Novo produto</a>
+        </div>
+        <div class="card">
+            {% if produtos %}
+                <table>
+                    <thead><tr><th>Produto</th><th>Estoque atual</th><th>Estoque mínimo</th><th>Duração estimada</th><th>Nível</th><th></th></tr></thead>
+                    <tbody>
+                    {% for p in produtos %}
+                        <tr>
+                            <td>{{ p.nome }}</td>
+                            <td>{{ p.estoque_atual }} un</td>
+                            <td>{{ p.estoque_minimo }} un</td>
+                            <td>{% if p.duracao_estimada_dias %}{{ p.duracao_estimada_dias }} dias{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                            <td>
+                                {% if p.nivel_estoque == "CRITICO" %}<span class="badge badge-atrasado">Crítico</span>
+                                {% elif p.nivel_estoque == "BAIXO" %}<span class="badge badge-parcial">Baixo</span>
+                                {% else %}<span class="badge">OK</span>{% endif %}
+                            </td>
+                            <td>
+                                <form method="post" action="{% url 'estoque:entrada_estoque' p.pk %}" style="display:inline; white-space:nowrap;">
+                                    {% csrf_token %}
+                                    <input type="number" name="quantidade" min="1" value="1" style="width:60px; padding:.3rem; border-radius:6px; border:1px solid #ddd5ee;">
+                                    <button type="submit" class="btn btn-sm btn-secondary">+ Entrada</button>
+                                </form>
+                                · <a href="{% url 'estoque:produto_editar' p.pk %}">Editar ›</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nenhum produto cadastrado ainda. <a href="{% url 'estoque:produto_criar' %}">Cadastre o primeiro</a>.</p>
+            {% endif %}
+        </div>
+
+    {% elif aba_atual == "producao" %}
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <p style="color:var(--text-muted); margin:0;">Reposições em andamento — ao marcar como pronta, a quantidade já soma automaticamente no estoque do produto.</p>
+            <a class="btn" href="{% url 'estoque:producao_criar' %}">+ Nova produção</a>
+        </div>
+        <div class="card">
+            {% if producoes_pendentes %}
+                <table>
+                    <thead><tr><th>Produto</th><th>Quantidade</th><th>Status</th><th>Previsão</th><th></th></tr></thead>
+                    <tbody>
+                    {% for pr in producoes_pendentes %}
+                        <tr>
+                            <td>{{ pr.produto.nome }}</td>
+                            <td>{{ pr.quantidade }} un</td>
+                            <td>{{ pr.get_status_display }}</td>
+                            <td>{{ pr.previsao_conclusao|date:"d/m/Y"|default:"—" }}</td>
+                            <td>
+                                <form method="post" action="{% url 'estoque:producao_marcar_pronto' pr.pk %}" style="display:inline;" onsubmit="return confirm('Marcar como pronto? Isso soma a quantidade ao estoque do produto.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm">Marcar como pronto</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nenhuma produção pendente no momento.</p>
+            {% endif %}
+        </div>
+
+    {% elif aba_atual == "recompras" %}
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+            <p style="color:var(--text-muted); margin:0;">Geradas automaticamente ao montar um kit (quando o produto tem duração estimada) ou lançadas manualmente aqui.</p>
+            <a class="btn" href="{% url 'estoque:recompra_criar' %}">+ Nova recompra</a>
+        </div>
+        <div class="card">
+            {% if recompras_abertas %}
+                <table>
+                    <thead><tr><th>Paciente</th><th>Produto</th><th>Previsão</th><th>Status</th><th></th></tr></thead>
+                    <tbody>
+                    {% for r in recompras_abertas %}
+                        <tr>
+                            <td>{{ r.paciente.nome }}</td>
+                            <td>{{ r.produto.nome }}</td>
+                            <td>{{ r.data_prevista|date:"d/m/Y" }}</td>
+                            <td>
+                                {% if r.status == "ATRASADA" %}<span class="badge badge-atrasado">Atrasada</span>
+                                {% elif r.status == "PROXIMA_DO_PRAZO" %}<span class="badge badge-parcial">Próxima do prazo</span>
+                                {% else %}<span class="badge">Em dia</span>{% endif %}
+                            </td>
+                            <td>
+                                <form method="post" action="{% url 'estoque:recompra_marcar_comprada' r.pk %}" style="display:inline;" onsubmit="return confirm('Registrar que a paciente comprou de novo? Isso já agenda o próximo ciclo.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm">Comprou</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nenhuma recompra em aberto no momento.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}
