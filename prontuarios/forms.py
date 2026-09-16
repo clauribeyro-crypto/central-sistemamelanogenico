@@ -3,18 +3,27 @@ from django import forms
 from agenda.models import Consulta
 from profissionais.models import Profissional
 
-from .models import Anamnese, Atendimento, Documento
+from .models import SATISFACOES, SECOES_ANAMNESE, Anamnese, Atendimento, Documento
 
 CAMPOS_TEXTO_LONGO = (
     "queixa_principal", "historico_atual", "exame_fisico",
     "diagnostico", "conduta", "prescricao", "observacoes",
 )
 
-CAMPOS_ANAMNESE = (
-    "melasma_pele", "intestino", "estomago_digestao", "figado_vesicula",
-    "hormonal_ciclo", "sono", "alimentacao", "medicamentos",
-    "historico_saude", "sinais_sintomas", "observacoes_profissional",
+# Ordem completa dos campos da anamnese, achatando as 15 seções — usada pelo
+# form e, junto com SECOES_ANAMNESE, pelos templates (público e interno).
+CAMPOS_ANAMNESE = [
+    campo
+    for secao in SECOES_ANAMNESE
+    for campo in secao["campos"] + ([secao["satisfacao"]] if secao["satisfacao"] else [])
+]
+
+_CAMPOS_TEXTAREA = (
+    "tratamentos_anteriores", "rotina_matinal", "cirurgias_previas",
+    "tratamento_medico_atual", "outras_doencas", "outros_sintomas_doencas",
+    "orgaos_mais_atencao",
 )
+_CAMPOS_SATISFACAO = [campo for campo, _ in SATISFACOES]
 
 
 class AtendimentoForm(forms.ModelForm):
@@ -55,8 +64,15 @@ class AtendimentoForm(forms.ModelForm):
 class AnamneseForm(forms.ModelForm):
     class Meta:
         model = Anamnese
-        fields = list(CAMPOS_ANAMNESE)
-        widgets = {campo: forms.Textarea(attrs={"rows": 3}) for campo in CAMPOS_ANAMNESE}
+        fields = CAMPOS_ANAMNESE
+        widgets = {
+            **{campo: forms.Textarea(attrs={"rows": 3}) for campo in _CAMPOS_TEXTAREA},
+            **{
+                campo: forms.NumberInput(attrs={"min": 0, "max": 10})
+                for campo in _CAMPOS_SATISFACAO
+            },
+            "data_nascimento": forms.DateInput(attrs={"type": "date"}),
+        }
 
 
 class DocumentoForm(forms.ModelForm):

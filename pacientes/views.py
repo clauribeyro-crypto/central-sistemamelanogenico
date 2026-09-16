@@ -2,15 +2,16 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from agenda.models import Consulta
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
 from leads.models import HistoricoLead
 from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao, FotoEvolucao
-from prontuarios.models import Anamnese, Documento
+from prontuarios.models import SECOES_ANAMNESE, Anamnese, Documento
 
-from .forms import IniciarProtocoloForm
+from .forms import IniciarProtocoloForm, PacienteRapidoForm
 from .models import Paciente
 
 ABAS = [
@@ -60,7 +61,32 @@ def lista(request):
     pacientes = Paciente.objects.filter(organizacao=org, ativo=True).order_by("nome")
     if busca:
         pacientes = pacientes.filter(Q(nome__icontains=busca) | Q(telefone__icontains=busca))
-    return render(request, "pacientes/lista.html", {"pacientes": pacientes, "busca": busca})
+    form_rapido = PacienteRapidoForm(initial={"nome": busca} if busca and not pacientes else None)
+    return render(request, "pacientes/lista.html", {
+        "pacientes": pacientes, "busca": busca, "form_rapido": form_rapido,
+    })
+
+
+@login_required
+def criar(request):
+    org = organizacao_do_usuario(request)
+    if request.method == "POST":
+        form_rapido = PacienteRapidoForm(request.POST)
+        if form_rapido.is_valid():
+            paciente = form_rapido.save(commit=False)
+            paciente.organizacao = org
+            paciente.save()
+            messages.success(request, f"Paciente \"{paciente.nome}\" cadastrada.")
+            return redirect("pacientes:ficha", pk=paciente.pk)
+        messages.error(request, "Não deu pra cadastrar — confira o formulário.")
+        busca = request.POST.get("nome", "")
+        pacientes = Paciente.objects.filter(organizacao=org, ativo=True).order_by("nome")
+        if busca:
+            pacientes = pacientes.filter(Q(nome__icontains=busca) | Q(telefone__icontains=busca))
+        return render(request, "pacientes/lista.html", {
+            "pacientes": pacientes, "busca": busca, "form_rapido": form_rapido,
+        })
+    return redirect("pacientes:lista")
 
 
 @login_required
@@ -96,6 +122,14 @@ def ficha(request, pk):
 
     if aba == "anamnese":
         contexto["anamnese"] = Anamnese.objects.filter(paciente=paciente).first()
+        contexto["secoes_anamnese"] = SECOES_ANAMNESE
+        contexto["link_anamnese_ativo"] = paciente.links_anamnese.filter(
+            ativo=True, preenchido_em__isnull=True
+        ).order_by("-criado_em").first()
+        if contexto["link_anamnese_ativo"]:
+            contexto["link_anamnese_url"] = request.build_absolute_uri(
+                reverse("prontuarios:anamnese_publica", args=[contexto["link_anamnese_ativo"].token])
+            )
         contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
 
     if acompanhamento and aba == "modulacao":
