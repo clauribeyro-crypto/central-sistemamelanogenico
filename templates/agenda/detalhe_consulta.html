@@ -26,6 +26,11 @@
                 <a class="btn" href="{% url 'pacientes:iniciar_protocolo' consulta.paciente.pk %}">Iniciar protocolo de acompanhamento</a>
             {% endif %}
             {% if consulta.status != "CANCELADA" and consulta.status != "REALIZADA" %}
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="marcar_realizada">
+                    <button class="btn" type="submit">Marcar como realizada</button>
+                </form>
                 <form method="post" onsubmit="return confirm('Cancelar esta consulta? O lançamento financeiro pendente vinculado (se houver) também será cancelado.');">
                     {% csrf_token %}
                     <input type="hidden" name="acao" value="cancelar_consulta">
