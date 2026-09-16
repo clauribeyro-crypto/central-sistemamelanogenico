@@ -3,7 +3,7 @@ from django import forms
 from agenda.models import Consulta
 from profissionais.models import Profissional
 
-from .models import SATISFACOES, SECOES_ANAMNESE, Anamnese, Atendimento, Documento
+from .models import SATISFACOES, SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, RegistroEvolucao
 
 CAMPOS_TEXTO_LONGO = (
     "queixa_principal", "historico_atual", "exame_fisico",
@@ -24,6 +24,14 @@ _CAMPOS_TEXTAREA = (
     "orgaos_mais_atencao",
 )
 _CAMPOS_SATISFACAO = [campo for campo, _ in SATISFACOES]
+
+# Ordem completa dos campos do check-in, achatando as 4 seções — mesma lógica
+# de CAMPOS_ANAMNESE, usada pelo form e pelos templates (público e manual).
+CAMPOS_CHECKIN = [campo for secao in SECOES_CHECKIN for campo in secao["campos"]]
+_CAMPOS_ESCALA_CHECKIN = (
+    "distensao_abdominal", "plenitude_pos_comer", "dor_desconforto",
+    "energia_acordar", "energia_apos_almoco", "energia_fim_dia", "qualidade_sono",
+)
 
 
 class AtendimentoForm(forms.ModelForm):
@@ -72,6 +80,19 @@ class AnamneseForm(forms.ModelForm):
                 for campo in _CAMPOS_SATISFACAO
             },
             "data_nascimento": forms.DateInput(attrs={"type": "date"}),
+        }
+
+
+class RegistroEvolucaoForm(forms.ModelForm):
+    class Meta:
+        model = RegistroEvolucao
+        fields = CAMPOS_CHECKIN
+        widgets = {
+            **{
+                campo: forms.NumberInput(attrs={"min": 0, "max": 10})
+                for campo in _CAMPOS_ESCALA_CHECKIN
+            },
+            "vezes_acordou_noite": forms.NumberInput(attrs={"min": 0}),
         }
 
 

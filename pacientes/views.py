@@ -17,6 +17,7 @@ from .models import Paciente
 ABAS = [
     ("geral", "Visão geral"),
     ("anamnese", "Anamnese"),
+    ("evolucao", "Evolução"),
     ("modulacao", "Modulação"),
     ("feedbacks", "Feedbacks"),
     ("consultas", "Consultas"),
@@ -27,9 +28,43 @@ ABAS = [
     ("historico", "Histórico"),
 ]
 ABAS_PRONTAS = {
-    "geral", "anamnese", "modulacao", "feedbacks", "consultas", "fotos",
+    "geral", "anamnese", "evolucao", "modulacao", "feedbacks", "consultas", "fotos",
     "documentos", "produtos", "financeiro", "historico",
 }
+
+
+def _grafico_evolucao(registros, largura=640, altura=160, pad=24):
+    """
+    Coordenadas SVG já prontas pra desenhar as 3 linhas (energia, sono,
+    digestão) do resumo visual da aba Evolução — `registros` deve vir em
+    ordem cronológica (mais antigo primeiro). Só entram os check-ins com
+    as 3 métricas calculáveis, pra manter o gráfico "simples" sem lidar
+    com buracos na linha.
+    """
+    pontos = []
+    for r in registros:
+        energia, digestao = r.energia_media, r.digestao_media
+        if energia is None or digestao is None or r.qualidade_sono is None:
+            continue
+        pontos.append({"data": r.criado_em, "energia": energia, "sono": r.qualidade_sono, "digestao": digestao})
+
+    def linha(chave):
+        n = len(pontos)
+        partes = []
+        for i, p in enumerate(pontos):
+            x = pad if n <= 1 else pad + (largura - 2 * pad) * i / (n - 1)
+            y = pad + (altura - 2 * pad) * (1 - p[chave] / 10)
+            partes.append(f"{x:.1f},{y:.1f}")
+        return " ".join(partes)
+
+    return {
+        "pontos": pontos,
+        "largura": largura,
+        "altura": altura,
+        "energia_points": linha("energia"),
+        "sono_points": linha("sono"),
+        "digestao_points": linha("digestao"),
+    }
 
 
 def _financeiro_do_acompanhamento(acompanhamento):
@@ -130,6 +165,16 @@ def ficha(request, pk):
                 reverse("prontuarios:anamnese_publica", args=[contexto["link_anamnese_ativo"].token])
             )
         contexto["atendimentos"] = paciente.atendimentos.select_related("profissional").order_by("-data_hora")
+
+    if aba == "evolucao":
+        contexto["link_checkin"] = getattr(paciente, "link_checkin", None)
+        if contexto["link_checkin"]:
+            contexto["link_checkin_url"] = request.build_absolute_uri(
+                reverse("prontuarios:checkin_publico", args=[contexto["link_checkin"].token])
+            )
+        registros = list(paciente.registros_evolucao.select_related("criado_por").order_by("-criado_em"))
+        contexto["registros_evolucao"] = registros
+        contexto["grafico_evolucao"] = _grafico_evolucao(list(reversed(registros)))
 
     if acompanhamento and aba == "modulacao":
         contexto["modulacoes"] = acompanhamento.modulacoes.prefetch_related("fases").order_by("numero")

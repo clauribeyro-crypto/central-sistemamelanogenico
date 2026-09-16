@@ -494,6 +494,130 @@ class LinkAnamnese(models.Model):
         self.save(update_fields=["preenchido_em", "ativo"])
 
 
+class SimNao(models.TextChoices):
+    SIM = "SIM", "Sim"
+    NAO = "NAO", "Não"
+
+
+class SimUmPoucoNao(models.TextChoices):
+    SIM = "SIM", "Sim"
+    UM_POUCO = "UM_POUCO", "Um pouco"
+    NAO = "NAO", "Não"
+
+
+def _campo_escala(label):
+    return models.PositiveSmallIntegerField(
+        label, null=True, blank=True,
+        validators=[MinValueValidator(0), MaxValueValidator(10)],
+    )
+
+
+# Mesma lógica de SECOES_ANAMNESE: uma única estrutura organiza os campos do
+# check-in diário nas 4 seções da entrevista, usada pelo form e pelos
+# templates (público e o de lançamento manual pelo profissional).
+SECOES_CHECKIN = [
+    {"titulo": "Intestino", "campos": ["evacuou", "fezes_endurecidas", "evacuacao_completa"]},
+    {"titulo": "Digestão", "campos": ["distensao_abdominal", "plenitude_pos_comer", "arrotos", "dor_desconforto"]},
+    {"titulo": "Energia", "campos": ["energia_acordar", "energia_apos_almoco", "energia_fim_dia"]},
+    {"titulo": "Sono", "campos": ["qualidade_sono", "vezes_acordou_noite", "horarios_acordou"]},
+]
+
+
+class RegistroEvolucao(ModeloDaOrganizacao):
+    """
+    Check-in diário de evolução — cada envio é um registro novo na linha do
+    tempo da paciente (diferente da Anamnese, que é uma foto única sempre
+    atualizada). Pode vir da própria paciente, pelo link público
+    (`LinkCheckin`), ou lançado manualmente pelo profissional quando ela
+    conta por outro canal (WhatsApp etc.) — lançar é sempre livre, sem
+    exigir administrador, igual à criação de qualquer outro registro
+    clínico novo neste sistema.
+    """
+
+    class Origem(models.TextChoices):
+        PACIENTE = "PACIENTE", "Paciente"
+        PROFISSIONAL = "PROFISSIONAL", "Equipe"
+
+    paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, related_name="registros_evolucao")
+    origem = models.CharField(max_length=12, choices=Origem.choices, default=Origem.PACIENTE)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+
+    # Intestino
+    evacuou = models.CharField("evacuou?", max_length=3, choices=SimNao.choices, blank=True)
+    fezes_endurecidas = models.CharField(
+        "fezes endurecidas?", max_length=8, choices=SimUmPoucoNao.choices, blank=True
+    )
+    evacuacao_completa = models.CharField(
+        "sensação de evacuação completa?", max_length=3, choices=SimNao.choices, blank=True
+    )
+
+    # Digestão
+    distensao_abdominal = _campo_escala("distensão abdominal")
+    plenitude_pos_comer = _campo_escala("plenitude após comer")
+    arrotos = models.CharField("arrotos?", max_length=3, choices=SimNao.choices, blank=True)
+    dor_desconforto = _campo_escala("dor ou desconforto")
+
+    # Energia
+    energia_acordar = _campo_escala("energia ao acordar")
+    energia_apos_almoco = _campo_escala("energia após o almoço")
+    energia_fim_dia = _campo_escala("energia no final do dia")
+
+    # Sono
+    qualidade_sono = _campo_escala("qualidade do sono")
+    vezes_acordou_noite = models.PositiveSmallIntegerField(
+        "quantas vezes acordou durante a noite?", null=True, blank=True
+    )
+    horarios_acordou = models.CharField("em quais horários?", max_length=255, blank=True)
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "registro de evolução"
+        verbose_name_plural = "registros de evolução"
+        ordering = ["-criado_em"]
+        indexes = [models.Index(fields=["paciente", "criado_em"])]
+
+    def __str__(self):
+        return f"Check-in de {self.paciente} em {self.criado_em:%d/%m/%Y %H:%M}"
+
+    @property
+    def energia_media(self):
+        vals = [v for v in [self.energia_acordar, self.energia_apos_almoco, self.energia_fim_dia] if v is not None]
+        return sum(vals) / len(vals) if vals else None
+
+    @property
+    def digestao_media(self):
+        vals = [
+            v for v in [self.distensao_abdominal, self.plenitude_pos_comer, self.dor_desconforto]
+            if v is not None
+        ]
+        return sum(vals) / len(vals) if vals else None
+
+
+class LinkCheckin(models.Model):
+    """
+    Link público e permanente de check-in diário — um por paciente, gerado
+    uma vez e reaproveitado pra sempre (diferente do LinkAnamnese, que é
+    de uso único e desativa sozinho depois do preenchimento).
+    """
+
+    paciente = models.OneToOneField(Paciente, on_delete=models.CASCADE, related_name="link_checkin")
+    token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    criado_em = models.DateTimeField(auto_now_add=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+
+    class Meta:
+        verbose_name = "link de check-in"
+        verbose_name_plural = "links de check-in"
+
+    def __str__(self):
+        return f"Link de check-in de {self.paciente}"
+
+
 class Documento(ModeloDaOrganizacao):
     """Exame, laudo ou outro documento anexado à paciente (não ligado a um acompanhamento específico)."""
 

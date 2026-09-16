@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load anamnese_extras %}
+{% block title %}Novo registro de evolução · {{ paciente.nome }}{% endblock %}
+{% block content %}
+    <p><a href="{% url 'pacientes:ficha' paciente.pk %}?aba=evolucao">← Voltar à ficha da paciente</a></p>
+    <div class="card">
+        <h1>Novo registro de evolução — {{ paciente.nome }}</h1>
+        <p style="font-size:.85rem; color:var(--text-muted);">Use quando a paciente contar sobre o dia dela por outro canal (WhatsApp, telefone etc.) — fica marcado como registrado pela equipe, não por ela.</p>
+    </div>
+    <form method="post" class="acao" style="max-width:700px;">
+        {% csrf_token %}
+        {% for secao in secoes %}
+            <div class="card">
+                <h2>{{ secao.titulo }}</h2>
+                {% for nome_campo in secao.campos %}
+                    {% with bf=form|get_field:nome_campo %}
+                        <div>
+                            <label for="{{ bf.id_for_label }}">{{ bf.label }}</label>
+                            {{ bf }}
+                            {% for error in bf.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                        </div>
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        {% endfor %}
+        <button class="btn" type="submit">Registrar</button>
+    </form>
+{% endblock %}

@@ -9,8 +9,11 @@ from django.views.decorators.http import require_POST
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
 
-from .forms import AnamneseForm, AtendimentoForm, DocumentoForm
-from .models import SECOES_ANAMNESE, Anamnese, Atendimento, Documento, LinkAnamnese
+from .forms import AnamneseForm, AtendimentoForm, DocumentoForm, RegistroEvolucaoForm
+from .models import (
+    SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, LinkAnamnese,
+    LinkCheckin, RegistroEvolucao,
+)
 
 
 @login_required
@@ -216,6 +219,87 @@ def anamnese_publica(request, token):
 
     return render(request, "prontuarios/anamnese_publica.html", {
         "paciente": paciente, "form": form, "secoes": SECOES_ANAMNESE,
+    })
+
+
+@login_required
+@require_POST
+def link_checkin_criar(request, paciente_pk):
+    """
+    Gera o link permanente de check-in diário pra paciente (um só por
+    paciente pra sempre — diferente do link de anamnese, esse nunca é
+    desativado nem trocado).
+    """
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    LinkCheckin.objects.get_or_create(paciente=paciente, defaults={"criado_por": request.user})
+    messages.success(request, "Link de check-in gerado — copie e envie pra paciente.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=evolucao")
+
+
+@login_required
+def checkin_criar(request, paciente_pk):
+    """Lançamento manual de um check-in pelo profissional (ex.: paciente contou por WhatsApp) — sempre livre, igual à criação de qualquer registro clínico novo."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    if request.method == "POST":
+        form = RegistroEvolucaoForm(request.POST)
+        if form.is_valid():
+            registro = form.save(commit=False)
+            registro.organizacao = org
+            registro.paciente = paciente
+            registro.origem = RegistroEvolucao.Origem.PROFISSIONAL
+            registro.criado_por = request.user
+            registro.save()
+            messages.success(request, "Registro de evolução adicionado.")
+            return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=evolucao")
+    else:
+        form = RegistroEvolucaoForm()
+    return render(request, "prontuarios/checkin_form.html", {
+        "paciente": paciente, "form": form, "secoes": SECOES_CHECKIN,
+    })
+
+
+@login_required
+@require_POST
+def checkin_excluir(request, pk):
+    """Excluir um check-in já registrado exige administrador — igual a Documento."""
+    org = organizacao_do_usuario(request)
+    registro = get_object_or_404(
+        RegistroEvolucao.objects.select_related("paciente"), pk=pk, organizacao=org
+    )
+    paciente = registro.paciente
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só um administrador da clínica pode excluir um registro de evolução.")
+        return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=evolucao")
+    registro.delete()
+    messages.success(request, "Registro de evolução excluído.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=evolucao")
+
+
+def checkin_publico(request, token):
+    """
+    Tela pública (sem login) pra paciente registrar o check-in diário — o
+    link é permanente (nunca desativa) e cada envio cria um registro novo
+    na linha do tempo, diferente da anamnese que sempre atualiza a mesma.
+    """
+    link = get_object_or_404(LinkCheckin.objects.select_related("paciente"), token=token)
+    paciente = link.paciente
+
+    if request.method == "POST":
+        form = RegistroEvolucaoForm(request.POST)
+        if form.is_valid():
+            registro = form.save(commit=False)
+            registro.organizacao = paciente.organizacao
+            registro.paciente = paciente
+            registro.origem = RegistroEvolucao.Origem.PACIENTE
+            registro.save()
+            return render(request, "prontuarios/checkin_publico_sucesso.html", {"paciente": paciente})
+    else:
+        form = RegistroEvolucaoForm()
+
+    return render(request, "prontuarios/checkin_publico.html", {
+        "paciente": paciente, "form": form, "secoes": SECOES_CHECKIN,
     })
 
 

@@ -237,6 +237,99 @@
                     <p style="margin-top:1rem;">Nenhum atendimento registrado ainda para esta paciente.</p>
                 {% endif %}
             </div>
+        {% elif aba_atual == "evolucao" %}
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Link de check-in diário</h2>
+                </div>
+                {% if link_checkin %}
+                    <p style="font-size:.85rem; color:var(--text-muted); margin-top:.5rem;">Link permanente — a paciente pode preencher o check-in dela quantas vezes quiser, sem precisar de login:</p>
+                    <div style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+                        <input type="text" readonly value="{{ link_checkin_url }}" id="link-checkin-url" style="flex:1; min-width:220px; padding:.5rem; border-radius:8px; border:1px solid #ddd6ea;">
+                        <button type="button" class="btn btn-secondary" onclick="navigator.clipboard.writeText(document.getElementById('link-checkin-url').value); this.textContent='Copiado!';">Copiar link</button>
+                    </div>
+                {% else %}
+                    <form method="post" action="{% url 'prontuarios:link_checkin_criar' paciente.pk %}" style="margin-top:.5rem;">
+                        {% csrf_token %}
+                        <button class="btn" type="submit">Gerar link de check-in</button>
+                    </form>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <h2>Resumo visual</h2>
+                {% if grafico_evolucao.pontos|length > 1 %}
+                    <div class="legenda">
+                        <span><span class="ponto" style="background:#7c5cbf;"></span>Energia (média do dia)</span>
+                        <span><span class="ponto" style="background:#3f9c6d;"></span>Sono</span>
+                        <span><span class="ponto" style="background:#d1a12e;"></span>Desconforto digestivo</span>
+                    </div>
+                    <svg viewBox="0 0 {{ grafico_evolucao.largura }} {{ grafico_evolucao.altura }}" style="width:100%; max-width:640px; height:auto;">
+                        <polyline points="{{ grafico_evolucao.energia_points }}" fill="none" stroke="#7c5cbf" stroke-width="2" />
+                        <polyline points="{{ grafico_evolucao.sono_points }}" fill="none" stroke="#3f9c6d" stroke-width="2" />
+                        <polyline points="{{ grafico_evolucao.digestao_points }}" fill="none" stroke="#d1a12e" stroke-width="2" />
+                    </svg>
+                    {% with ultimo=grafico_evolucao.pontos|last %}
+                        <p style="font-size:.78rem; color:var(--text-muted); margin:0;">
+                            {{ grafico_evolucao.pontos.0.data|date:"d/m" }} até {{ ultimo.data|date:"d/m" }}
+                        </p>
+                    {% endwith %}
+                {% else %}
+                    <p>Ainda não há check-ins suficientes com energia, sono e digestão preenchidos pra montar o gráfico.</p>
+                {% endif %}
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
+                    <h2 style="margin:0;">Histórico de check-ins</h2>
+                    <a class="btn" href="{% url 'prontuarios:checkin_criar' paciente.pk %}">+ Adicionar registro</a>
+                </div>
+                {% if registros_evolucao %}
+                    <ul class="timeline" style="margin-top:1rem;">
+                        {% for r in registros_evolucao %}
+                            <li>
+                                <div class="quando">
+                                    {{ r.criado_em|date:"d/m/Y H:i" }} ·
+                                    {% if r.origem == "PACIENTE" %}
+                                        <span class="badge">📱 Preenchido pela paciente</span>
+                                    {% else %}
+                                        <span class="badge badge-neutro">👩‍⚕️ Registrado pela equipe{% if r.criado_por %} ({{ r.criado_por }}){% endif %}</span>
+                                    {% endif %}
+                                </div>
+                                <div style="font-size:.88rem; margin-top:.35rem;">
+                                    {% if r.evacuou %}<strong>Evacuou:</strong> {{ r.get_evacuou_display }} · {% endif %}
+                                    {% if r.fezes_endurecidas %}<strong>Fezes endurecidas:</strong> {{ r.get_fezes_endurecidas_display }} · {% endif %}
+                                    {% if r.evacuacao_completa %}<strong>Evacuação completa:</strong> {{ r.get_evacuacao_completa_display }}{% endif %}
+                                </div>
+                                <div style="font-size:.88rem;">
+                                    {% if r.distensao_abdominal != None %}<strong>Distensão:</strong> {{ r.distensao_abdominal }}/10 · {% endif %}
+                                    {% if r.plenitude_pos_comer != None %}<strong>Plenitude:</strong> {{ r.plenitude_pos_comer }}/10 · {% endif %}
+                                    {% if r.arrotos %}<strong>Arrotos:</strong> {{ r.get_arrotos_display }} · {% endif %}
+                                    {% if r.dor_desconforto != None %}<strong>Dor/desconforto:</strong> {{ r.dor_desconforto }}/10{% endif %}
+                                </div>
+                                <div style="font-size:.88rem;">
+                                    {% if r.energia_acordar != None %}<strong>Energia ao acordar:</strong> {{ r.energia_acordar }}/10 · {% endif %}
+                                    {% if r.energia_apos_almoco != None %}<strong>Após o almoço:</strong> {{ r.energia_apos_almoco }}/10 · {% endif %}
+                                    {% if r.energia_fim_dia != None %}<strong>Fim do dia:</strong> {{ r.energia_fim_dia }}/10{% endif %}
+                                </div>
+                                <div style="font-size:.88rem;">
+                                    {% if r.qualidade_sono != None %}<strong>Qualidade do sono:</strong> {{ r.qualidade_sono }}/10 · {% endif %}
+                                    {% if r.vezes_acordou_noite != None %}<strong>Vezes que acordou:</strong> {{ r.vezes_acordou_noite }}{% endif %}
+                                    {% if r.horarios_acordou %} ({{ r.horarios_acordou }}){% endif %}
+                                </div>
+                                {% if usuario_e_administrador %}
+                                    <form method="post" action="{% url 'prontuarios:checkin_excluir' r.pk %}" style="margin-top:.35rem;" onsubmit="return confirm('Excluir este registro?');">
+                                        {% csrf_token %}
+                                        <button type="submit" style="background:none;border:none;color:#8f2e45;text-decoration:underline;cursor:pointer;padding:0;font-size:.8rem;">Excluir</button>
+                                    </form>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="margin-top:1rem;">Nenhum check-in registrado ainda para esta paciente.</p>
+                {% endif %}
+            </div>
         {% elif aba_atual == "modulacao" %}
             {% if resumo_evolucao %}
                 <div class="card">
