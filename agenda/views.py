@@ -18,6 +18,15 @@ from .forms import BloqueioRapidoForm, ConsultaRapidaForm
 from .models import Consulta, HorarioBloqueado, TipoConsulta
 
 
+def _desvincular_consulta_prevista(consulta):
+    """Ao cancelar/excluir uma consulta vinculada a uma consulta prevista do programa, devolve o item do checklist pra pendente."""
+    from programas.models import ConsultaPrevista
+
+    ConsultaPrevista.objects.filter(consulta=consulta).update(
+        consulta=None, status=ConsultaPrevista.Status.PENDENTE_AGENDAMENTO
+    )
+
+
 def _horarios_do_dia(org):
     passo = datetime.timedelta(minutes=org.agenda_intervalo_minutos)
     base = datetime.date.today()
@@ -184,6 +193,22 @@ def criar_consulta_rapida(request):
         observacoes=form.cleaned_data["observacoes"],
     )
 
+    # Se a paciente já tem um programa ativo com uma consulta do checklist
+    # ainda pendente de agendamento, essa consulta nova já é aquela —
+    # vincula automaticamente pra o checklist da ficha refletir sem precisar
+    # de nenhum passo extra.
+    acompanhamento = paciente.acompanhamento_atual
+    if acompanhamento:
+        from programas.models import ConsultaPrevista
+
+        prevista = acompanhamento.consultas_previstas.filter(
+            status=ConsultaPrevista.Status.PENDENTE_AGENDAMENTO
+        ).order_by("numero").first()
+        if prevista:
+            prevista.consulta = consulta
+            prevista.status = ConsultaPrevista.Status.AGENDADA
+            prevista.save(update_fields=["consulta", "status"])
+
     # Como um horário agora pode ter itens de mais de um profissional
     # empilhados na mesma célula, é mais simples recarregar a página do que
     # tentar remendar a célula certa via JS.
@@ -285,9 +310,35 @@ def detalhe_consulta(request, pk):
             messages.success(request, "Lançamento excluído.")
             return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
+        elif acao == "marcar_realizada":
+            consulta.status = Consulta.Status.REALIZADA
+            consulta.save()
+            from programas.models import ConsultaPrevista
+
+            # Cobre tanto a consulta já vinculada na criação (ver
+            # criar_consulta_rapida) quanto uma consulta antiga, criada antes
+            # dessa vinculação existir — nesse caso vincula agora, à primeira
+            # consulta prevista ainda pendente do programa ativo da paciente.
+            vinculada = ConsultaPrevista.objects.filter(consulta=consulta).first()
+            if vinculada:
+                vinculada.status = ConsultaPrevista.Status.REALIZADA
+                vinculada.save(update_fields=["status"])
+            else:
+                acompanhamento = consulta.paciente.acompanhamento_atual
+                prevista = acompanhamento.consultas_previstas.filter(
+                    status=ConsultaPrevista.Status.PENDENTE_AGENDAMENTO
+                ).order_by("numero").first() if acompanhamento else None
+                if prevista:
+                    prevista.consulta = consulta
+                    prevista.status = ConsultaPrevista.Status.REALIZADA
+                    prevista.save(update_fields=["consulta", "status"])
+            messages.success(request, "Consulta marcada como realizada.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
         elif acao == "cancelar_consulta":
             consulta.status = Consulta.Status.CANCELADA
             consulta.save()  # dispara a sincronização automática do Financeiro
+            _desvincular_consulta_prevista(consulta)
             messages.success(
                 request,
                 "Consulta cancelada. O lançamento pendente vinculado (se houver) também foi cancelado.",
@@ -295,6 +346,7 @@ def detalhe_consulta(request, pk):
             return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
         elif acao == "excluir_consulta":
+            _desvincular_consulta_prevista(consulta)
             semana_da_consulta = timezone.localtime(consulta.data_hora).date().isoformat()
             tinha_pagamento = pagamento is not None
             if pagamento:
