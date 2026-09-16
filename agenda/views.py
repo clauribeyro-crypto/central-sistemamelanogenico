@@ -148,6 +148,8 @@ def semana(request):
             .values("id", "nome", "telefone")
         ),
         "intervalo_minutos": org.agenda_intervalo_minutos,
+        "intervalo_horas": org.agenda_intervalo_minutos // 60,
+        "intervalo_minutos_resto": org.agenda_intervalo_minutos % 60,
         "semana_anterior": (inicio_semana - datetime.timedelta(days=7)).isoformat(),
         "semana_seguinte": (inicio_semana + datetime.timedelta(days=7)).isoformat(),
         "hoje": datetime.date.today(),

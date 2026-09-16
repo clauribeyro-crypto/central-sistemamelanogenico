@@ -117,8 +117,14 @@
                     </select>
                 </div>
                 <div>
-                    <label for="fr-duracao">Duração (min)</label>
-                    <input type="number" id="fr-duracao" name="duracao_minutos" value="{{ intervalo_minutos }}" min="5" required>
+                    <label for="fr-duracao-horas">Duração</label>
+                    <div style="display:flex; gap:.5rem; align-items:center;">
+                        <input type="number" id="fr-duracao-horas" min="0" max="24" step="1" value="{{ intervalo_horas }}" style="width:80px;">
+                        <span style="color:var(--text-muted); font-size:.85rem;">h</span>
+                        <input type="number" id="fr-duracao-minutos" min="0" max="59" step="5" value="{{ intervalo_minutos_resto }}" style="width:80px;">
+                        <span style="color:var(--text-muted); font-size:.85rem;">min</span>
+                    </div>
+                    <input type="hidden" id="fr-duracao" name="duracao_minutos">
                 </div>
                 <div>
                     <label for="fr-valor">Valor (R$)</label>
@@ -162,8 +168,14 @@
                     </select>
                 </div>
                 <div>
-                    <label for="fb-duracao">Duração (min)</label>
-                    <input type="number" id="fb-duracao" name="duracao_minutos" value="{{ intervalo_minutos }}" min="5" required>
+                    <label for="fb-duracao-horas">Duração</label>
+                    <div style="display:flex; gap:.5rem; align-items:center;">
+                        <input type="number" id="fb-duracao-horas" min="0" max="24" step="1" value="{{ intervalo_horas }}" style="width:80px;">
+                        <span style="color:var(--text-muted); font-size:.85rem;">h</span>
+                        <input type="number" id="fb-duracao-minutos" min="0" max="59" step="5" value="{{ intervalo_minutos_resto }}" style="width:80px;">
+                        <span style="color:var(--text-muted); font-size:.85rem;">min</span>
+                    </div>
+                    <input type="hidden" id="fb-duracao" name="duracao_minutos">
                 </div>
                 <div>
                     <label for="fb-observacoes">Observações</label>
@@ -190,7 +202,31 @@
         const erro = document.getElementById("modal-erro");
         const campoTipo = document.getElementById("fr-tipo");
         const campoDuracao = document.getElementById("fr-duracao");
+        const campoDuracaoHoras = document.getElementById("fr-duracao-horas");
+        const campoDuracaoMinutos = document.getElementById("fr-duracao-minutos");
         const campoValor = document.getElementById("fr-valor");
+
+        function atualizarDuracaoConsulta() {
+            const horas = parseInt(campoDuracaoHoras.value, 10) || 0;
+            const minutos = parseInt(campoDuracaoMinutos.value, 10) || 0;
+            campoDuracao.value = horas * 60 + minutos;
+        }
+        campoDuracaoHoras.addEventListener("input", atualizarDuracaoConsulta);
+        campoDuracaoMinutos.addEventListener("input", atualizarDuracaoConsulta);
+        atualizarDuracaoConsulta();
+
+        const campoDuracaoBloqueioHoras = document.getElementById("fb-duracao-horas");
+        const campoDuracaoBloqueioMinutos = document.getElementById("fb-duracao-minutos");
+        const campoDuracaoBloqueio = document.getElementById("fb-duracao");
+
+        function atualizarDuracaoBloqueio() {
+            const horas = parseInt(campoDuracaoBloqueioHoras.value, 10) || 0;
+            const minutos = parseInt(campoDuracaoBloqueioMinutos.value, 10) || 0;
+            campoDuracaoBloqueio.value = horas * 60 + minutos;
+        }
+        campoDuracaoBloqueioHoras.addEventListener("input", atualizarDuracaoBloqueio);
+        campoDuracaoBloqueioMinutos.addEventListener("input", atualizarDuracaoBloqueio);
+        atualizarDuracaoBloqueio();
 
         const pacientesData = JSON.parse(document.getElementById("pacientes-data").textContent);
         const buscaInput = document.getElementById("fr-paciente-busca");
@@ -297,6 +333,8 @@
         function abrirModal(dia, horario) {
             form.reset();
             formBloquear.reset();
+            atualizarDuracaoConsulta();
+            atualizarDuracaoBloqueio();
             erro.textContent = "";
             erroBloqueio.textContent = "";
             mostrarModoPacienteExistente();
@@ -339,6 +377,7 @@
         formBloquear.addEventListener("submit", function (ev) {
             ev.preventDefault();
             erroBloqueio.textContent = "";
+            atualizarDuracaoBloqueio();
             const dados = new FormData(formBloquear);
             fetch("{% url 'agenda:criar_bloqueio_rapido' %}", {
                 method: "POST",
@@ -381,7 +420,10 @@
         campoTipo.addEventListener("change", function () {
             const opcao = campoTipo.selectedOptions[0];
             if (opcao && opcao.dataset.duracao) {
-                campoDuracao.value = opcao.dataset.duracao;
+                const totalMinutos = parseInt(opcao.dataset.duracao, 10) || 0;
+                campoDuracaoHoras.value = Math.floor(totalMinutos / 60);
+                campoDuracaoMinutos.value = totalMinutos % 60;
+                atualizarDuracaoConsulta();
             }
             if (opcao) {
                 campoValor.value = opcao.dataset.valor || "";
@@ -404,6 +446,7 @@
                 return;
             }
 
+            atualizarDuracaoConsulta();
             const dados = new FormData(form);
             fetch("{% url 'agenda:criar_rapido' %}", {
                 method: "POST",
