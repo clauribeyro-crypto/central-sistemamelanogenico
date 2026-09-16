@@ -123,7 +123,11 @@
                         {% for k in acompanhamento.kits_previstos.all %}
                             <li class="{% if k.status == 'ENVIADO' %}feito{% endif %}">
                                 <span class="caixa">{% if k.status == 'ENVIADO' %}✓{% endif %}</span>
-                                Kit {{ k.numero }} entregue
+                                {% if k.status == 'ENVIADO' %}
+                                    Kit {{ k.numero }} entregue
+                                {% else %}
+                                    <a href="{% url 'programas:kit_montar' k.pk %}">Kit {{ k.numero }} — marcar como entregue ›</a>
+                                {% endif %}
                             </li>
                         {% endfor %}
                     </ul>
