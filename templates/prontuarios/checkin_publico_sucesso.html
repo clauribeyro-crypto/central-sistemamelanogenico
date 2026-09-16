@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Check-in enviado</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            margin: 0; background: #f7f4fb; color: #2b2635;
+            display: flex; align-items: center; justify-content: center; min-height: 100vh; text-align: center;
+        }
+        .card { background: #fff; border-radius: 14px; padding: 2.5rem 2rem; max-width: 420px; margin: 1rem; }
+        h1 { font-family: "Playfair Display", Georgia, serif; font-size: 1.5rem; }
+        p { color: #766f85; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>✅ Check-in enviado!</h1>
+        <p>Obrigada, {{ paciente.nome }}. Seu registro de hoje já está na sua ficha na clínica. Pode voltar por aqui amanhã pra registrar de novo.</p>
+    </div>
+</body>
+</html>
