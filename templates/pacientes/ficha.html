@@ -200,15 +200,19 @@
                     {% if anamnese.foto_rosto %}
                         <p style="margin-top:1rem;"><a href="{{ anamnese.foto_rosto.url }}" target="_blank"><img src="{{ anamnese.foto_rosto.url }}" alt="Foto do rosto" style="max-width:140px; border-radius:8px;"></a></p>
                     {% endif %}
-                    {% for secao in anamnese.secoes_preenchidas %}
-                        <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:1.25rem 0 .5rem;">{{ secao.titulo }}</p>
-                        <dl>
-                            {% for rotulo, valor in secao.itens %}
-                                <dt><strong>{{ rotulo }}</strong></dt>
-                                <dd>{{ valor|linebreaksbr }}</dd>
-                            {% endfor %}
-                        </dl>
-                    {% endfor %}
+                    <div class="grid-2col" style="margin-top:1rem; align-items:start;">
+                        {% for secao in anamnese.secoes_preenchidas %}
+                            <div class="card" style="margin-bottom:0;">
+                                <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:0 0 .5rem;">{{ secao.titulo }}</p>
+                                <dl style="margin:0;">
+                                    {% for rotulo, valor in secao.itens %}
+                                        <dt><strong>{{ rotulo }}</strong></dt>
+                                        <dd>{{ valor|linebreaksbr }}</dd>
+                                    {% endfor %}
+                                </dl>
+                            </div>
+                        {% endfor %}
+                    </div>
                 {% else %}
                     <p style="margin-top:1rem;">Anamnese ainda não preenchida para esta paciente.</p>
                 {% endif %}
