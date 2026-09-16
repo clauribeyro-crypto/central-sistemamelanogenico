@@ -167,9 +167,11 @@
 
         .legenda { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; font-size: .85rem; }
         .legenda span.ponto { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; margin-right: .3rem; }
-        table.agenda-semana { border-collapse: collapse; }
-        table.agenda-semana th, table.agenda-semana td { vertical-align: top; min-width: 130px; }
-        table.agenda-semana th:first-child, table.agenda-semana td:first-child { min-width: 70px; width: 70px; }
+        table.agenda-semana { border-collapse: collapse; table-layout: fixed; width: 100%; min-width: 720px; }
+        table.agenda-semana th, table.agenda-semana td {
+            vertical-align: top; border-left: 1px solid #e5ddf3; overflow-wrap: break-word;
+        }
+        table.agenda-semana th:first-child, table.agenda-semana td:first-child { width: 70px; border-left: none; }
         table.agenda-semana td.hoje { background: #f4effc; }
         .slot-vazio-parcial {
             cursor: pointer; font-size: .72rem; color: var(--text-muted);
