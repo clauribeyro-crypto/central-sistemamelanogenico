@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from agenda.models import TipoConsulta
-from contas.utils import organizacao_do_usuario, usuario_e_administrador
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Produto, Recompra
 
 from .forms import (
@@ -23,6 +23,7 @@ from .models import Acompanhamento, Feedback, FaseModulacao, FotoEvolucao, KitPr
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def configuracoes(request):
     org = organizacao_do_usuario(request)
     aba = request.GET.get("aba", "tipos")
@@ -38,6 +39,7 @@ def configuracoes(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def tipo_criar(request):
     org = organizacao_do_usuario(request)
     if request.method == "POST":
@@ -54,6 +56,7 @@ def tipo_criar(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def tipo_editar(request, pk):
     org = organizacao_do_usuario(request)
     tipo = get_object_or_404(TipoConsulta, pk=pk, organizacao=org)
@@ -69,6 +72,7 @@ def tipo_editar(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def plano_criar(request):
     org = organizacao_do_usuario(request)
     if request.method == "POST":
@@ -85,6 +89,7 @@ def plano_criar(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def plano_editar(request, pk):
     org = organizacao_do_usuario(request)
     plano = get_object_or_404(Programa, pk=pk, organizacao=org)

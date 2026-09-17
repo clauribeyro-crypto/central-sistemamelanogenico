@@ -283,14 +283,20 @@
             </div>
             <nav>
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'home' %}ativo{% endif %}" href="{% url 'core:home' %}"><span class="icone">🗓️</span> O que fazer hoje</a>
+                {% if request.user.organizacao.modulo_leads_ativo %}
                 <a class="{% if request.resolver_match.app_name == 'leads' %}ativo{% endif %}" href="{% url 'leads:kanban' %}"><span class="icone">👥</span> CRM de leads</a>
+                {% endif %}
                 <a class="{% if request.resolver_match.app_name == 'pacientes' %}ativo{% endif %}" href="{% url 'pacientes:lista' %}"><span class="icone">📄</span> Ficha da paciente</a>
                 <a class="{% if request.resolver_match.app_name == 'agenda' %}ativo{% endif %}" href="{% url 'agenda:semana' %}"><span class="icone">📅</span> Agenda</a>
                 <a class="{% if request.resolver_match.app_name == 'prontuarios' %}ativo{% endif %}" href="{% url 'prontuarios:lista' %}"><span class="icone">📋</span> Prontuários</a>
+                {% if request.user.organizacao.modulo_financeiro_ativo %}
                 <a class="{% if request.resolver_match.app_name == 'financeiro' %}ativo{% endif %}" href="{% url 'financeiro:painel' %}"><span class="icone">💰</span> Financeiro</a>
+                {% endif %}
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'indicadores' %}ativo{% endif %}" href="{% url 'core:indicadores' %}"><span class="icone">📊</span> Indicadores</a>
                 <a class="{% if request.resolver_match.app_name == 'estoque' %}ativo{% endif %}" href="{% url 'estoque:painel' %}"><span class="icone">📦</span> Produtos &amp; Estoque</a>
+                {% if request.user.organizacao.modulo_programas_ativo %}
                 <a class="{% if request.resolver_match.app_name == 'programas' %}ativo{% endif %}" href="{% url 'programas:configuracoes' %}"><span class="icone">🗂️</span> Programas</a>
+                {% endif %}
                 <a class="{% if request.resolver_match.app_name == 'profissionais' %}ativo{% endif %}" href="{% url 'profissionais:lista' %}"><span class="icone">🩺</span> Profissionais</a>
                 <a href="/admin/"><span class="icone">⚙️</span> Administração</a>
             </nav>

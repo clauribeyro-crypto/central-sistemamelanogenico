@@ -37,6 +37,19 @@ class Organizacao(models.Model):
         help_text="Saldo em caixa antes do primeiro lançamento registrado no sistema — base pro saldo acumulado do Controle Financeiro.",
     )
 
+    modulo_leads_ativo = models.BooleanField(
+        default=True, verbose_name="módulo CRM de leads ativo",
+        help_text="Desmarque para esconder o CRM de leads do menu dessa organização.",
+    )
+    modulo_financeiro_ativo = models.BooleanField(
+        default=True, verbose_name="módulo Controle Financeiro ativo",
+        help_text="Desmarque para esconder o Controle Financeiro do menu dessa organização.",
+    )
+    modulo_programas_ativo = models.BooleanField(
+        default=True, verbose_name="módulo Programas/Acompanhamento ativo",
+        help_text="Desmarque para esconder Programas e o início de protocolo de acompanhamento dessa organização.",
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:

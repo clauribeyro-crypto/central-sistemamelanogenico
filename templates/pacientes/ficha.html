@@ -83,7 +83,7 @@
                     {% endif %}
                 </div>
             </div>
-        {% else %}
+        {% elif paciente.organizacao.modulo_programas_ativo %}
             <div class="card">
                 {% if tem_algum_acompanhamento %}
                     <p>Esta paciente não tem um acompanhamento ativo no momento — o histórico dos programas anteriores continua abaixo.</p>
@@ -92,6 +92,10 @@
                     <p>Esta paciente ainda não tem um programa de acompanhamento — as abas de anamnese, documentos e consultas já funcionam normalmente.</p>
                     <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar protocolo de acompanhamento</a>
                 {% endif %}
+            </div>
+        {% else %}
+            <div class="card">
+                <p>O módulo de Programas/Acompanhamento não está disponível pra sua organização.</p>
             </div>
         {% endif %}
 
@@ -386,7 +390,9 @@
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem;">
                     <h2 style="margin:0;">Feedbacks</h2>
-                    <a class="btn" href="{% url 'programas:feedback_criar' acompanhamento.pk %}">+ Novo feedback</a>
+                    {% if acompanhamento %}
+                        <a class="btn" href="{% url 'programas:feedback_criar' acompanhamento.pk %}">+ Novo feedback</a>
+                    {% endif %}
                 </div>
                 {% if feedbacks %}
                     <ul class="timeline" style="margin-top:1rem;">

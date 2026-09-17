@@ -13,7 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
-from contas.utils import organizacao_do_usuario
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
 from pacientes.models import Paciente
 
 from .forms import (
@@ -56,6 +56,7 @@ def _leads_do_usuario(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def kanban(request):
     leads_qs, org = _leads_do_usuario(request)
     filtro = request.GET.get("filtro")
@@ -125,6 +126,7 @@ def kanban(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 @require_POST
 def criar_lead(request):
     """Cadastro rápido de lead direto no board (botão "+ Novo lead")."""
@@ -145,6 +147,7 @@ def criar_lead(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 @require_POST
 def mover_etapa(request, pk):
     """Arrastar e soltar o card entre colunas do board."""
@@ -158,6 +161,7 @@ def mover_etapa(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 @require_POST
 def marcar_respondido_rapido(request, pk):
     """Botão rápido do card: avança a cadência sem abrir a tela de detalhe."""
@@ -169,6 +173,7 @@ def marcar_respondido_rapido(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 @require_POST
 def mover_para_agendados(request, pk):
     """
@@ -185,6 +190,7 @@ def mover_para_agendados(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def detalhe(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
@@ -213,6 +219,7 @@ def detalhe(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def registrar_ligacao(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
@@ -244,6 +251,7 @@ def registrar_ligacao(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def enviar_whatsapp(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
@@ -277,6 +285,7 @@ def enviar_whatsapp(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def resultado_contato(request, pk):
     """Após uma mensagem de WhatsApp (ou ligação atendida): respondeu ou não respondeu."""
     leads_qs, org = _leads_do_usuario(request)
@@ -308,6 +317,7 @@ def resultado_contato(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def pausar(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
@@ -335,6 +345,7 @@ def pausar(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def retomar(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
@@ -350,6 +361,7 @@ def retomar(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 @require_POST
 def excluir(request, pk):
     """
@@ -367,6 +379,7 @@ def excluir(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def perder(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
@@ -388,6 +401,7 @@ def perder(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def agendar(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
@@ -479,6 +493,7 @@ def webhook_importar_lead(request, token):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def configuracao_importacao(request):
     """Tela de configuração do webhook de importação automática de leads."""
     org = organizacao_do_usuario(request)
