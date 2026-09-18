@@ -6,6 +6,12 @@ from profissionais.models import Profissional
 from .models import Lead, MotivoPerda, Origem
 
 
+class OrigemForm(forms.ModelForm):
+    class Meta:
+        model = Origem
+        fields = ["nome", "ativo"]
+
+
 class NovoLeadForm(forms.ModelForm):
     """Cadastro rápido de lead direto no board do CRM ("+ Novo lead")."""
 

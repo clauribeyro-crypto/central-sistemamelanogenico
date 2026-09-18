@@ -17,7 +17,7 @@ from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
 from pacientes.models import Paciente
 
 from .forms import (
-    AgendarConsultaForm, EnviarWhatsAppForm, NovoLeadForm, PausarCadenciaForm,
+    AgendarConsultaForm, EnviarWhatsAppForm, NovoLeadForm, OrigemForm, PausarCadenciaForm,
     PerderLeadForm, RegistrarLigacaoForm, ResultadoContatoForm,
 )
 from .models import HistoricoLead, Lead, MensagemModelo, Origem, WebhookImportacao
@@ -123,6 +123,24 @@ def kanban(request):
         request, "leads/kanban.html",
         {"colunas": colunas, "contadores": contadores, "origens": origens, "leads_busca": leads_busca},
     )
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+def origem_criar(request):
+    """Cadastro de origem de lead (Indicação, Instagram...), livre pra qualquer usuária da organização."""
+    org = organizacao_do_usuario(request)
+    if request.method == "POST":
+        form = OrigemForm(request.POST)
+        if form.is_valid():
+            origem = form.save(commit=False)
+            origem.organizacao = org
+            origem.save()
+            messages.success(request, "Origem cadastrada.")
+            return redirect("leads:kanban")
+    else:
+        form = OrigemForm()
+    return render(request, "leads/origem_form.html", {"form": form})
 
 
 @login_required

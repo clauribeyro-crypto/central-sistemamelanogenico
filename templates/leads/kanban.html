@@ -4,6 +4,7 @@
     <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
         <h1>CRM de leads</h1>
         <div style="display:flex; gap:.5rem;">
+            <a class="btn btn-secondary" href="{% url 'leads:origem_criar' %}">+ Origem</a>
             <a class="btn btn-secondary" href="{% url 'leads:configuracao_importacao' %}">⚙️ Importação automática</a>
             <button class="btn" type="button" id="btn-novo-lead">+ Novo lead</button>
         </div>
@@ -81,6 +82,11 @@
                             <option value="{{ origem.pk }}">{{ origem.nome }}</option>
                         {% endfor %}
                     </select>
+                    {% if not origens %}
+                        <p style="font-size:.8rem; color:var(--text-muted); margin-top:.25rem;">
+                            Nenhuma origem cadastrada ainda — <a href="{% url 'leads:origem_criar' %}">cadastre uma primeiro</a>.
+                        </p>
+                    {% endif %}
                 </div>
                 <p id="novo-lead-erro" style="color:#8f2e45; font-size:.85rem;"></p>
                 <div style="display:flex; gap:.5rem;">
