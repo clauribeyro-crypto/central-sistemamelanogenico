@@ -58,11 +58,37 @@ class BancoForm(forms.ModelForm):
         model = Banco
         fields = ["nome", "ativo"]
 
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organizacao = organizacao
+
+    def clean_nome(self):
+        # organizacao não é campo do form (é preenchida na view), então o
+        # validate_unique automático do ModelForm não pega a constraint
+        # organizacao+nome — sem isso, um nome repetido derruba o app com
+        # IntegrityError em vez de mostrar um erro de formulário.
+        nome = self.cleaned_data["nome"]
+        if Banco.objects.filter(organizacao=self.organizacao, nome=nome).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("Já existe um banco com esse nome.")
+        return nome
+
 
 class CategoriaFinanceiraForm(forms.ModelForm):
     class Meta:
         model = CategoriaFinanceira
         fields = ["nome", "grupo", "ativo"]
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organizacao = organizacao
+
+    def clean_nome(self):
+        nome = self.cleaned_data["nome"]
+        if CategoriaFinanceira.objects.filter(
+            organizacao=self.organizacao, nome=nome
+        ).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("Já existe uma categoria com esse nome.")
+        return nome
 
 
 class LancamentoForm(forms.ModelForm):

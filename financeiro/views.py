@@ -409,7 +409,7 @@ def lancamento_excluir(request, pk):
 def banco_criar(request):
     org = organizacao_do_usuario(request)
     if request.method == "POST":
-        form = BancoForm(request.POST)
+        form = BancoForm(request.POST, organizacao=org)
         if form.is_valid():
             banco = form.save(commit=False)
             banco.organizacao = org
@@ -417,7 +417,7 @@ def banco_criar(request):
             messages.success(request, "Banco cadastrado.")
             return redirect(f"{reverse('financeiro:painel')}?aba=lancamentos")
     else:
-        form = BancoForm()
+        form = BancoForm(organizacao=org)
     return render(request, "financeiro/banco_form.html", {"form": form})
 
 
@@ -426,7 +426,7 @@ def banco_criar(request):
 def categoria_criar(request):
     org = organizacao_do_usuario(request)
     if request.method == "POST":
-        form = CategoriaFinanceiraForm(request.POST)
+        form = CategoriaFinanceiraForm(request.POST, organizacao=org)
         if form.is_valid():
             categoria = form.save(commit=False)
             categoria.organizacao = org
@@ -434,5 +434,5 @@ def categoria_criar(request):
             messages.success(request, "Categoria cadastrada.")
             return redirect(f"{reverse('financeiro:painel')}?aba=lancamentos")
     else:
-        form = CategoriaFinanceiraForm()
+        form = CategoriaFinanceiraForm(organizacao=org)
     return render(request, "financeiro/categoria_form.html", {"form": form})
