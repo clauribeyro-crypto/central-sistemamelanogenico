@@ -4,6 +4,7 @@
     <h1>O que preciso fazer hoje?</h1>
 
     <div class="grid">
+        {% if org.modulo_leads_ativo %}
         <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none;">
             <div class="num">{{ novos_hoje }}</div>
             <div class="rotulo">Novos leads aguardando 1º contato</div>
@@ -24,10 +25,12 @@
             <div class="num">{{ retomar_hoje }}</div>
             <div class="rotulo">Cadências pausadas para retomar hoje</div>
         </a>
+        {% endif %}
         <a class="card stat" href="{% url 'agenda:semana' %}" style="text-decoration:none;">
             <div class="num">{{ consultas_hoje|length }}</div>
             <div class="rotulo">Consultas agendadas hoje</div>
         </a>
+        {% if org.modulo_leads_ativo %}
         <div class="card stat">
             <div class="num">{{ atrasados|length }}</div>
             <div class="rotulo">Tarefas atrasadas</div>
@@ -36,9 +39,11 @@
             <div class="num">{{ total_leads_parados }}</div>
             <div class="rotulo">Leads parados (sem atualização há {{ dias_lead_parado }}+ dias)</div>
         </a>
+        {% endif %}
     </div>
 
-    <div class="grid-2-1">
+    <div class="{% if org.modulo_leads_ativo %}grid-2-1{% endif %}">
+        {% if org.modulo_leads_ativo %}
         <div class="card">
             <h2>Fila de atendimento do dia</h2>
             {% if fila %}
@@ -60,6 +65,7 @@
                 <p>Nenhum lead precisando de ação agora. 🎉</p>
             {% endif %}
         </div>
+        {% endif %}
 
         <div style="display:flex; flex-direction:column; gap:1rem;">
             <div class="card">
@@ -88,7 +94,7 @@
                 {% endif %}
             </div>
 
-            {% if alertas_acompanhamentos %}
+            {% if org.modulo_programas_ativo and alertas_acompanhamentos %}
                 <div class="card">
                     <h2>Alertas de acompanhamento</h2>
                     {% for item in alertas_acompanhamentos %}
@@ -102,6 +108,7 @@
         </div>
     </div>
 
+    {% if org.modulo_programas_ativo %}
     <div class="grid">
         <div class="card stat stat-em-breve">
             <div class="num">—</div>
@@ -117,8 +124,9 @@
         </div>
     </div>
     <p class="placeholder-em-breve" style="margin-top:-.5rem;">Pacientes por fase da modulação — em breve.</p>
+    {% endif %}
 
-    {% if atrasados %}
+    {% if org.modulo_leads_ativo and atrasados %}
         <div class="card">
             <h2>⚠️ Tarefas atrasadas</h2>
             <table>
@@ -136,7 +144,7 @@
         </div>
     {% endif %}
 
-    {% if leads_parados %}
+    {% if org.modulo_leads_ativo and leads_parados %}
         <div class="card">
             <h2>💤 Leads parados</h2>
             <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">

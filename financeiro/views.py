@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from contas.utils import organizacao_do_usuario, usuario_e_administrador
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 
 from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, RecebimentoForm
 from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, Recebimento
@@ -61,6 +61,7 @@ def _redirecionar_com_seguranca(request, destino_padrao):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def relatorio(request):
     """Relatório financeiro simples, filtrável por período (mês corrente por padrão)."""
     org = organizacao_do_usuario(request)
@@ -135,6 +136,7 @@ def relatorio(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def editar_pagamento(request, pk):
     org = organizacao_do_usuario(request)
     pagamento = get_object_or_404(Pagamento, pk=pk, organizacao=org)
@@ -188,6 +190,7 @@ def editar_pagamento(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 @require_POST
 def excluir_pagamento(request, pk):
     org = organizacao_do_usuario(request)
@@ -198,6 +201,7 @@ def excluir_pagamento(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def painel(request):
     """Controle Financeiro: painel com abas Geral (dashboard), Lançamentos e Resumo Mensal."""
     org = organizacao_do_usuario(request)
@@ -320,6 +324,7 @@ def painel(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 @require_POST
 def salvar_saldo_inicial(request):
     org = organizacao_do_usuario(request)
@@ -340,6 +345,7 @@ def salvar_saldo_inicial(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def lancamento_criar(request):
     org = organizacao_do_usuario(request)
     ano = request.GET.get("ano") or datetime.date.today().year
@@ -360,6 +366,7 @@ def lancamento_criar(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def lancamento_editar(request, pk):
     org = organizacao_do_usuario(request)
     lancamento = get_object_or_404(Lancamento, pk=pk, organizacao=org)
@@ -381,6 +388,7 @@ def lancamento_editar(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 @require_POST
 def lancamento_excluir(request, pk):
     org = organizacao_do_usuario(request)
@@ -397,6 +405,7 @@ def lancamento_excluir(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def banco_criar(request):
     org = organizacao_do_usuario(request)
     if request.method == "POST":
@@ -413,6 +422,7 @@ def banco_criar(request):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def categoria_criar(request):
     org = organizacao_do_usuario(request)
     if request.method == "POST":

@@ -6,10 +6,24 @@ from .models import Organizacao, Usuario
 
 @admin.register(Organizacao)
 class OrganizacaoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "slug", "ativo", "criado_em")
+    list_display = (
+        "nome", "slug", "ativo",
+        "modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo",
+        "criado_em",
+    )
     list_filter = ("ativo",)
     search_fields = ("nome", "slug")
     prepopulated_fields = {"slug": ("nome",)}
+    fieldsets = (
+        (None, {"fields": ("nome", "slug", "ativo")}),
+        ("Agenda", {"fields": ("agenda_hora_inicio", "agenda_hora_fim", "agenda_intervalo_minutos")}),
+        ("Leads", {"fields": ("dias_lead_parado",)}),
+        ("Financeiro", {"fields": ("saldo_inicial_financeiro",)}),
+        ("Módulos ativos", {
+            "fields": ("modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo"),
+            "description": "Desmarque um módulo pra escondê-lo do menu e bloquear o acesso pra essa organização.",
+        }),
+    )
 
 
 @admin.register(Usuario)

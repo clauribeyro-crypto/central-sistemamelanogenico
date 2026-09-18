@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from agenda.models import Consulta
-from contas.utils import organizacao_do_usuario, usuario_e_administrador
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
 from leads.models import HistoricoLead
 from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao, FotoEvolucao
@@ -289,6 +289,7 @@ def ficha(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def iniciar_protocolo(request, pk):
     org = organizacao_do_usuario(request)
     paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)

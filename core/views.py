@@ -85,6 +85,7 @@ def home(request):
             alertas_acompanhamentos.append({"acompanhamento": acomp, "texto": alerta})
 
     contexto = {
+        "org": org,
         "novos_hoje": leads_ativos.filter(etapa=Lead.Etapa.NOVO, entrou_em__date=hoje).count(),
         "contato_1": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_1).count(),
         "contato_2": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_2).count(),

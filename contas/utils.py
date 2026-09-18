@@ -42,6 +42,26 @@ def usuario_e_administrador(request):
     return request.user.is_authenticated and request.user.is_staff
 
 
+def modulo_ativo_obrigatorio(campo_modulo, nome_exibicao):
+    """
+    Decorator de view: bloqueia o acesso a um módulo opcional (CRM de leads,
+    Controle Financeiro, Programas/Acompanhamento) quando ele está desativado
+    pra organização do usuário — evita que alguém chegue numa tela desligada
+    digitando a URL direto. Use sempre depois de @login_required (nessa ordem:
+    @login_required em cima, @modulo_ativo_obrigatorio embaixo).
+    """
+    def decorador(view_func):
+        @functools.wraps(view_func)
+        def view_decorada(request, *args, **kwargs):
+            org = organizacao_do_usuario(request)
+            if not getattr(org, campo_modulo):
+                messages.error(request, f"O módulo {nome_exibicao} não está disponível pra sua organização.")
+                return redirect("core:home")
+            return view_func(request, *args, **kwargs)
+        return view_decorada
+    return decorador
+
+
 def administrador_obrigatorio(view_func):
     """
     Decorator para views de edição de histórico clínico: bloqueia quem não
