@@ -554,6 +554,22 @@ SECOES_CHECKIN = [
         "titulo": "Sono", "campos": ["qualidade_sono", "vezes_acordou_noite", "horarios_acordou"],
         "melhora": "melhora_sono", "observacao": "observacao_sono",
     },
+    {
+        "titulo": "Pele", "campos": ["estado_pele"],
+        "melhora": "melhora_pele", "observacao": "observacao_pele",
+    },
+    {
+        "titulo": "Equilíbrio emocional", "campos": ["equilibrio_emocional"],
+        "melhora": "melhora_emocional", "observacao": "observacao_emocional",
+    },
+    {
+        "titulo": "Equilíbrio hormonal", "campos": ["equilibrio_hormonal"],
+        "melhora": "melhora_hormonal", "observacao": "observacao_hormonal",
+    },
+    {
+        "titulo": "Disposição geral", "campos": ["disposicao_geral"],
+        "melhora": "melhora_disposicao", "observacao": "observacao_disposicao",
+    },
 ]
 
 
@@ -612,6 +628,26 @@ class RegistroEvolucao(ModeloDaOrganizacao):
     horarios_acordou = models.CharField("em quais horários?", max_length=255, blank=True)
     melhora_sono = _campo_melhora("o sono")
     observacao_sono = models.TextField("observação (sono)", blank=True)
+
+    # Pele
+    estado_pele = _campo_escala("como está sua pele hoje")
+    melhora_pele = _campo_melhora("a pele")
+    observacao_pele = models.TextField("observação (pele)", blank=True)
+
+    # Emocional
+    equilibrio_emocional = _campo_escala("seu equilíbrio emocional hoje")
+    melhora_emocional = _campo_melhora("o equilíbrio emocional")
+    observacao_emocional = models.TextField("observação (emocional)", blank=True)
+
+    # Hormonal
+    equilibrio_hormonal = _campo_escala("seu equilíbrio hormonal hoje")
+    melhora_hormonal = _campo_melhora("o equilíbrio hormonal")
+    observacao_hormonal = models.TextField("observação (hormonal)", blank=True)
+
+    # Disposição
+    disposicao_geral = _campo_escala("sua disposição geral hoje")
+    melhora_disposicao = _campo_melhora("a disposição geral")
+    observacao_disposicao = models.TextField("observação (disposição)", blank=True)
 
     criado_em = models.DateTimeField(auto_now_add=True)
 

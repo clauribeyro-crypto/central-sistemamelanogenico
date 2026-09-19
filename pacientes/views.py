@@ -33,27 +33,51 @@ ABAS_PRONTAS = {
 }
 
 
+# Cada linha do "Resumo visual": chave interna, como calcular a partir de um
+# RegistroEvolucao (com inversão quando o campo mede o problema, não o
+# bem-estar — ex.: digestao_media mede desconforto, quanto maior pior),
+# o campo de satisfação correspondente na anamnese (usado só no ponto
+# "Anamnese", o baseline) e a cor da linha no gráfico.
+METRICAS_GRAFICO = [
+    ("energia", lambda r: r.energia_media, "satisfacao_energia", "#7c5cbf"),
+    ("sono", lambda r: r.qualidade_sono, "satisfacao_sono", "#3f9c6d"),
+    ("conforto_digestivo", lambda r: None if r.digestao_media is None else 10 - r.digestao_media, "satisfacao_intestino", "#d1a12e"),
+    ("pele", lambda r: r.estado_pele, "satisfacao_pele", "#d16b9e"),
+    ("emocional", lambda r: r.equilibrio_emocional, "satisfacao_emocional", "#4a90d9"),
+    ("hormonal", lambda r: r.equilibrio_hormonal, "satisfacao_hormonal", "#e0793c"),
+    ("disposicao", lambda r: r.disposicao_geral, "satisfacao_figado", "#2fa89a"),
+]
+
+
 def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_esquerda=30, margem=16, margem_baixo=22):
     """
-    Coordenadas SVG já prontas pra desenhar as 3 linhas (energia, sono,
-    conforto digestivo) do resumo visual da aba Evolução — `registros` deve
-    vir em ordem cronológica (mais antigo primeiro). Só entram os check-ins
-    com as 3 métricas calculáveis, pra manter o gráfico "simples" sem lidar
-    com buracos na linha.
+    Coordenadas SVG já prontas pra desenhar as linhas do resumo visual da
+    aba Evolução (ver `METRICAS_GRAFICO`) — `registros` deve vir em ordem
+    cronológica (mais antigo primeiro).
 
-    As 3 linhas usam a mesma convenção — quanto mais alto, melhor —, por
-    isso `digestao_media` (que mede desconforto: quanto maior, pior) entra
-    invertida (10 - valor) como "conforto". Sem isso a linha de digestão
-    subiria quando a paciente piorasse, o que é o oposto do que as outras
-    duas linhas mostram.
+    Cada data entra no eixo X assim que tiver PELO MENOS UMA das métricas
+    calculável, e cada linha só desenha vértice nas datas em que a métrica
+    dela específica está disponível — pulando o resto. Isso é de propósito:
+    exigir todas as métricas de uma vez faria qualquer check-in antigo
+    (de antes de uma métrica nova existir, ou qualquer dia em que a
+    paciente pulou uma seção) sumir do gráfico inteiro, não só da linha
+    daquela métrica.
 
-    Quando `anamnese` tem as 3 notas de satisfação preenchidas, entra como
-    primeiro ponto ("Anamnese", antes de qualquer check-in) — dá pra
-    comparar o relato da primeira consulta com a evolução depois. É uma
-    aproximação: a anamnese pergunta satisfação (0 a 10) com energia, sono
-    e intestino, não exatamente as mesmas 3 métricas dos check-ins diários
-    — mas segue a mesma escala e a mesma convenção (quanto mais alto,
-    melhor), e intestino é o que mais se aproxima de "conforto digestivo".
+    Todas as linhas usam a mesma convenção — quanto mais alto, melhor —,
+    por isso `digestao_media` (que mede desconforto: quanto maior, pior)
+    entra invertida (10 - valor) como "conforto". Sem isso a linha de
+    digestão subiria quando a paciente piorasse, o que é o oposto do que as
+    outras linhas mostram.
+
+    Quando `anamnese` tem pelo menos uma nota de satisfação preenchida, ela
+    entra como primeiro ponto ("Anamnese", antes de qualquer check-in) —
+    dá pra comparar o relato da primeira consulta com a evolução depois
+    (só nas linhas cuja nota ela realmente tem). É uma aproximação: a
+    anamnese pergunta satisfação (0 a 10) com cada tema, não exatamente a
+    mesma métrica calculada do check-in diário — mas segue a mesma escala e
+    a mesma convenção (quanto mais alto, melhor), e cada campo de
+    satisfação é o mais próximo que a anamnese já tinha do que o check-in
+    mede.
 
     Além das linhas, monta um eixo Y (0 a 10, a régua pedida pra dar
     referência de escala) e um eixo X com a data de cada ponto — esse
@@ -62,26 +86,17 @@ def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_
     embaixo do gráfico já cobre o intervalo).
     """
     pontos = []
-    if (
-        anamnese is not None
-        and anamnese.satisfacao_energia is not None
-        and anamnese.satisfacao_sono is not None
-        and anamnese.satisfacao_intestino is not None
-    ):
-        pontos.append({
-            "data": anamnese.criado_em, "rotulo": "Anamnese",
-            "energia": anamnese.satisfacao_energia, "sono": anamnese.satisfacao_sono,
-            "conforto_digestivo": anamnese.satisfacao_intestino,
-        })
+    if anamnese is not None:
+        valores_anamnese = {
+            chave: getattr(anamnese, campo_satisfacao) for chave, _, campo_satisfacao, _ in METRICAS_GRAFICO
+        }
+        if any(v is not None for v in valores_anamnese.values()):
+            pontos.append({"data": anamnese.criado_em, "rotulo": "Anamnese", "valores": valores_anamnese})
 
     for r in registros:
-        energia, digestao = r.energia_media, r.digestao_media
-        if energia is None or digestao is None or r.qualidade_sono is None:
-            continue
-        pontos.append({
-            "data": r.criado_em, "rotulo": None, "energia": energia, "sono": r.qualidade_sono,
-            "conforto_digestivo": 10 - digestao,
-        })
+        valores = {chave: calcular(r) for chave, calcular, _, _ in METRICAS_GRAFICO}
+        if any(v is not None for v in valores.values()):
+            pontos.append({"data": r.criado_em, "rotulo": None, "valores": valores})
 
     largura_util = largura - margem_esquerda - margem
     altura_util = altura - 2 * margem - margem_baixo
@@ -94,7 +109,12 @@ def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_
         return margem + altura_util * (1 - valor / 10)
 
     def linha(chave):
-        return " ".join(f"{x_de(i):.1f},{y_de(p[chave]):.1f}" for i, p in enumerate(pontos))
+        partes = []
+        for i, p in enumerate(pontos):
+            valor = p["valores"][chave]
+            if valor is not None:
+                partes.append(f"{x_de(i):.1f},{y_de(valor):.1f}")
+        return " ".join(partes)
 
     # Formatadas como string (não como float) de propósito: template do
     # Django localiza número solto pro padrão pt-br (vírgula decimal), o
@@ -115,9 +135,10 @@ def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_
         "margem_esquerda": margem_esquerda,
         "eixo_y": eixo_y,
         "eixo_x": eixo_x,
-        "energia_points": linha("energia"),
-        "sono_points": linha("sono"),
-        "conforto_points": linha("conforto_digestivo"),
+        "linhas": [
+            {"cor": cor, "points": linha(chave)}
+            for chave, _, _, cor in METRICAS_GRAFICO
+        ],
     }
 
 
