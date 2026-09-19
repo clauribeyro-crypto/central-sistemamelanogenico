@@ -131,7 +131,7 @@ def origem_criar(request):
     """Cadastro de origem de lead (Indicação, Instagram...), livre pra qualquer usuária da organização."""
     org = organizacao_do_usuario(request)
     if request.method == "POST":
-        form = OrigemForm(request.POST)
+        form = OrigemForm(request.POST, organizacao=org)
         if form.is_valid():
             origem = form.save(commit=False)
             origem.organizacao = org
@@ -139,7 +139,7 @@ def origem_criar(request):
             messages.success(request, "Origem cadastrada.")
             return redirect("leads:kanban")
     else:
-        form = OrigemForm()
+        form = OrigemForm(organizacao=org)
     return render(request, "leads/origem_form.html", {"form": form})
 
 

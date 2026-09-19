@@ -270,12 +270,13 @@
                     <div class="legenda">
                         <span><span class="ponto" style="background:#7c5cbf;"></span>Energia (média do dia)</span>
                         <span><span class="ponto" style="background:#3f9c6d;"></span>Sono</span>
-                        <span><span class="ponto" style="background:#d1a12e;"></span>Desconforto digestivo</span>
+                        <span><span class="ponto" style="background:#d1a12e;"></span>Conforto digestivo</span>
                     </div>
+                    <p style="font-size:.78rem; color:var(--text-muted); margin:-.5rem 0 .5rem;">Nas 3 linhas, quanto mais alto, melhor.</p>
                     <svg viewBox="0 0 {{ grafico_evolucao.largura }} {{ grafico_evolucao.altura }}" style="width:100%; max-width:640px; height:auto;">
                         <polyline points="{{ grafico_evolucao.energia_points }}" fill="none" stroke="#7c5cbf" stroke-width="2" />
                         <polyline points="{{ grafico_evolucao.sono_points }}" fill="none" stroke="#3f9c6d" stroke-width="2" />
-                        <polyline points="{{ grafico_evolucao.digestao_points }}" fill="none" stroke="#d1a12e" stroke-width="2" />
+                        <polyline points="{{ grafico_evolucao.conforto_points }}" fill="none" stroke="#d1a12e" stroke-width="2" />
                     </svg>
                     {% with ultimo=grafico_evolucao.pontos|last %}
                         <p style="font-size:.78rem; color:var(--text-muted); margin:0;">

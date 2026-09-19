@@ -11,6 +11,20 @@ class OrigemForm(forms.ModelForm):
         model = Origem
         fields = ["nome", "ativo"]
 
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.organizacao = organizacao
+
+    def clean_nome(self):
+        # organizacao não é campo do form (é preenchida na view), então o
+        # validate_unique automático do ModelForm não pega a constraint
+        # organizacao+nome — sem isso, um nome repetido derruba o app com
+        # IntegrityError em vez de mostrar um erro de formulário.
+        nome = self.cleaned_data["nome"]
+        if Origem.objects.filter(organizacao=self.organizacao, nome=nome).exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("Já existe uma origem com esse nome.")
+        return nome
+
 
 class NovoLeadForm(forms.ModelForm):
     """Cadastro rápido de lead direto no board do CRM ("+ Novo lead")."""
