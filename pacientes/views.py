@@ -53,9 +53,15 @@ def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_
     """
     Coordenadas SVG já prontas pra desenhar as linhas do resumo visual da
     aba Evolução (ver `METRICAS_GRAFICO`) — `registros` deve vir em ordem
-    cronológica (mais antigo primeiro). Só entram os check-ins com todas as
-    métricas calculáveis, pra manter o gráfico "simples" sem lidar com
-    buracos na linha.
+    cronológica (mais antigo primeiro).
+
+    Cada data entra no eixo X assim que tiver PELO MENOS UMA das métricas
+    calculável, e cada linha só desenha vértice nas datas em que a métrica
+    dela específica está disponível — pulando o resto. Isso é de propósito:
+    exigir todas as métricas de uma vez faria qualquer check-in antigo
+    (de antes de uma métrica nova existir, ou qualquer dia em que a
+    paciente pulou uma seção) sumir do gráfico inteiro, não só da linha
+    daquela métrica.
 
     Todas as linhas usam a mesma convenção — quanto mais alto, melhor —,
     por isso `digestao_media` (que mede desconforto: quanto maior, pior)
@@ -63,14 +69,15 @@ def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_
     digestão subiria quando a paciente piorasse, o que é o oposto do que as
     outras linhas mostram.
 
-    Quando `anamnese` tem as notas de satisfação de todas as métricas
-    preenchidas, ela entra como primeiro ponto ("Anamnese", antes de
-    qualquer check-in) — dá pra comparar o relato da primeira consulta com
-    a evolução depois. É uma aproximação: a anamnese pergunta satisfação
-    (0 a 10) com cada tema, não exatamente a mesma métrica calculada do
-    check-in diário — mas segue a mesma escala e a mesma convenção (quanto
-    mais alto, melhor), e cada campo de satisfação é o mais próximo que a
-    anamnese já tinha do que o check-in mede.
+    Quando `anamnese` tem pelo menos uma nota de satisfação preenchida, ela
+    entra como primeiro ponto ("Anamnese", antes de qualquer check-in) —
+    dá pra comparar o relato da primeira consulta com a evolução depois
+    (só nas linhas cuja nota ela realmente tem). É uma aproximação: a
+    anamnese pergunta satisfação (0 a 10) com cada tema, não exatamente a
+    mesma métrica calculada do check-in diário — mas segue a mesma escala e
+    a mesma convenção (quanto mais alto, melhor), e cada campo de
+    satisfação é o mais próximo que a anamnese já tinha do que o check-in
+    mede.
 
     Além das linhas, monta um eixo Y (0 a 10, a régua pedida pra dar
     referência de escala) e um eixo X com a data de cada ponto — esse
@@ -83,14 +90,13 @@ def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_
         valores_anamnese = {
             chave: getattr(anamnese, campo_satisfacao) for chave, _, campo_satisfacao, _ in METRICAS_GRAFICO
         }
-        if all(v is not None for v in valores_anamnese.values()):
-            pontos.append({"data": anamnese.criado_em, "rotulo": "Anamnese", **valores_anamnese})
+        if any(v is not None for v in valores_anamnese.values()):
+            pontos.append({"data": anamnese.criado_em, "rotulo": "Anamnese", "valores": valores_anamnese})
 
     for r in registros:
         valores = {chave: calcular(r) for chave, calcular, _, _ in METRICAS_GRAFICO}
-        if any(v is None for v in valores.values()):
-            continue
-        pontos.append({"data": r.criado_em, "rotulo": None, **valores})
+        if any(v is not None for v in valores.values()):
+            pontos.append({"data": r.criado_em, "rotulo": None, "valores": valores})
 
     largura_util = largura - margem_esquerda - margem
     altura_util = altura - 2 * margem - margem_baixo
@@ -103,7 +109,12 @@ def _grafico_evolucao(registros, anamnese=None, largura=640, altura=170, margem_
         return margem + altura_util * (1 - valor / 10)
 
     def linha(chave):
-        return " ".join(f"{x_de(i):.1f},{y_de(p[chave]):.1f}" for i, p in enumerate(pontos))
+        partes = []
+        for i, p in enumerate(pontos):
+            valor = p["valores"][chave]
+            if valor is not None:
+                partes.append(f"{x_de(i):.1f},{y_de(valor):.1f}")
+        return " ".join(partes)
 
     # Formatadas como string (não como float) de propósito: template do
     # Django localiza número solto pro padrão pt-br (vírgula decimal), o
