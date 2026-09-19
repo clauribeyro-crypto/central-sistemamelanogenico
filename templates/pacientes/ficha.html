@@ -274,13 +274,20 @@
                     </div>
                     <p style="font-size:.78rem; color:var(--text-muted); margin:-.5rem 0 .5rem;">Nas 3 linhas, quanto mais alto, melhor.</p>
                     <svg viewBox="0 0 {{ grafico_evolucao.largura }} {{ grafico_evolucao.altura }}" style="width:100%; max-width:640px; height:auto;">
+                        {% for tick in grafico_evolucao.eixo_y %}
+                            <line x1="{{ grafico_evolucao.margem_esquerda }}" y1="{{ tick.y }}" x2="{{ grafico_evolucao.largura }}" y2="{{ tick.y }}" stroke="#ece6f5" stroke-width="1" />
+                            <text x="{{ grafico_evolucao.margem_esquerda|add:'-6' }}" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="#766f85">{{ tick.valor }}</text>
+                        {% endfor %}
                         <polyline points="{{ grafico_evolucao.energia_points }}" fill="none" stroke="#7c5cbf" stroke-width="2" />
                         <polyline points="{{ grafico_evolucao.sono_points }}" fill="none" stroke="#3f9c6d" stroke-width="2" />
                         <polyline points="{{ grafico_evolucao.conforto_points }}" fill="none" stroke="#d1a12e" stroke-width="2" />
+                        {% for tick in grafico_evolucao.eixo_x %}
+                            <text x="{{ tick.x }}" y="{{ grafico_evolucao.altura|add:'-6' }}" text-anchor="{% if forloop.first %}start{% elif forloop.last %}end{% else %}middle{% endif %}" font-size="10" fill="#766f85">{% if tick.rotulo %}{{ tick.rotulo }}{% else %}{{ tick.data|date:"d/m" }}{% endif %}</text>
+                        {% endfor %}
                     </svg>
-                    {% with ultimo=grafico_evolucao.pontos|last %}
+                    {% with primeiro=grafico_evolucao.pontos.0 ultimo=grafico_evolucao.pontos|last %}
                         <p style="font-size:.78rem; color:var(--text-muted); margin:0;">
-                            {{ grafico_evolucao.pontos.0.data|date:"d/m" }} até {{ ultimo.data|date:"d/m" }}
+                            {% if primeiro.rotulo %}{{ primeiro.rotulo }}{% else %}{{ primeiro.data|date:"d/m" }}{% endif %} até {{ ultimo.data|date:"d/m" }}
                         </p>
                     {% endwith %}
                 {% else %}
