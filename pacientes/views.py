@@ -33,7 +33,7 @@ ABAS_PRONTAS = {
 }
 
 
-def _grafico_evolucao(registros, largura=640, altura=160, pad=24):
+def _grafico_evolucao(registros, largura=640, altura=170, margem_esquerda=30, margem=16, margem_baixo=22):
     """
     Coordenadas SVG já prontas pra desenhar as 3 linhas (energia, sono,
     conforto digestivo) do resumo visual da aba Evolução — `registros` deve
@@ -46,6 +46,12 @@ def _grafico_evolucao(registros, largura=640, altura=160, pad=24):
     invertida (10 - valor) como "conforto". Sem isso a linha de digestão
     subiria quando a paciente piorasse, o que é o oposto do que as outras
     duas linhas mostram.
+
+    Além das linhas, monta um eixo Y (0 a 10, a régua pedida pra dar
+    referência de escala) e um eixo X com a data de cada check-in — esse
+    último só quando há poucos pontos, pra não amontoar texto quando o
+    histórico tiver muitos check-ins (nesse caso a legenda de período
+    embaixo do gráfico já cobre o intervalo).
     """
     pontos = []
     for r in registros:
@@ -57,19 +63,35 @@ def _grafico_evolucao(registros, largura=640, altura=160, pad=24):
             "conforto_digestivo": 10 - digestao,
         })
 
+    largura_util = largura - margem_esquerda - margem
+    altura_util = altura - 2 * margem - margem_baixo
+    n = len(pontos)
+
+    def x_de(i):
+        return margem_esquerda if n <= 1 else margem_esquerda + largura_util * i / (n - 1)
+
+    def y_de(valor):
+        return margem + altura_util * (1 - valor / 10)
+
     def linha(chave):
-        n = len(pontos)
-        partes = []
-        for i, p in enumerate(pontos):
-            x = pad if n <= 1 else pad + (largura - 2 * pad) * i / (n - 1)
-            y = pad + (altura - 2 * pad) * (1 - p[chave] / 10)
-            partes.append(f"{x:.1f},{y:.1f}")
-        return " ".join(partes)
+        return " ".join(f"{x_de(i):.1f},{y_de(p[chave]):.1f}" for i, p in enumerate(pontos))
+
+    # Formatadas como string (não como float) de propósito: template do
+    # Django localiza número solto pro padrão pt-br (vírgula decimal), o
+    # que quebraria a coordenada no SVG.
+    eixo_y = [{"valor": v, "y": f"{y_de(v):.1f}"} for v in (0, 2, 4, 6, 8, 10)]
+    eixo_x = (
+        [{"data": p["data"], "x": f"{x_de(i):.1f}"} for i, p in enumerate(pontos)]
+        if n <= 6 else []
+    )
 
     return {
         "pontos": pontos,
         "largura": largura,
         "altura": altura,
+        "margem_esquerda": margem_esquerda,
+        "eixo_y": eixo_y,
+        "eixo_x": eixo_x,
         "energia_points": linha("energia"),
         "sono_points": linha("sono"),
         "conforto_points": linha("conforto_digestivo"),
