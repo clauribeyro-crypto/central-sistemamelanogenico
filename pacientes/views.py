@@ -36,17 +36,26 @@ ABAS_PRONTAS = {
 def _grafico_evolucao(registros, largura=640, altura=160, pad=24):
     """
     Coordenadas SVG já prontas pra desenhar as 3 linhas (energia, sono,
-    digestão) do resumo visual da aba Evolução — `registros` deve vir em
-    ordem cronológica (mais antigo primeiro). Só entram os check-ins com
-    as 3 métricas calculáveis, pra manter o gráfico "simples" sem lidar
+    conforto digestivo) do resumo visual da aba Evolução — `registros` deve
+    vir em ordem cronológica (mais antigo primeiro). Só entram os check-ins
+    com as 3 métricas calculáveis, pra manter o gráfico "simples" sem lidar
     com buracos na linha.
+
+    As 3 linhas usam a mesma convenção — quanto mais alto, melhor —, por
+    isso `digestao_media` (que mede desconforto: quanto maior, pior) entra
+    invertida (10 - valor) como "conforto". Sem isso a linha de digestão
+    subiria quando a paciente piorasse, o que é o oposto do que as outras
+    duas linhas mostram.
     """
     pontos = []
     for r in registros:
         energia, digestao = r.energia_media, r.digestao_media
         if energia is None or digestao is None or r.qualidade_sono is None:
             continue
-        pontos.append({"data": r.criado_em, "energia": energia, "sono": r.qualidade_sono, "digestao": digestao})
+        pontos.append({
+            "data": r.criado_em, "energia": energia, "sono": r.qualidade_sono,
+            "conforto_digestivo": 10 - digestao,
+        })
 
     def linha(chave):
         n = len(pontos)
@@ -63,7 +72,7 @@ def _grafico_evolucao(registros, largura=640, altura=160, pad=24):
         "altura": altura,
         "energia_points": linha("energia"),
         "sono_points": linha("sono"),
-        "digestao_points": linha("digestao"),
+        "conforto_points": linha("conforto_digestivo"),
     }
 
 
