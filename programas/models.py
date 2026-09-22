@@ -108,6 +108,29 @@ class Acompanhamento(ModeloDaOrganizacao):
         )
         for numero in range(1, programa.qtd_consultas + 1):
             ConsultaPrevista.objects.create(acompanhamento=acompanhamento, numero=numero)
+
+        # Na prática, a "Consulta 1" quase sempre já aconteceu antes de iniciar
+        # o protocolo — é a consulta de diagnóstico que trouxe a paciente até
+        # aqui, agendada lá no CRM de leads, antes de existir qualquer
+        # acompanhamento pra vincular. Sem isso, o checklist ficaria pedindo
+        # pra "agendar a consulta 1" pra sempre, mesmo ela já tendo ocorrido.
+        from agenda.models import Consulta
+
+        consulta_ja_vinculada = ConsultaPrevista.objects.exclude(consulta__isnull=True).values_list(
+            "consulta_id", flat=True
+        )
+        consulta_diagnostico = Consulta.objects.filter(
+            organizacao=acompanhamento.organizacao,
+            paciente=paciente,
+            status=Consulta.Status.REALIZADA,
+        ).exclude(pk__in=consulta_ja_vinculada).order_by("-data_hora").first()
+        if consulta_diagnostico:
+            primeira_prevista = acompanhamento.consultas_previstas.filter(numero=1).first()
+            if primeira_prevista:
+                primeira_prevista.consulta = consulta_diagnostico
+                primeira_prevista.status = ConsultaPrevista.Status.REALIZADA
+                primeira_prevista.save(update_fields=["consulta", "status"])
+
         for numero in range(1, programa.qtd_kits + 1):
             KitPrevisto.objects.create(acompanhamento=acompanhamento, numero=numero)
         for numero in range(1, programa.qtd_modulacoes + 1):

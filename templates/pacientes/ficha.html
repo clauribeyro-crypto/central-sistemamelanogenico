@@ -473,6 +473,16 @@
                                     <td>
                                         {% if cp.consulta %}
                                             <a href="{% url 'agenda:detalhe_consulta' cp.consulta.pk %}">Ver ›</a>
+                                        {% elif consultas_para_vincular %}
+                                            <form method="post" action="{% url 'programas:vincular_consulta_prevista' cp.pk %}" style="display:flex; gap:.35rem; align-items:center;">
+                                                {% csrf_token %}
+                                                <select name="consulta_id" style="padding:.3rem; border:1px solid #ddd5ee; border-radius:6px; font-size:.8rem;">
+                                                    {% for c in consultas_para_vincular %}
+                                                        <option value="{{ c.pk }}">{{ c.data_hora|date:"d/m/Y" }} — {{ c.profissional }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Já aconteceu — vincular</button>
+                                            </form>
                                         {% endif %}
                                     </td>
                                 </tr>

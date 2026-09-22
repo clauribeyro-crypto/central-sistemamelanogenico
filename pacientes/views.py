@@ -11,7 +11,7 @@ from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
 from leads.models import HistoricoLead
-from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao, FotoEvolucao
+from programas.models import Acompanhamento, ConsultaPrevista, CustoAcompanhamento, FaseModulacao, FotoEvolucao
 from prontuarios.models import Anamnese, Documento
 
 from .forms import IniciarProtocoloForm, PacienteRapidoForm
@@ -421,6 +421,12 @@ def ficha(request, pk):
         ).exclude(status=Consulta.Status.CANCELADA).select_related(
             "profissional", "tipo_consulta"
         ).order_by("-data_hora")
+        consulta_ja_vinculada = ConsultaPrevista.objects.exclude(consulta__isnull=True).values_list(
+            "consulta_id", flat=True
+        )
+        contexto["consultas_para_vincular"] = Consulta.objects.filter(
+            organizacao=org, paciente=paciente, status=Consulta.Status.REALIZADA,
+        ).exclude(pk__in=consulta_ja_vinculada).order_by("-data_hora")
 
     if acompanhamento and aba == "produtos":
         contexto["kits"] = acompanhamento.kits_previstos.prefetch_related("itens__produto").order_by("numero")
