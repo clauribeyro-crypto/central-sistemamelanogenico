@@ -188,15 +188,6 @@
                 <div class="rotulo">Resultado do ano</div>
             </div>
             <div class="card stat">
-                <div class="num">R$ {{ saldo_futuro_previsto|floatformat:2 }}</div>
-                <div class="rotulo">Saldo futuro previsto</div>
-                <div style="font-size:.72rem; color:var(--text-muted); margin-top:.15rem;">
-                    Saldo em caixa hoje + tudo que ainda está pendente de receber ou pagar (sem data definida — inclui valores de qualquer mês futuro), somando os pagamentos de pacientes e os
-                    <a href="{% url 'financeiro:painel' %}?aba=lancamentos&status=PREVISTO&todos_periodos=1">lançamentos previstos</a>
-                    do Controle Financeiro geral.
-                </div>
-            </div>
-            <div class="card stat">
                 <div class="num">R$ {{ receitas_mes|floatformat:2 }}</div>
                 <div class="rotulo">Receitas do mês</div>
             </div>
@@ -211,6 +202,14 @@
             <div class="card stat">
                 <div class="num">R$ {{ saldo_hoje|floatformat:2 }}</div>
                 <div class="rotulo">Saldo em caixa hoje</div>
+            </div>
+            <div class="card stat">
+                <div class="num">R$ {{ saldo_futuro_previsto|floatformat:2 }}</div>
+                <div class="rotulo">Saldo futuro previsto</div>
+                <div style="font-size:.72rem; color:var(--text-muted); margin-top:.15rem;">
+                    Saldo em caixa hoje (R$ {{ saldo_hoje|floatformat:2 }}) + o que ainda falta receber das pacientes (R$ {{ saldo_pendente_pacientes|floatformat:2 }}).
+                    <a href="{% url 'financeiro:relatorio' %}?inicio=2000-01-01&fim=2099-12-31">Ver quem ainda deve ›</a>
+                </div>
             </div>
         </div>
 
