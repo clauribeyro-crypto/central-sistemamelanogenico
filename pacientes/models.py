@@ -35,6 +35,12 @@ class Paciente(ModeloDaOrganizacao):
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
+    fechamento_descartado_em = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Preenchido quando alguém marca que, após a consulta, a paciente decidiu não continuar — tira ela da fila de fechamento sem precisar excluir nada.",
+    )
+    fechamento_descartado_motivo = models.CharField(max_length=255, blank=True)
+
     class Meta:
         verbose_name = "paciente"
         verbose_name_plural = "pacientes"
@@ -66,3 +72,17 @@ class Paciente(ModeloDaOrganizacao):
         return self.acompanhamentos.filter(
             status__in=Acompanhamento.STATUS_ATIVOS
         ).order_by("-data_inicio").first()
+
+    @property
+    def precisa_fechamento(self):
+        """
+        Já teve consulta realizada, não tem acompanhamento ativo e ninguém
+        marcou que ela decidiu não continuar — precisa de follow-up pra
+        fechar (ou não perder) a venda.
+        """
+        from agenda.models import Consulta
+        return (
+            self.fechamento_descartado_em is None
+            and self.acompanhamento_atual is None
+            and self.consultas.filter(status=Consulta.Status.REALIZADA).exists()
+        )

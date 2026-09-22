@@ -9,4 +9,6 @@ urlpatterns = [
     path("nova/", views.criar, name="criar"),
     path("<int:pk>/", views.ficha, name="ficha"),
     path("<int:pk>/iniciar-protocolo/", views.iniciar_protocolo, name="iniciar_protocolo"),
+    path("<int:pk>/descartar-fechamento/", views.descartar_fechamento, name="descartar_fechamento"),
+    path("<int:pk>/reabrir-fechamento/", views.reabrir_fechamento, name="reabrir_fechamento"),
 ]

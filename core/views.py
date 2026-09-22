@@ -11,6 +11,7 @@ from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
+from pacientes.models import Paciente
 from programas.models import Acompanhamento
 
 BADGE_POR_ETAPA = {
@@ -112,6 +113,25 @@ def home(request):
             organizacao=org, status=Pagamento.Status.PENDENTE
         ).order_by("data_vencimento")[:10],
     }
+
+    if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
+        pacientes_candidatas = Paciente.objects.filter(
+            organizacao=org,
+            consultas__status=Consulta.Status.REALIZADA,
+            fechamento_descartado_em__isnull=True,
+        ).exclude(
+            acompanhamentos__status__in=Acompanhamento.STATUS_ATIVOS
+        ).distinct()
+        fila_fechamento = []
+        for paciente in pacientes_candidatas:
+            ultima_consulta = paciente.consultas.filter(
+                status=Consulta.Status.REALIZADA
+            ).select_related("profissional", "tipo_consulta").order_by("-data_hora").first()
+            if ultima_consulta:
+                fila_fechamento.append({"paciente": paciente, "consulta": ultima_consulta})
+        fila_fechamento.sort(key=lambda item: item["consulta"].data_hora, reverse=True)
+        contexto["fila_fechamento"] = fila_fechamento[:20]
+        contexto["total_fila_fechamento"] = len(fila_fechamento)
 
     if request.user.papel == Usuario.Papel.COMERCIAL:
         agendamentos_mes = HistoricoLead.objects.filter(

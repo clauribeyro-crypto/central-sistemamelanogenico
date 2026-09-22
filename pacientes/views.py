@@ -3,6 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
@@ -388,3 +391,34 @@ def iniciar_protocolo(request, pk):
         form = IniciarProtocoloForm(organizacao=org)
 
     return render(request, "pacientes/iniciar_protocolo.html", {"paciente": paciente, "form": form})
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def descartar_fechamento(request, pk):
+    """Marca que a paciente decidiu não continuar após a consulta — tira ela da fila de fechamento."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    paciente.fechamento_descartado_em = timezone.now()
+    paciente.fechamento_descartado_motivo = request.POST.get("motivo", "").strip()
+    paciente.save(update_fields=["fechamento_descartado_em", "fechamento_descartado_motivo", "atualizado_em"])
+    messages.success(request, "Marcado — essa paciente não aparece mais na fila de fechamento.")
+    proximo = request.POST.get("proximo")
+    if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        return redirect(proximo)
+    return redirect("pacientes:ficha", pk=paciente.pk)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def reabrir_fechamento(request, pk):
+    """Desfaz o 'não vai continuar' — a paciente volta a aparecer na fila de fechamento."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    paciente.fechamento_descartado_em = None
+    paciente.fechamento_descartado_motivo = ""
+    paciente.save(update_fields=["fechamento_descartado_em", "fechamento_descartado_motivo", "atualizado_em"])
+    messages.success(request, "Paciente voltou pra fila de fechamento.")
+    return redirect("pacientes:ficha", pk=paciente.pk)
