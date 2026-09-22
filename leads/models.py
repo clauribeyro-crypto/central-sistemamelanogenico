@@ -369,6 +369,37 @@ class PausaLead(models.Model):
         return f"Pausa de {self.lead} até {self.data_retomada_prevista:%d/%m/%Y}"
 
 
+class RegistroSocialSelling(ModeloDaOrganizacao):
+    """
+    Números diários de prospecção manual no Instagram, preenchidos pela
+    própria pessoa (ex.: a SDR) — um registro por pessoa por dia.
+    """
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="registros_social_selling",
+    )
+    data = models.DateField(default=timezone.localdate)
+
+    seguidores_novos = models.PositiveIntegerField("seguidores novos", default=0)
+    pessoas_chamadas = models.PositiveIntegerField("pessoas chamadas no Instagram", default=0)
+    pessoas_responderam = models.PositiveIntegerField("pessoas que responderam", default=0)
+    contatos_conseguidos = models.PositiveIntegerField("telefones conseguidos", default=0)
+
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "registro de social selling"
+        verbose_name_plural = "registros de social selling"
+        ordering = ["-data"]
+        constraints = [
+            models.UniqueConstraint(fields=["usuario", "data"], name="social_selling_unico_por_dia"),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} — {self.data:%d/%m/%Y}"
+
+
 class WebhookImportacao(ModeloDaOrganizacao):
     """
     Endpoint automático de entrada de leads (ex.: um Google Apps Script

@@ -3,7 +3,7 @@ from django import forms
 from agenda.models import TipoConsulta
 from profissionais.models import Profissional
 
-from .models import Lead, MotivoPerda, Origem
+from .models import Lead, MotivoPerda, Origem, RegistroSocialSelling
 
 
 class OrigemForm(forms.ModelForm):
@@ -24,6 +24,19 @@ class OrigemForm(forms.ModelForm):
         if Origem.objects.filter(organizacao=self.organizacao, nome=nome).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError("Já existe uma origem com esse nome.")
         return nome
+
+
+class RegistroSocialSellingForm(forms.ModelForm):
+    class Meta:
+        model = RegistroSocialSelling
+        fields = ["seguidores_novos", "pessoas_chamadas", "pessoas_responderam", "contatos_conseguidos"]
+        widgets = {
+            campo: forms.NumberInput(attrs={
+                "min": 0, "inputmode": "numeric",
+                "style": "width:80px; padding:.4rem; border:1px solid #ddd5ee; border-radius:8px;",
+            })
+            for campo in ["seguidores_novos", "pessoas_chamadas", "pessoas_responderam", "contatos_conseguidos"]
+        }
 
 
 class NovoLeadForm(forms.ModelForm):

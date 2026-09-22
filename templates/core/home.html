@@ -3,6 +3,54 @@
 {% block content %}
     <h1>O que preciso fazer hoje?</h1>
 
+    {% if form_social_selling %}
+        <div class="card">
+            <h2>📲 Social selling de hoje (Instagram)</h2>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+                Atualize esses números ao longo do dia — pode salvar quantas vezes precisar.
+            </p>
+            <form method="post" action="{% url 'leads:registrar_social_selling' %}"
+                  style="display:flex; gap:1.25rem; flex-wrap:wrap; align-items:flex-end;">
+                {% csrf_token %}
+                {% for field in form_social_selling %}
+                    <div>
+                        <label for="{{ field.id_for_label }}" style="display:block; font-size:.8rem; color:var(--text-muted); margin-bottom:.25rem;">{{ field.label }}</label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <button class="btn" type="submit">Salvar</button>
+            </form>
+        </div>
+    {% endif %}
+
+    {% if equipe_social_selling %}
+        <div class="card">
+            <h2>📲 Social selling da equipe</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pessoa</th>
+                        <th>Seguidores novos</th>
+                        <th>Pessoas chamadas</th>
+                        <th>Responderam</th>
+                        <th>Telefones conseguidos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in equipe_social_selling %}
+                        <tr>
+                            <td>{{ item.usuario }}</td>
+                            <td>{{ item.hoje.seguidores_novos|default:0 }} <span style="color:var(--text-muted); font-size:.8rem;">(mês: {{ item.mes.seguidores_novos|default:0 }})</span></td>
+                            <td>{{ item.hoje.pessoas_chamadas|default:0 }} <span style="color:var(--text-muted); font-size:.8rem;">(mês: {{ item.mes.pessoas_chamadas|default:0 }})</span></td>
+                            <td>{{ item.hoje.pessoas_responderam|default:0 }} <span style="color:var(--text-muted); font-size:.8rem;">(mês: {{ item.mes.pessoas_responderam|default:0 }})</span></td>
+                            <td>{{ item.hoje.contatos_conseguidos|default:0 }} <span style="color:var(--text-muted); font-size:.8rem;">(mês: {{ item.mes.contatos_conseguidos|default:0 }})</span></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
     {% if remuneracao %}
         <div class="card" style="border:2px solid #22c55e;">
             <h2>💰 Sua remuneração este mês</h2>

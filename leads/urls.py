@@ -9,6 +9,7 @@ urlpatterns = [
     path("novo/", views.criar_lead, name="criar_lead"),
     path("origens/nova/", views.origem_criar, name="origem_criar"),
     path("importacao/", views.configuracao_importacao, name="configuracao_importacao"),
+    path("social-selling/", views.registrar_social_selling, name="registrar_social_selling"),
     path("webhook/<str:token>/", views.webhook_importar_lead, name="webhook_importar_lead"),
     path("<int:pk>/", views.detalhe, name="detalhe"),
     path("<int:pk>/mover/", views.mover_etapa, name="mover_etapa"),
