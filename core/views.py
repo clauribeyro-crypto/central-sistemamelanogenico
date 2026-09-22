@@ -6,9 +6,10 @@ from django.shortcuts import render
 from django.utils import timezone
 
 from agenda.models import Consulta
+from contas.models import Usuario
 from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento
-from leads.models import Lead
+from leads.models import HistoricoLead, Lead
 from programas.models import Acompanhamento
 
 BADGE_POR_ETAPA = {
@@ -110,6 +111,24 @@ def home(request):
             organizacao=org, status=Pagamento.Status.PENDENTE
         ).order_by("data_vencimento")[:10],
     }
+
+    if request.user.papel == Usuario.Papel.COMERCIAL:
+        agendamentos_mes = HistoricoLead.objects.filter(
+            lead__organizacao=org,
+            tipo=HistoricoLead.Tipo.AGENDAMENTO,
+            responsavel=request.user,
+            data_hora__year=hoje.year,
+            data_hora__month=hoje.month,
+        ).count()
+        comissao_agendamentos = agendamentos_mes * request.user.comissao_por_agendamento
+        contexto["remuneracao"] = {
+            "fixo_mensal": request.user.comissao_fixo_mensal,
+            "valor_por_agendamento": request.user.comissao_por_agendamento,
+            "agendamentos_mes": agendamentos_mes,
+            "comissao_agendamentos": comissao_agendamentos,
+            "total_mes": request.user.comissao_fixo_mensal + comissao_agendamentos,
+        }
+
     return render(request, "core/home.html", contexto)
 
 

@@ -30,9 +30,14 @@ class OrganizacaoAdmin(admin.ModelAdmin):
 class UsuarioAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ("Organização", {"fields": ("organizacao", "papel")}),
+        ("Comissão (papel Comercial)", {
+            "fields": ("comissao_fixo_mensal", "comissao_por_agendamento"),
+            "description": "Aparece no painel \"O que fazer hoje\" de quem tem papel Comercial.",
+        }),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
         ("Organização", {"fields": ("organizacao", "papel")}),
+        ("Comissão (papel Comercial)", {"fields": ("comissao_fixo_mensal", "comissao_por_agendamento")}),
     )
     list_display = ("username", "email", "organizacao", "papel", "is_staff", "is_superuser")
     list_filter = UserAdmin.list_filter + ("organizacao", "papel")

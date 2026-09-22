@@ -3,6 +3,33 @@
 {% block content %}
     <h1>O que preciso fazer hoje?</h1>
 
+    {% if remuneracao %}
+        <div class="card" style="border:2px solid #22c55e;">
+            <h2>💰 Sua remuneração este mês</h2>
+            <div class="grid">
+                <div class="card stat">
+                    <div class="num">R$ {{ remuneracao.fixo_mensal|floatformat:2 }}</div>
+                    <div class="rotulo">Fixo mensal</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ remuneracao.agendamentos_mes }}</div>
+                    <div class="rotulo">Consultas agendadas por você este mês</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">R$ {{ remuneracao.comissao_agendamentos|floatformat:2 }}</div>
+                    <div class="rotulo">Comissão do mês (R$ {{ remuneracao.valor_por_agendamento|floatformat:2 }} por agendamento)</div>
+                </div>
+                <div class="card stat" style="background:#22c55e11;">
+                    <div class="num">R$ {{ remuneracao.total_mes|floatformat:2 }}</div>
+                    <div class="rotulo">Total do mês (fixo + comissão)</div>
+                </div>
+            </div>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
+                Cada consulta agendada a partir de um lead que você atendeu no CRM soma à sua comissão. Quanto mais agendamentos, maior o total do mês. 🚀
+            </p>
+        </div>
+    {% endif %}
+
     <div class="grid">
         {% if org.modulo_leads_ativo %}
         <a class="card stat" href="{% url 'leads:kanban' %}" style="text-decoration:none;">
