@@ -207,14 +207,16 @@ def criar(request):
 @require_POST
 def excluir(request, pk):
     """
-    Exclui a paciente definitivamente — só quando não há nenhum registro
-    clínico ou financeiro real que dependa dela, pra nunca apagar histórico
-    sem querer. Um acompanhamento/programa iniciado só de teste (sem
-    nenhum dinheiro recebido) é excluído junto, com tudo que ele gerou
-    (consultas previstas, kits, modulação, fotos). Pagamentos pendentes
-    (sem nenhum recebimento) também são cancelados junto, já que nada
-    chegou a entrar no caixa por eles; se algum já teve dinheiro
-    recebido, a exclusão é bloqueada.
+    Exclui a paciente definitivamente — a única coisa que nunca é apagada
+    junto é dinheiro que já entrou de verdade (Recebimento) e consultas
+    registradas na Agenda (histórico de horários, mexe com a agenda dos
+    profissionais). Tudo o mais que só pertence a essa paciente —
+    acompanhamento/programa (com tudo que ele gerou: consultas previstas,
+    kits, modulação, fotos), anamnese, check-ins de evolução, atendimentos
+    de prontuário sem consulta vinculada e documentos — é apagado junto,
+    sem exigir nenhuma limpeza manual antes. Pagamentos pendentes (sem
+    nenhum recebimento) também são cancelados junto, já que nada chegou a
+    entrar no caixa por eles.
     """
     org = organizacao_do_usuario(request)
     if not usuario_e_administrador(request):
@@ -224,15 +226,7 @@ def excluir(request, pk):
 
     bloqueios = []
     if paciente.consultas.exists():
-        bloqueios.append("consultas registradas")
-    if paciente.atendimentos.exists():
-        bloqueios.append("atendimentos no prontuário")
-    if paciente.registros_evolucao.exists():
-        bloqueios.append("check-ins de evolução")
-    if paciente.documentos.exists():
-        bloqueios.append("exames/documentos anexados")
-    if hasattr(paciente, "anamnese"):
-        bloqueios.append("anamnese preenchida")
+        bloqueios.append("consultas registradas na agenda")
     if Recebimento.objects.filter(pagamento__paciente=paciente).exists():
         bloqueios.append("pagamentos com dinheiro já recebido")
 
@@ -247,6 +241,10 @@ def excluir(request, pk):
 
     tinha_acompanhamento = paciente.acompanhamentos.exists()
     Acompanhamento.objects.filter(paciente=paciente).delete()
+    Anamnese.objects.filter(paciente=paciente).delete()
+    paciente.registros_evolucao.all().delete()
+    paciente.atendimentos.all().delete()
+    paciente.documentos.all().delete()
     valor_cancelado = Pagamento.objects.filter(paciente=paciente).aggregate(total=Sum("valor"))["total"] or 0
     Pagamento.objects.filter(paciente=paciente).delete()
     nome = paciente.nome
