@@ -271,6 +271,13 @@
             .sidebar .rodape { display: none; }
             main { padding: 1.25rem; }
         }
+
+        @media print {
+            .sidebar, .no-print { display: none !important; }
+            .shell { display: block; }
+            main { padding: 0; max-width: none; }
+            .card { box-shadow: none; border: 1px solid #e5e0ee; break-inside: avoid; }
+        }
     </style>
 </head>
 <body>

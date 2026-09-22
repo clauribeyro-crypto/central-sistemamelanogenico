@@ -14,7 +14,7 @@ from financeiro.models import Pagamento, Recebimento
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
-from .forms import BloqueioRapidoForm, ConsultaRapidaForm
+from .forms import BloqueioRapidoForm, ConsultaEditarForm, ConsultaRapidaForm
 from .models import Consulta, HorarioBloqueado, TipoConsulta
 
 
@@ -278,11 +278,19 @@ def detalhe_consulta(request, pk):
     pagamento = Pagamento.objects.filter(consulta=consulta, organizacao=org).order_by("-criado_em").first()
     pagamento_form = None
     recebimento_form = None
+    consulta_form = None
 
     if request.method == "POST":
         acao = request.POST.get("acao")
 
-        if acao == "salvar_pagamento" and pagamento:
+        if acao == "editar_consulta":
+            consulta_form = ConsultaEditarForm(request.POST, instance=consulta, organizacao=org, prefix="consulta")
+            if consulta_form.is_valid():
+                consulta_form.save()  # dispara a sincronização automática do Financeiro (valor/data)
+                messages.success(request, "Consulta atualizada.")
+                return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "salvar_pagamento" and pagamento:
             pagamento_form = PagamentoForm(request.POST, instance=pagamento)
             if pagamento_form.is_valid():
                 pagamento_form.save()
@@ -290,7 +298,7 @@ def detalhe_consulta(request, pk):
                 return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
         elif acao == "adicionar_recebimento" and pagamento:
-            recebimento_form = RecebimentoForm(request.POST, pagamento=pagamento)
+            recebimento_form = RecebimentoForm(request.POST, pagamento=pagamento, prefix="recebimento")
             if recebimento_form.is_valid():
                 recebimento = recebimento_form.save(commit=False)
                 recebimento.organizacao = org
@@ -363,13 +371,16 @@ def detalhe_consulta(request, pk):
     if pagamento and pagamento_form is None:
         pagamento_form = PagamentoForm(instance=pagamento)
     if pagamento and recebimento_form is None:
-        recebimento_form = RecebimentoForm(pagamento=pagamento)
+        recebimento_form = RecebimentoForm(pagamento=pagamento, prefix="recebimento")
+    if consulta_form is None:
+        consulta_form = ConsultaEditarForm(instance=consulta, organizacao=org, prefix="consulta")
 
     contexto = {
         "consulta": consulta,
         "pagamento": pagamento,
         "pagamento_form": pagamento_form,
         "recebimento_form": recebimento_form,
+        "consulta_form": consulta_form,
         "recebimentos": pagamento.recebimentos.all() if pagamento else [],
         "next": "",
     }

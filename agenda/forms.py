@@ -3,7 +3,7 @@ from django import forms
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
-from .models import HorarioBloqueado, TipoConsulta
+from .models import Consulta, HorarioBloqueado, TipoConsulta
 
 
 class ConsultaRapidaForm(forms.Form):
@@ -50,6 +50,38 @@ class ConsultaRapidaForm(forms.Form):
                 "Selecione uma paciente existente ou informe o nome da nova paciente."
             )
         return cleaned
+
+
+class ConsultaEditarForm(forms.ModelForm):
+    """
+    Corrige dados da consulta já agendada — ex.: profissional errado (Fábio
+    x Cláudia) ou data errada. paciente e status ficam de fora: trocar de
+    paciente é uma operação bem maior, e status já tem os botões próprios
+    (marcar realizada/cancelar) na tela da consulta.
+    """
+
+    data_hora = forms.DateTimeField(
+        label="Data e hora", widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M")
+    )
+
+    class Meta:
+        model = Consulta
+        fields = ["profissional", "tipo_consulta", "data_hora", "duracao_minutos", "valor", "motivo", "observacoes"]
+        widgets = {
+            "motivo": forms.TextInput(),
+            "observacoes": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["data_hora"].input_formats = ["%Y-%m-%dT%H:%M"]
+        organizacao = organizacao or (self.instance.organizacao if self.instance and self.instance.pk else None)
+        self.fields["profissional"].queryset = Profissional.objects.filter(
+            organizacao=organizacao, ativo=True
+        ).order_by("nome")
+        self.fields["tipo_consulta"].queryset = TipoConsulta.objects.filter(
+            organizacao=organizacao, ativo=True
+        ).order_by("ordem", "nome")
 
 
 class BloqueioRapidoForm(forms.Form):
