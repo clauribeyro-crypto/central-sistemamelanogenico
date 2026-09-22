@@ -229,7 +229,10 @@ def painel(request):
     }
 
     if aba == "lancamentos":
-        lancamentos = Lancamento.objects.filter(organizacao=org, data__year=ano, data__month=mes)
+        todos_periodos = request.GET.get("todos_periodos") == "1"
+        lancamentos = Lancamento.objects.filter(organizacao=org)
+        if not todos_periodos:
+            lancamentos = lancamentos.filter(data__year=ano, data__month=mes)
 
         banco_id = request.GET.get("banco")
         if banco_id:
@@ -243,9 +246,17 @@ def painel(request):
         if grupo in CategoriaFinanceira.Grupo.values:
             lancamentos = lancamentos.filter(categoria__grupo=grupo)
 
-        totais = _totais_periodo(
-            org, datetime.date(ano, mes, 1), datetime.date(ano, mes, calendar.monthrange(ano, mes)[1])
-        )
+        if todos_periodos:
+            # "ver de todos os períodos" existe pra caçar lançamentos previstos
+            # esquecidos em qualquer data — não faz sentido somar um total de
+            # receitas/despesas "do período" quando não há período nenhum.
+            total_receitas = total_despesas = None
+        else:
+            totais = _totais_periodo(
+                org, datetime.date(ano, mes, 1), datetime.date(ano, mes, calendar.monthrange(ano, mes)[1])
+            )
+            total_receitas = totais["receitas"]
+            total_despesas = totais["despesas"]
 
         contexto.update({
             "lancamentos": lancamentos.select_related("categoria", "banco"),
@@ -254,8 +265,9 @@ def painel(request):
             "banco_selecionado": banco_id or "",
             "status_selecionado": status or "",
             "grupo_selecionado": grupo or "",
-            "total_receitas": totais["receitas"],
-            "total_despesas": totais["despesas"],
+            "todos_periodos": todos_periodos,
+            "total_receitas": total_receitas,
+            "total_despesas": total_despesas,
         })
 
     elif aba == "resumo_mensal":

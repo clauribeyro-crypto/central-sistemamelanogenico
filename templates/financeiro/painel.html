@@ -13,7 +13,7 @@
     {% if aba == "lancamentos" %}
         <form class="filtro" method="get">
             <input type="hidden" name="aba" value="lancamentos">
-            <div>
+            <div id="campos-periodo" {% if todos_periodos %}style="display:none;"{% endif %}>
                 <label for="mes">Mês</label>
                 <select id="mes" name="mes">
                     {% for numero, nome in meses %}
@@ -21,7 +21,7 @@
                     {% endfor %}
                 </select>
             </div>
-            <div>
+            <div id="campos-periodo-ano" {% if todos_periodos %}style="display:none;"{% endif %}>
                 <label for="ano">Ano</label>
                 <select id="ano" name="ano">
                     {% for a in anos %}
@@ -55,23 +55,33 @@
                     {% endfor %}
                 </select>
             </div>
+            <div>
+                <label for="todos_periodos" style="display:flex; align-items:center; gap:.35rem; white-space:nowrap;">
+                    <input type="checkbox" id="todos_periodos" name="todos_periodos" value="1"
+                           {% if todos_periodos %}checked{% endif %}
+                           onchange="document.getElementById('campos-periodo').style.display = this.checked ? 'none' : ''; document.getElementById('campos-periodo-ano').style.display = this.checked ? 'none' : '';">
+                    Ver de todos os períodos
+                </label>
+            </div>
             <button type="submit">Filtrar</button>
         </form>
 
-        <div class="grid">
-            <div class="card stat">
-                <div class="num">R$ {{ total_receitas|floatformat:2 }}</div>
-                <div class="rotulo">Receitas no período</div>
+        {% if not todos_periodos %}
+            <div class="grid">
+                <div class="card stat">
+                    <div class="num">R$ {{ total_receitas|floatformat:2 }}</div>
+                    <div class="rotulo">Receitas no período</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">R$ {{ total_despesas|floatformat:2 }}</div>
+                    <div class="rotulo">Despesas no período</div>
+                </div>
             </div>
-            <div class="card stat">
-                <div class="num">R$ {{ total_despesas|floatformat:2 }}</div>
-                <div class="rotulo">Despesas no período</div>
-            </div>
-        </div>
+        {% endif %}
 
         <div class="card">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem;">
-                <h2 style="margin:0;">Lançamentos de {{ mes|default:"" }}</h2>
+                <h2 style="margin:0;">{% if todos_periodos %}Lançamentos de todos os períodos{% else %}Lançamentos de {{ mes|default:"" }}{% endif %}</h2>
                 <div style="display:flex; gap:.5rem;">
                     <a class="btn btn-secondary" href="{% url 'financeiro:banco_criar' %}">+ Banco</a>
                     <a class="btn btn-secondary" href="{% url 'financeiro:categoria_criar' %}">+ Categoria</a>
@@ -181,7 +191,9 @@
                 <div class="num">R$ {{ saldo_futuro_previsto|floatformat:2 }}</div>
                 <div class="rotulo">Saldo futuro previsto</div>
                 <div style="font-size:.72rem; color:var(--text-muted); margin-top:.15rem;">
-                    Saldo em caixa hoje + tudo que ainda está pendente de receber ou pagar (sem data definida — inclui valores de qualquer mês futuro)
+                    Saldo em caixa hoje + tudo que ainda está pendente de receber ou pagar (sem data definida — inclui valores de qualquer mês futuro), somando os pagamentos de pacientes e os
+                    <a href="{% url 'financeiro:painel' %}?aba=lancamentos&status=PREVISTO&todos_periodos=1">lançamentos previstos</a>
+                    do Controle Financeiro geral.
                 </div>
             </div>
             <div class="card stat">
