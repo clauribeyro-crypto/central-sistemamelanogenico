@@ -75,7 +75,7 @@
         {% if consultas %}
             <table>
                 <thead>
-                    <tr><th>Data</th><th>Paciente</th><th>Tipo</th><th>Profissional</th><th>Valor</th><th>Recebido</th></tr>
+                    <tr><th>Data</th><th>Paciente</th><th>Tipo</th><th>Profissional</th><th>Valor</th><th>Recebido</th><th class="no-print"></th></tr>
                 </thead>
                 <tbody>
                 {% for c in consultas %}
@@ -86,6 +86,7 @@
                         <td>{{ c.profissional.nome|default:"—" }}</td>
                         <td>R$ {{ c.valor|floatformat:2 }}</td>
                         <td>R$ {{ c.total_recebido|floatformat:2 }}</td>
+                        <td class="no-print"><a href="{% url 'agenda:detalhe_consulta' c.pk %}">Editar ›</a></td>
                     </tr>
                 {% endfor %}
                 </tbody>

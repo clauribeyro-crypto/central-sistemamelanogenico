@@ -18,7 +18,6 @@
         {% if consulta.observacoes %}
             <p><strong>Observações:</strong> {{ consulta.observacoes }}</p>
         {% endif %}
-        <p style="font-size:.82rem;"><a href="/admin/agenda/consulta/{{ consulta.pk }}/change/">Editar profissional, tipo, data ou duração (administração) ›</a></p>
 
         <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem;">
             <a class="btn btn-secondary" href="{% url 'pacientes:ficha' consulta.paciente.pk %}">Ver ficha da paciente</a>
@@ -43,6 +42,23 @@
                 <button class="btn btn-secondary" type="submit" style="color:#8f2e45;">Excluir consulta</button>
             </form>
         </div>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Editar consulta</h2>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="editar_consulta">
+            {% for field in consulta_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Salvar alterações</button>
+        </form>
     </div>
 
     {% if pagamento %}
