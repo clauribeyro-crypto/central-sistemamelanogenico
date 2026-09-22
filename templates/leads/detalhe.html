@@ -27,6 +27,23 @@
         {% endif %}
     </div>
 
+    {% if dados_formulario %}
+        <div class="card">
+            <h2>Respostas do formulário</h2>
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                O que ela respondeu no formulário/quiz de origem — sem precisar abrir a planilha.
+            </p>
+            <table style="width:100%; border-collapse:collapse;">
+                {% for rotulo, valor in dados_formulario %}
+                    <tr>
+                        <td style="padding:.35rem .5rem .35rem 0; white-space:nowrap; vertical-align:top; color:var(--text-muted);">{{ rotulo }}</td>
+                        <td style="padding:.35rem 0;">{{ valor }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+    {% endif %}
+
     {% if pausa_ativa %}
         <div class="card" style="border:2px solid #f59e0b;">
             <h2>⏸️ RETOMAR CONTATO — CADÊNCIA PAUSADA</h2>

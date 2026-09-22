@@ -207,6 +207,17 @@ def mover_para_agendados(request, pk):
     return JsonResponse({"ok": True})
 
 
+def _rotular_dados_formulario(dados_formulario):
+    """Transforma as chaves cruas do formulário (ex.: 'qual_sua_renda') em rótulos legíveis."""
+    rotulos = []
+    for chave, valor in dados_formulario.items():
+        rotulo = chave.replace("_", " ").replace("-", " ").strip()
+        if rotulo and rotulo[0].islower():
+            rotulo = rotulo[0].upper() + rotulo[1:]
+        rotulos.append((rotulo or chave, valor))
+    return rotulos
+
+
 @login_required
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def detalhe(request, pk):
@@ -216,6 +227,7 @@ def detalhe(request, pk):
 
     contexto = {
         "lead": lead,
+        "dados_formulario": _rotular_dados_formulario(lead.dados_formulario),
         "historico": historico,
         "pausa_ativa": lead.pausa_ativa,
         "pode_agir": lead.status not in (Lead.Status.AGENDADA, Lead.Status.PERDIDA),
@@ -481,6 +493,15 @@ def webhook_importar_lead(request, token):
     else:
         dados = request.POST
 
+    CAMPOS_RECONHECIDOS = {
+        "nome", "name", "telefone", "whatsapp", "phone", "origem",
+        "data", "data_primeiro_contato", "timestamp",
+    }
+    dados_extras = {
+        chave: valor for chave, valor in dados.items()
+        if chave not in CAMPOS_RECONHECIDOS and str(valor).strip()
+    }
+
     nome = dados.get("nome") or dados.get("name") or ""
     telefone = dados.get("telefone") or dados.get("whatsapp") or dados.get("phone") or ""
 
@@ -504,6 +525,7 @@ def webhook_importar_lead(request, token):
 
     lead, criado, motivo = webhook.registrar_lead_importado(
         nome=nome, telefone=telefone, origem=origem, data_primeiro_contato=data_primeiro_contato,
+        dados_extras=dados_extras,
     )
     if lead is None:
         return JsonResponse({"ok": False, "erro": motivo}, status=400)

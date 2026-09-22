@@ -68,6 +68,10 @@ class Usuario(AbstractUser):
     outro usuário só enxerga e edita dados da própria organização.
     """
 
+    class Papel(models.TextChoices):
+        COMPLETO = "COMPLETO", "Acesso completo"
+        COMERCIAL = "COMERCIAL", "Comercial (Agenda + CRM de leads)"
+
     organizacao = models.ForeignKey(
         Organizacao,
         on_delete=models.CASCADE,
@@ -75,6 +79,15 @@ class Usuario(AbstractUser):
         blank=True,
         null=True,
         help_text="Deixe em branco apenas para administradores gerais do sistema.",
+    )
+    papel = models.CharField(
+        max_length=20, choices=Papel.choices, default=Papel.COMPLETO,
+        help_text=(
+            "\"Comercial\" restringe esse usuário só à Agenda, ao CRM de leads "
+            "e ao painel \"O que fazer hoje\" — o resto do sistema (ficha da "
+            "paciente, prontuários, financeiro, indicadores, estoque, "
+            "profissionais, programas) fica bloqueado pra ele."
+        ),
     )
 
     class Meta:

@@ -169,6 +169,14 @@ class Lead(ModeloDaOrganizacao):
 
     observacoes = models.TextField(blank=True)
 
+    dados_formulario = models.JSONField(
+        default=dict, blank=True,
+        help_text=(
+            "Respostas extras recebidas junto com o lead (ex.: quiz/formulário externo) "
+            "que não têm um campo próprio — guardadas aqui só pra exibir na ficha do lead."
+        ),
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -396,11 +404,17 @@ class WebhookImportacao(ModeloDaOrganizacao):
         self.token = secrets.token_urlsafe(32)
         self.save(update_fields=["token"])
 
-    def registrar_lead_importado(self, *, nome, telefone, origem=None, data_primeiro_contato=None):
+    def registrar_lead_importado(
+        self, *, nome, telefone, origem=None, data_primeiro_contato=None, dados_extras=None,
+    ):
         """
         Cria o lead se o telefone ainda não existir nesta organização (evita
         duplicados). Retorna (lead, criado, motivo) — motivo explica por que
         não criou, quando `criado` é False.
+
+        `dados_extras` são as respostas do formulário/quiz que não têm campo
+        próprio no Lead (idade, orçamento, queixa etc.) — guardadas junto pra
+        aparecer na ficha, sem precisar abrir a planilha de origem.
         """
         nome = (nome or "").strip()
         telefone_normalizado = "".join(ch for ch in (telefone or "") if ch.isdigit())
@@ -417,6 +431,9 @@ class WebhookImportacao(ModeloDaOrganizacao):
             self.total_duplicados += 1
             self.ultimo_recebido_em = timezone.now()
             self.save(update_fields=["total_duplicados", "ultimo_recebido_em"])
+            if dados_extras:
+                ja_existe.dados_formulario = {**ja_existe.dados_formulario, **dados_extras}
+                ja_existe.save(update_fields=["dados_formulario", "atualizado_em"])
             return ja_existe, False, "Já existe um lead com esse telefone."
 
         lead = Lead.objects.create(
@@ -425,6 +442,7 @@ class WebhookImportacao(ModeloDaOrganizacao):
             whatsapp=telefone_normalizado,
             origem=origem or self.origem_padrao,
             entrou_em=data_primeiro_contato or timezone.now(),
+            dados_formulario=dados_extras or {},
         )
         lead.registrar_historico(
             HistoricoLead.Tipo.ENTRADA, "Lead importado automaticamente (Respondi/planilha)", None

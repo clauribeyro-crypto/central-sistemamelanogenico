@@ -29,13 +29,13 @@ class OrganizacaoAdmin(admin.ModelAdmin):
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
-        ("Organização", {"fields": ("organizacao",)}),
+        ("Organização", {"fields": ("organizacao", "papel")}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ("Organização", {"fields": ("organizacao",)}),
+        ("Organização", {"fields": ("organizacao", "papel")}),
     )
-    list_display = ("username", "email", "organizacao", "is_staff", "is_superuser")
-    list_filter = UserAdmin.list_filter + ("organizacao",)
+    list_display = ("username", "email", "organizacao", "papel", "is_staff", "is_superuser")
+    list_filter = UserAdmin.list_filter + ("organizacao", "papel")
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

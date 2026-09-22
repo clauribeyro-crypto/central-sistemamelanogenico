@@ -36,10 +36,13 @@ CAMPOS_CHECKIN = [
 _CAMPOS_ESCALA_CHECKIN = (
     "distensao_abdominal", "plenitude_pos_comer", "dor_desconforto",
     "energia_acordar", "energia_apos_almoco", "energia_fim_dia", "qualidade_sono",
+    "estado_pele", "equilibrio_emocional", "equilibrio_hormonal", "disposicao_geral",
     "melhora_intestino", "melhora_digestao", "melhora_energia", "melhora_sono",
+    "melhora_pele", "melhora_emocional", "melhora_hormonal", "melhora_disposicao",
 )
 _CAMPOS_OBSERVACAO_CHECKIN = (
     "observacao_intestino", "observacao_digestao", "observacao_energia", "observacao_sono",
+    "observacao_pele", "observacao_emocional", "observacao_hormonal", "observacao_disposicao",
 )
 # Lista de seleção em vez de campo numérico — em alguns celulares o teclado
 # numérico do input type="number" trava ou não abre; escolher de uma lista
