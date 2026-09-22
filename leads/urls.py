@@ -12,6 +12,7 @@ urlpatterns = [
     path("social-selling/", views.registrar_social_selling, name="registrar_social_selling"),
     path("webhook/<str:token>/", views.webhook_importar_lead, name="webhook_importar_lead"),
     path("<int:pk>/", views.detalhe, name="detalhe"),
+    path("<int:pk>/editar/", views.editar_lead, name="editar_lead"),
     path("<int:pk>/mover/", views.mover_etapa, name="mover_etapa"),
     path("<int:pk>/responder-rapido/", views.marcar_respondido_rapido, name="marcar_respondido_rapido"),
     path("<int:pk>/mover-agendados/", views.mover_para_agendados, name="mover_para_agendados"),

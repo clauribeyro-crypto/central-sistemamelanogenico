@@ -17,8 +17,9 @@ from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
 from pacientes.models import Paciente
 
 from .forms import (
-    AgendarConsultaForm, EnviarWhatsAppForm, NovoLeadForm, OrigemForm, PausarCadenciaForm,
-    PerderLeadForm, RegistrarLigacaoForm, RegistroSocialSellingForm, ResultadoContatoForm,
+    AgendarConsultaForm, EditarLeadForm, EnviarWhatsAppForm, NovoLeadForm, OrigemForm,
+    PausarCadenciaForm, PerderLeadForm, RegistrarLigacaoForm, RegistroSocialSellingForm,
+    ResultadoContatoForm,
 )
 from .models import HistoricoLead, Lead, MensagemModelo, Origem, RegistroSocialSelling, WebhookImportacao
 
@@ -225,6 +226,23 @@ def mover_para_agendados(request, pk):
     return JsonResponse({"ok": True})
 
 
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+def editar_lead(request, pk):
+    """Editar os dados de contato de um lead (ex.: completar o telefone depois de abordar no Instagram)."""
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    if request.method == "POST":
+        form = EditarLeadForm(request.POST, instance=lead, organizacao=org)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Dados do lead atualizados.")
+            return redirect("leads:detalhe", pk=lead.pk)
+    else:
+        form = EditarLeadForm(instance=lead, organizacao=org)
+    return render(request, "leads/editar.html", {"lead": lead, "form": form})
+
+
 def _rotular_dados_formulario(dados_formulario):
     """Transforma as chaves cruas do formulário (ex.: 'qual_sua_renda') em rótulos legíveis."""
     rotulos = []
@@ -252,16 +270,24 @@ def detalhe(request, pk):
         "form_ligacao": RegistrarLigacaoForm(),
         "form_resultado": ResultadoContatoForm(),
         "mostrar_ligacao": (
-            lead.etapa == Lead.Etapa.CONTATO_1
+            bool(lead.whatsapp or lead.telefone)
+            and lead.etapa == Lead.Etapa.CONTATO_1
             and lead.status in (Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO)
             and lead.tentativas_etapa_atual < 2
         ),
         "numero_ligacao": lead.tentativas_etapa_atual + 1,
         "mostrar_whatsapp": (
+            bool(lead.whatsapp)
+            and lead.status in (Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO)
+            and lead.etapa != Lead.Etapa.NOVO
+            and not (lead.etapa == Lead.Etapa.CONTATO_1 and lead.tentativas_etapa_atual < 2)
+        ),
+        "mostrar_resultado_contato": (
             lead.status in (Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO)
             and lead.etapa != Lead.Etapa.NOVO
             and not (lead.etapa == Lead.Etapa.CONTATO_1 and lead.tentativas_etapa_atual < 2)
         ),
+        "falta_contato": not lead.whatsapp and lead.status in (Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO),
     }
     return render(request, "leads/detalhe.html", contexto)
 

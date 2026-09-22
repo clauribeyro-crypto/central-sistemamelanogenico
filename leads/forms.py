@@ -39,15 +39,33 @@ class RegistroSocialSellingForm(forms.ModelForm):
         }
 
 
-class NovoLeadForm(forms.ModelForm):
+class _LeadContatoFormMixin:
+    """
+    Exige pelo menos um jeito de contato (WhatsApp ou Instagram) — um lead
+    abordado primeiro pelo Instagram pode não ter telefone ainda, mas
+    precisa de algum contato pra não ficar impossível de falar com ele.
+    """
+
+    def clean(self):
+        cleaned = super().clean()
+        if not cleaned.get("whatsapp") and not cleaned.get("instagram"):
+            raise forms.ValidationError("Informe pelo menos o WhatsApp ou o Instagram do lead.")
+        return cleaned
+
+    def clean_estado(self):
+        return self.cleaned_data["estado"].upper()
+
+
+class NovoLeadForm(_LeadContatoFormMixin, forms.ModelForm):
     """Cadastro rápido de lead direto no board do CRM ("+ Novo lead")."""
 
     class Meta:
         model = Lead
-        fields = ["nome", "whatsapp", "telefone", "cidade", "estado", "origem"]
+        fields = ["nome", "whatsapp", "instagram", "telefone", "cidade", "estado", "origem"]
         widgets = {
             "nome": forms.TextInput(attrs={"placeholder": "Nome completo"}),
             "whatsapp": forms.TextInput(attrs={"placeholder": "(11) 91234-5678"}),
+            "instagram": forms.TextInput(attrs={"placeholder": "@usuario"}),
             "telefone": forms.TextInput(attrs={"placeholder": "Opcional"}),
             "cidade": forms.TextInput(attrs={"placeholder": "Ex.: São Paulo"}),
             "estado": forms.TextInput(attrs={"placeholder": "UF", "maxlength": 2}),
@@ -57,8 +75,23 @@ class NovoLeadForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["origem"].queryset = Origem.objects.filter(organizacao=organizacao, ativo=True)
 
-    def clean_estado(self):
-        return self.cleaned_data["estado"].upper()
+
+class EditarLeadForm(_LeadContatoFormMixin, forms.ModelForm):
+    """Editar os dados de contato de um lead já existente (ex.: completar o telefone depois)."""
+
+    class Meta:
+        model = Lead
+        fields = ["nome", "whatsapp", "instagram", "telefone", "cidade", "estado", "origem"]
+        widgets = {
+            "whatsapp": forms.TextInput(attrs={"placeholder": "(11) 91234-5678"}),
+            "instagram": forms.TextInput(attrs={"placeholder": "@usuario"}),
+            "telefone": forms.TextInput(attrs={"placeholder": "Opcional"}),
+            "estado": forms.TextInput(attrs={"maxlength": 2}),
+        }
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["origem"].queryset = Origem.objects.filter(organizacao=organizacao, ativo=True)
 
 
 class PausarCadenciaForm(forms.Form):

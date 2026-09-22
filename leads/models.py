@@ -120,8 +120,15 @@ class Lead(ModeloDaOrganizacao):
         CONCLUIDA = "CONCLUIDA", "Cadência concluída"
 
     nome = models.CharField("nome do paciente", max_length=150)
-    whatsapp = models.CharField(max_length=20)
+    whatsapp = models.CharField(
+        max_length=20, blank=True,
+        help_text="Pode ficar em branco enquanto o único contato é pelo Instagram.",
+    )
     telefone = models.CharField(max_length=20, blank=True)
+    instagram = models.CharField(
+        "usuário do Instagram", max_length=100, blank=True,
+        help_text="@ do Instagram — usado pra abordagem direta por lá, antes de conseguir o telefone.",
+    )
     cidade = models.CharField(max_length=100, blank=True)
     estado = models.CharField(
         "estado (UF)", max_length=2, blank=True,
