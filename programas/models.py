@@ -170,7 +170,10 @@ class Acompanhamento(ModeloDaOrganizacao):
                 i += 1
             if j < len(kits):
                 k = kits[j]
-                etapas.append({"nome": f"Kit {k.numero}", "concluida": k.status == k.Status.ENVIADO})
+                etapas.append({
+                    "nome": f"Kit {k.numero}",
+                    "concluida": k.status in (k.Status.ENVIADO, k.Status.NAO_SE_APLICA),
+                })
                 j += 1
 
         etapas.append({
@@ -242,12 +245,13 @@ class KitPrevisto(models.Model):
     class Status(models.TextChoices):
         PENDENTE = "PENDENTE", "Pendente"
         ENVIADO = "ENVIADO", "Enviado"
+        NAO_SE_APLICA = "NAO_SE_APLICA", "Não se aplica"
 
     acompanhamento = models.ForeignKey(
         Acompanhamento, on_delete=models.CASCADE, related_name="kits_previstos"
     )
     numero = models.PositiveIntegerField()
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDENTE)
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.PENDENTE)
     data_envio = models.DateField(blank=True, null=True)
 
     class Meta:

@@ -21,6 +21,7 @@ urlpatterns = [
     path("acompanhamentos/<int:acompanhamento_pk>/fotos/nova/", views.foto_criar, name="foto_criar"),
     path("fotos/<int:pk>/excluir/", views.foto_excluir, name="foto_excluir"),
     path("kits/<int:pk>/montar/", views.kit_montar, name="kit_montar"),
+    path("kits/<int:pk>/nao-se-aplica/", views.kit_nao_se_aplica, name="kit_nao_se_aplica"),
     path(
         "consultas-previstas/<int:pk>/vincular/",
         views.vincular_consulta_prevista,

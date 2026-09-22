@@ -154,12 +154,18 @@
                     <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:.75rem 0 .25rem;">Produtos</p>
                     <ul class="checklist">
                         {% for k in acompanhamento.kits_previstos.all %}
-                            <li class="{% if k.status == 'ENVIADO' %}feito{% endif %}">
-                                <span class="caixa">{% if k.status == 'ENVIADO' %}✓{% endif %}</span>
+                            <li class="{% if k.status == 'ENVIADO' or k.status == 'NAO_SE_APLICA' %}feito{% endif %}">
+                                <span class="caixa">{% if k.status == 'ENVIADO' or k.status == 'NAO_SE_APLICA' %}✓{% endif %}</span>
                                 {% if k.status == 'ENVIADO' %}
                                     Kit {{ k.numero }} entregue
+                                {% elif k.status == 'NAO_SE_APLICA' %}
+                                    Kit {{ k.numero }} — não se aplica
                                 {% else %}
                                     <a href="{% url 'programas:kit_montar' k.pk %}">Kit {{ k.numero }} — marcar como entregue ›</a>
+                                    <form method="post" action="{% url 'programas:kit_nao_se_aplica' k.pk %}" style="display:inline; margin-left:.4rem;">
+                                        {% csrf_token %}
+                                        <button type="submit" style="color:var(--text-muted); background:none; border:none; padding:0; cursor:pointer; font-size:.78rem; text-decoration:underline;">não se aplica</button>
+                                    </form>
                                 {% endif %}
                             </li>
                         {% endfor %}
@@ -667,6 +673,10 @@
                             <td>
                                 {% if k.status == "PENDENTE" %}
                                     <a href="{% url 'programas:kit_montar' k.pk %}">Montar/Enviar kit ›</a>
+                                    <form method="post" action="{% url 'programas:kit_nao_se_aplica' k.pk %}" style="display:inline; margin-left:.5rem;">
+                                        {% csrf_token %}
+                                        <button type="submit" style="color:var(--text-muted); background:none; border:none; padding:0; cursor:pointer; font-size:.82rem; text-decoration:underline;">Não se aplica</button>
+                                    </form>
                                 {% endif %}
                             </td>
                         </tr>

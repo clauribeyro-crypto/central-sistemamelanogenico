@@ -413,3 +413,25 @@ def kit_montar(request, pk):
     return render(request, "programas/kit_form.html", {
         "paciente": paciente, "kit": kit, "produtos": produtos_disponiveis,
     })
+
+
+@login_required
+@require_POST
+def kit_nao_se_aplica(request, pk):
+    """
+    Marca que esse kit não faz parte do que foi combinado com a paciente
+    (ex.: consulta avulsa, sem produto incluso) — pra parar de aparecer
+    o alerta "Kit N precisa ser enviado" sem precisar montar um kit que
+    não existe.
+    """
+    org = organizacao_do_usuario(request)
+    kit = get_object_or_404(
+        KitPrevisto.objects.select_related("acompanhamento__paciente"),
+        pk=pk, acompanhamento__organizacao=org,
+    )
+    paciente = kit.acompanhamento.paciente
+    if kit.status == KitPrevisto.Status.PENDENTE:
+        kit.status = KitPrevisto.Status.NAO_SE_APLICA
+        kit.save(update_fields=["status"])
+        messages.success(request, f"Kit {kit.numero} marcado como \"não se aplica\" — o alerta some.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=produtos")
