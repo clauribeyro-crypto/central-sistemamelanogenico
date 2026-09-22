@@ -208,10 +208,13 @@ def criar(request):
 def excluir(request, pk):
     """
     Exclui a paciente definitivamente — só quando não há nenhum registro
-    clínico ou financeiro que dependa dela, pra nunca apagar histórico sem
-    querer. Pagamentos pendentes (sem nenhum recebimento) são cancelados
-    junto, já que nada chegou a entrar no caixa por eles; se algum já teve
-    dinheiro recebido, a exclusão é bloqueada.
+    clínico ou financeiro real que dependa dela, pra nunca apagar histórico
+    sem querer. Um acompanhamento/programa iniciado só de teste (sem
+    nenhum dinheiro recebido) é excluído junto, com tudo que ele gerou
+    (consultas previstas, kits, modulação, fotos). Pagamentos pendentes
+    (sem nenhum recebimento) também são cancelados junto, já que nada
+    chegou a entrar no caixa por eles; se algum já teve dinheiro
+    recebido, a exclusão é bloqueada.
     """
     org = organizacao_do_usuario(request)
     if not usuario_e_administrador(request):
@@ -222,8 +225,6 @@ def excluir(request, pk):
     bloqueios = []
     if paciente.consultas.exists():
         bloqueios.append("consultas registradas")
-    if paciente.acompanhamentos.exists():
-        bloqueios.append("um ou mais acompanhamentos/programas")
     if paciente.atendimentos.exists():
         bloqueios.append("atendimentos no prontuário")
     if paciente.registros_evolucao.exists():
@@ -239,19 +240,25 @@ def excluir(request, pk):
         messages.error(
             request,
             f'Não dá pra excluir "{paciente.nome}" — ela já tem {", ".join(bloqueios)}. '
-            'Se for um cadastro duplicado, use "Mesclar com paciente duplicada" na ficha dela.',
+            'Se for um cadastro duplicado (mesma pessoa em duas fichas), use '
+            '"Mesclar com paciente duplicada" na ficha dela.',
         )
         return redirect("pacientes:ficha", pk=paciente.pk)
 
+    tinha_acompanhamento = paciente.acompanhamentos.exists()
+    Acompanhamento.objects.filter(paciente=paciente).delete()
     valor_cancelado = Pagamento.objects.filter(paciente=paciente).aggregate(total=Sum("valor"))["total"] or 0
     Pagamento.objects.filter(paciente=paciente).delete()
     nome = paciente.nome
     paciente.delete()
     if valor_cancelado:
+        extra = " (inclusive o programa/acompanhamento que ela tinha)" if tinha_acompanhamento else ""
         messages.success(
             request,
-            f'"{nome}" foi excluída — e R$ {valor_cancelado:.2f} que estavam pendentes saíram do sistema junto.',
+            f'"{nome}" foi excluída{extra} — e R$ {valor_cancelado:.2f} que estavam pendentes saíram do sistema junto.',
         )
+    elif tinha_acompanhamento:
+        messages.success(request, f'"{nome}" foi excluída, junto com o programa/acompanhamento que ela tinha.')
     else:
         messages.success(request, f'"{nome}" foi excluída.')
     return redirect("pacientes:lista")
