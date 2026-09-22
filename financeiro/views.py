@@ -10,7 +10,9 @@ from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
+from programas.models import Acompanhamento
 
 from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, RecebimentoForm
 from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, Recebimento
@@ -133,6 +135,75 @@ def relatorio(request):
         "por_profissional": por_profissional,
     }
     return render(request, "financeiro/relatorio.html", contexto)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+def relatorio_fechamentos(request):
+    """
+    Relatório do mês pra imprimir: programas/tratamentos fechados (contratos
+    assinados no período) de um lado, consultas cobradas do outro — são
+    duas fontes de faturamento bem diferentes e a Cláudia quer ver cada uma
+    separada, não misturada num total só de "pagamentos".
+    """
+    org = organizacao_do_usuario(request)
+    hoje = datetime.date.today()
+
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+
+    tratamentos = list(
+        Acompanhamento.objects.filter(
+            organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
+        ).select_related("paciente", "programa").order_by("data_inicio")
+    )
+    for t in tratamentos:
+        t.valor_liquido = t.valor_contratado - t.desconto
+        pagamento = t.pagamentos.first()
+        t.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
+    total_tratamentos = sum((t.valor_liquido for t in tratamentos), Decimal("0.00"))
+    total_recebido_tratamentos = sum((t.total_recebido for t in tratamentos), Decimal("0.00"))
+
+    consultas = list(
+        Consulta.objects.filter(
+            organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim, valor__gt=0,
+        ).exclude(status=Consulta.Status.CANCELADA)
+        .select_related("paciente", "tipo_consulta", "profissional").order_by("data_hora")
+    )
+    for c in consultas:
+        pagamento = c.pagamentos.first()
+        c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
+    total_consultas = sum((c.valor for c in consultas), Decimal("0.00"))
+    total_recebido_consultas = sum((c.total_recebido for c in consultas), Decimal("0.00"))
+
+    contexto = {
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+        "tratamentos": tratamentos,
+        "total_tratamentos": total_tratamentos,
+        "total_recebido_tratamentos": total_recebido_tratamentos,
+        "consultas": consultas,
+        "total_consultas": total_consultas,
+        "total_recebido_consultas": total_recebido_consultas,
+        "total_geral": total_tratamentos + total_consultas,
+        "total_recebido_geral": total_recebido_tratamentos + total_recebido_consultas,
+    }
+    return render(request, "financeiro/relatorio_fechamentos.html", contexto)
 
 
 @login_required

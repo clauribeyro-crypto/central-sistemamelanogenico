@@ -4,10 +4,11 @@
     <h1>Controle Financeiro</h1>
 
     <div class="tabs">
-        <a class="{% if aba == 'geral' %}ativo{% endif %}" href="?aba=geral&ano={{ ano }}&mes={{ mes }}">Geral</a>
-        <a class="{% if aba == 'lancamentos' %}ativo{% endif %}" href="?aba=lancamentos&ano={{ ano }}&mes={{ mes }}">Lançamentos</a>
-        <a class="{% if aba == 'resumo_mensal' %}ativo{% endif %}" href="?aba=resumo_mensal&ano={{ ano }}">Resumo Mensal</a>
+        <a class="{% if aba == 'geral' %}ativo{% endif %}" href="?aba=geral&ano={{ ano|stringformat:'d' }}&mes={{ mes }}">Geral</a>
+        <a class="{% if aba == 'lancamentos' %}ativo{% endif %}" href="?aba=lancamentos&ano={{ ano|stringformat:'d' }}&mes={{ mes }}">Lançamentos</a>
+        <a class="{% if aba == 'resumo_mensal' %}ativo{% endif %}" href="?aba=resumo_mensal&ano={{ ano|stringformat:'d' }}">Resumo Mensal</a>
         <a href="{% url 'financeiro:relatorio' %}">Relatório por paciente ›</a>
+        <a href="{% url 'financeiro:relatorio_fechamentos' %}">Tratamentos fechados e consultas ›</a>
     </div>
 
     {% if aba == "lancamentos" %}
@@ -25,7 +26,7 @@
                 <label for="ano">Ano</label>
                 <select id="ano" name="ano">
                     {% for a in anos %}
-                        <option value="{{ a }}" {% if a == ano %}selected{% endif %}>{{ a }}</option>
+                        <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -85,7 +86,7 @@
                 <div style="display:flex; gap:.5rem;">
                     <a class="btn btn-secondary" href="{% url 'financeiro:banco_criar' %}">+ Banco</a>
                     <a class="btn btn-secondary" href="{% url 'financeiro:categoria_criar' %}">+ Categoria</a>
-                    <a class="btn" href="{% url 'financeiro:lancamento_criar' %}?ano={{ ano }}&mes={{ mes }}">+ Lançamento</a>
+                    <a class="btn" href="{% url 'financeiro:lancamento_criar' %}?ano={{ ano|stringformat:'d' }}&mes={{ mes }}">+ Lançamento</a>
                 </div>
             </div>
             <table>
@@ -128,7 +129,7 @@
                 <label for="ano-resumo">Ano</label>
                 <select id="ano-resumo" name="ano" onchange="this.form.submit()">
                     {% for a in anos %}
-                        <option value="{{ a }}" {% if a == ano %}selected{% endif %}>{{ a }}</option>
+                        <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -168,7 +169,7 @@
                 <label for="ano-geral">Ano</label>
                 <select id="ano-geral" name="ano" onchange="this.form.submit()">
                     {% for a in anos %}
-                        <option value="{{ a }}" {% if a == ano %}selected{% endif %}>{{ a }}</option>
+                        <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
                     {% endfor %}
                 </select>
             </div>

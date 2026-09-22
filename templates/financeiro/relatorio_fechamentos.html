@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Relatório de fechamentos · Sistema da Clínica{% endblock %}
+{% block content %}
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+        <h1>Tratamentos fechados e consultas — {{ mes_nome }}/{{ ano|stringformat:'d' }}</h1>
+        <button class="btn no-print" onclick="window.print();">Imprimir / Salvar PDF</button>
+    </div>
+
+    <form class="filtro no-print" method="get">
+        <div>
+            <label for="mes">Mês</label>
+            <select id="mes" name="mes">
+                {% for numero, nome in meses %}
+                    <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ano">Ano</label>
+            <select id="ano" name="ano">
+                {% for a in anos %}
+                    <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <div class="grid">
+        <div class="card stat">
+            <div class="num">R$ {{ total_tratamentos|floatformat:2 }}</div>
+            <div class="rotulo">Tratamentos fechados no mês</div>
+        </div>
+        <div class="card stat">
+            <div class="num">R$ {{ total_consultas|floatformat:2 }}</div>
+            <div class="rotulo">Consultas cobradas no mês</div>
+        </div>
+        <div class="card stat">
+            <div class="num">R$ {{ total_geral|floatformat:2 }}</div>
+            <div class="rotulo">Total fechado no mês</div>
+        </div>
+        <div class="card stat">
+            <div class="num">R$ {{ total_recebido_geral|floatformat:2 }}</div>
+            <div class="rotulo">Já recebido desse total</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Tratamentos/programas fechados no mês</h2>
+        {% if tratamentos %}
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Paciente</th><th>Programa</th><th>Valor</th><th>Recebido</th></tr>
+                </thead>
+                <tbody>
+                {% for t in tratamentos %}
+                    <tr>
+                        <td>{{ t.data_inicio|date:"d/m/Y" }}</td>
+                        <td>{{ t.paciente }}</td>
+                        <td>{{ t.programa }}</td>
+                        <td>R$ {{ t.valor_liquido|floatformat:2 }}</td>
+                        <td>R$ {{ t.total_recebido|floatformat:2 }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhum tratamento fechado nesse mês.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Consultas cobradas no mês</h2>
+        {% if consultas %}
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Paciente</th><th>Tipo</th><th>Profissional</th><th>Valor</th><th>Recebido</th></tr>
+                </thead>
+                <tbody>
+                {% for c in consultas %}
+                    <tr>
+                        <td>{{ c.data_hora|date:"d/m/Y" }}</td>
+                        <td>{{ c.paciente }}</td>
+                        <td>{{ c.tipo_consulta.nome|default:"—" }}</td>
+                        <td>{{ c.profissional.nome|default:"—" }}</td>
+                        <td>R$ {{ c.valor|floatformat:2 }}</td>
+                        <td>R$ {{ c.total_recebido|floatformat:2 }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhuma consulta cobrada nesse mês.</p>
+        {% endif %}
+    </div>
+{% endblock %}

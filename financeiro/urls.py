@@ -13,6 +13,7 @@ urlpatterns = [
     path("bancos/novo/", views.banco_criar, name="banco_criar"),
     path("categorias/nova/", views.categoria_criar, name="categoria_criar"),
     path("relatorio/", views.relatorio, name="relatorio"),
+    path("relatorio/fechamentos/", views.relatorio_fechamentos, name="relatorio_fechamentos"),
     path("pagamentos/<int:pk>/editar/", views.editar_pagamento, name="editar_pagamento"),
     path("pagamentos/<int:pk>/excluir/", views.excluir_pagamento, name="excluir_pagamento"),
 ]
