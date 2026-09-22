@@ -10,4 +10,9 @@ urlpatterns = [
     path("bloquear-rapido/", views.criar_bloqueio_rapido, name="criar_bloqueio_rapido"),
     path("bloqueios/<int:pk>/excluir/", views.excluir_bloqueio, name="excluir_bloqueio"),
     path("consultas/<int:pk>/", views.detalhe_consulta, name="detalhe_consulta"),
+    path(
+        "consultas/<int:pk>/remover-cobranca/",
+        views.consulta_remover_cobranca,
+        name="consulta_remover_cobranca",
+    ),
 ]
