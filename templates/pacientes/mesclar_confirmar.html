@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Confirmar mesclagem · {{ paciente.nome }}{% endblock %}
+{% block content %}
+    <p><a href="{% url 'pacientes:mesclar_selecionar' paciente.pk %}">← Voltar</a></p>
+
+    <div class="card">
+        <h1>Confirmar mesclagem</h1>
+        <p>
+            Tudo que estiver na ficha de <strong>"{{ duplicada.nome }}"</strong> passa pra
+            <strong>"{{ paciente.nome }}"</strong>, e a ficha duplicada é apagada. Essa ação não pode ser desfeita.
+        </p>
+
+        {% if conflito_anamnese %}
+            <p style="color:#8f2e45; font-weight:600;">
+                ⚠️ As duas fichas têm anamnese preenchida — não dá pra mesclar automaticamente.
+                Antes de continuar, decida qual anamnese quer manter e apague/esvazie a outra
+                (edite a anamnese na ficha da paciente que você vai descartar).
+            </p>
+        {% endif %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Vai continuar: {{ paciente.nome }}</th>
+                    <th>Vai ser apagada: {{ duplicada.nome }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Telefone</td><td>{{ paciente.telefone|default:"—" }}</td><td>{{ duplicada.telefone|default:"—" }}</td></tr>
+                <tr><td>E-mail</td><td>{{ paciente.email|default:"—" }}</td><td>{{ duplicada.email|default:"—" }}</td></tr>
+                <tr><td>CPF</td><td>{{ paciente.cpf|default:"—" }}</td><td>{{ duplicada.cpf|default:"—" }}</td></tr>
+                <tr><td>Consultas</td><td>{{ resumo_paciente.consultas }}</td><td>{{ resumo_duplicada.consultas }}</td></tr>
+                <tr><td>Pagamentos</td><td>{{ resumo_paciente.pagamentos }}</td><td>{{ resumo_duplicada.pagamentos }}</td></tr>
+                <tr><td>Acompanhamentos</td><td>{{ resumo_paciente.acompanhamentos }}</td><td>{{ resumo_duplicada.acompanhamentos }}</td></tr>
+                <tr><td>Leads vinculados</td><td>{{ resumo_paciente.leads }}</td><td>{{ resumo_duplicada.leads }}</td></tr>
+                <tr><td>Atendimentos (prontuário)</td><td>{{ resumo_paciente.atendimentos }}</td><td>{{ resumo_duplicada.atendimentos }}</td></tr>
+                <tr><td>Check-ins</td><td>{{ resumo_paciente.checkins }}</td><td>{{ resumo_duplicada.checkins }}</td></tr>
+                <tr><td>Documentos</td><td>{{ resumo_paciente.documentos }}</td><td>{{ resumo_duplicada.documentos }}</td></tr>
+                <tr><td>Anamnese preenchida</td><td>{{ resumo_paciente.tem_anamnese|yesno:"Sim,Não" }}</td><td>{{ resumo_duplicada.tem_anamnese|yesno:"Sim,Não" }}</td></tr>
+            </tbody>
+        </table>
+
+        <p style="font-size:.85rem; color:var(--text-muted); margin-top:1rem;">
+            Qualquer dado de contato que estiver vazio em "{{ paciente.nome }}" (telefone, e-mail, CPF, endereço etc.)
+            é preenchido automaticamente com o que tiver em "{{ duplicada.nome }}", se houver.
+        </p>
+
+        {% if not conflito_anamnese %}
+            <form method="post" style="margin-top:1rem;">
+                {% csrf_token %}
+                <label for="nome_final">Nome final da paciente</label>
+                <input type="text" id="nome_final" name="nome_final" value="{{ paciente.nome }}" style="width:100%; max-width:400px; padding:.5rem; border:1px solid #ddd5ee; border-radius:8px; box-sizing:border-box; margin:.35rem 0 1rem;">
+                <div>
+                    <button class="btn btn-danger" type="submit"
+                            onclick="return confirm('Mesclar \'{{ duplicada.nome|escapejs }}\' em \'{{ paciente.nome|escapejs }}\'? A ficha duplicada será apagada. Essa ação não pode ser desfeita.');">
+                        Confirmar mesclagem
+                    </button>
+                </div>
+            </form>
+        {% endif %}
+    </div>
+{% endblock %}

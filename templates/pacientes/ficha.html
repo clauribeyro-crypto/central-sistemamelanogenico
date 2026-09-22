@@ -18,6 +18,13 @@
                 {% else %}
                     <span class="badge">Sem programa ativo</span>
                 {% endif %}
+                {% if usuario_e_administrador %}
+                    <p style="margin-top:.6rem;">
+                        <a href="{% url 'pacientes:mesclar_selecionar' paciente.pk %}" style="font-size:.85rem;">
+                            🔗 Mesclar com paciente duplicada
+                        </a>
+                    </p>
+                {% endif %}
             </div>
             {% if acompanhamento %}
                 <div style="text-align:right; font-size:.85rem; color:var(--text-muted);">

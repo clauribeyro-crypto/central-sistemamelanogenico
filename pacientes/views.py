@@ -203,6 +203,70 @@ def criar(request):
 
 
 @login_required
+def mesclar_selecionar(request, pk):
+    """Passo 1 de mesclar pacientes duplicadas: escolher qual é a outra ficha."""
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem mesclar pacientes.")
+        return redirect("pacientes:ficha", pk=pk)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    busca = request.GET.get("q", "").strip()
+    candidatas = Paciente.objects.none()
+    if busca:
+        candidatas = Paciente.objects.filter(organizacao=org).exclude(pk=paciente.pk).filter(
+            Q(nome__icontains=busca) | Q(telefone__icontains=busca)
+        ).order_by("nome")
+    return render(request, "pacientes/mesclar_selecionar.html", {
+        "paciente": paciente, "busca": busca, "candidatas": candidatas,
+    })
+
+
+def _resumo_registros_paciente(paciente):
+    return {
+        "consultas": paciente.consultas.count(),
+        "pagamentos": paciente.pagamentos.count(),
+        "leads": paciente.leads.count(),
+        "acompanhamentos": paciente.acompanhamentos.count(),
+        "atendimentos": paciente.atendimentos.count(),
+        "checkins": paciente.registros_evolucao.count(),
+        "documentos": paciente.documentos.count(),
+        "tem_anamnese": hasattr(paciente, "anamnese"),
+    }
+
+
+@login_required
+def mesclar_confirmar(request, pk, duplicada_pk):
+    """Passo 2 de mesclar pacientes duplicadas: preview lado a lado e confirmação."""
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem mesclar pacientes.")
+        return redirect("pacientes:ficha", pk=pk)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    duplicada = get_object_or_404(Paciente, pk=duplicada_pk, organizacao=org)
+
+    if request.method == "POST":
+        nome_final = request.POST.get("nome_final", "").strip() or paciente.nome
+        try:
+            Paciente.mesclar(paciente, duplicada, nome_final=nome_final)
+        except ValueError as erro:
+            messages.error(request, str(erro))
+            return redirect("pacientes:mesclar_confirmar", pk=paciente.pk, duplicada_pk=duplicada.pk)
+        messages.success(
+            request,
+            f'"{duplicada.nome}" foi mesclada em "{nome_final}" — tudo junto numa ficha só agora.',
+        )
+        return redirect("pacientes:ficha", pk=paciente.pk)
+
+    return render(request, "pacientes/mesclar_confirmar.html", {
+        "paciente": paciente,
+        "duplicada": duplicada,
+        "resumo_paciente": _resumo_registros_paciente(paciente),
+        "resumo_duplicada": _resumo_registros_paciente(duplicada),
+        "conflito_anamnese": hasattr(paciente, "anamnese") and hasattr(duplicada, "anamnese"),
+    })
+
+
+@login_required
 def ficha(request, pk):
     org = organizacao_do_usuario(request)
     paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
