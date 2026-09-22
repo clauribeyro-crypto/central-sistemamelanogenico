@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.lista, name="lista"),
     path("nova/", views.criar, name="criar"),
     path("<int:pk>/", views.ficha, name="ficha"),
+    path("<int:pk>/excluir/", views.excluir, name="excluir"),
     path("<int:pk>/mesclar/", views.mesclar_selecionar, name="mesclar_selecionar"),
     path("<int:pk>/mesclar/<int:duplicada_pk>/", views.mesclar_confirmar, name="mesclar_confirmar"),
     path("<int:pk>/iniciar-protocolo/", views.iniciar_protocolo, name="iniciar_protocolo"),

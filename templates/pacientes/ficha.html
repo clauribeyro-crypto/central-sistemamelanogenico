@@ -19,10 +19,15 @@
                     <span class="badge">Sem programa ativo</span>
                 {% endif %}
                 {% if usuario_e_administrador %}
-                    <p style="margin-top:.6rem;">
+                    <p style="margin-top:.6rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
                         <a href="{% url 'pacientes:mesclar_selecionar' paciente.pk %}" style="font-size:.85rem;">
                             🔗 Mesclar com paciente duplicada
                         </a>
+                        <form method="post" action="{% url 'pacientes:excluir' paciente.pk %}"
+                              onsubmit="return confirm('Excluir \'{{ paciente.nome|escapejs }}\'? Só funciona se ela não tiver consultas, pagamentos recebidos, anamnese ou outros registros — essa ação não pode ser desfeita.');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger" style="padding:.2rem .6rem; font-size:.8rem;" type="submit">🗑️ Excluir paciente</button>
+                        </form>
                     </p>
                 {% endif %}
             </div>

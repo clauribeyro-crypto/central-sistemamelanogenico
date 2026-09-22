@@ -177,6 +177,7 @@ def lista(request):
     form_rapido = PacienteRapidoForm(initial={"nome": busca} if busca and not pacientes else None)
     return render(request, "pacientes/lista.html", {
         "pacientes": pacientes, "busca": busca, "form_rapido": form_rapido,
+        "usuario_e_administrador": usuario_e_administrador(request),
     })
 
 
@@ -199,6 +200,60 @@ def criar(request):
         return render(request, "pacientes/lista.html", {
             "pacientes": pacientes, "busca": busca, "form_rapido": form_rapido,
         })
+    return redirect("pacientes:lista")
+
+
+@login_required
+@require_POST
+def excluir(request, pk):
+    """
+    Exclui a paciente definitivamente — só quando não há nenhum registro
+    clínico ou financeiro que dependa dela, pra nunca apagar histórico sem
+    querer. Pagamentos pendentes (sem nenhum recebimento) são cancelados
+    junto, já que nada chegou a entrar no caixa por eles; se algum já teve
+    dinheiro recebido, a exclusão é bloqueada.
+    """
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem excluir pacientes.")
+        return redirect("pacientes:ficha", pk=pk)
+    paciente = get_object_or_404(Paciente, organizacao=org, pk=pk)
+
+    bloqueios = []
+    if paciente.consultas.exists():
+        bloqueios.append("consultas registradas")
+    if paciente.acompanhamentos.exists():
+        bloqueios.append("um ou mais acompanhamentos/programas")
+    if paciente.atendimentos.exists():
+        bloqueios.append("atendimentos no prontuário")
+    if paciente.registros_evolucao.exists():
+        bloqueios.append("check-ins de evolução")
+    if paciente.documentos.exists():
+        bloqueios.append("exames/documentos anexados")
+    if hasattr(paciente, "anamnese"):
+        bloqueios.append("anamnese preenchida")
+    if Recebimento.objects.filter(pagamento__paciente=paciente).exists():
+        bloqueios.append("pagamentos com dinheiro já recebido")
+
+    if bloqueios:
+        messages.error(
+            request,
+            f'Não dá pra excluir "{paciente.nome}" — ela já tem {", ".join(bloqueios)}. '
+            'Se for um cadastro duplicado, use "Mesclar com paciente duplicada" na ficha dela.',
+        )
+        return redirect("pacientes:ficha", pk=paciente.pk)
+
+    valor_cancelado = Pagamento.objects.filter(paciente=paciente).aggregate(total=Sum("valor"))["total"] or 0
+    Pagamento.objects.filter(paciente=paciente).delete()
+    nome = paciente.nome
+    paciente.delete()
+    if valor_cancelado:
+        messages.success(
+            request,
+            f'"{nome}" foi excluída — e R$ {valor_cancelado:.2f} que estavam pendentes saíram do sistema junto.',
+        )
+    else:
+        messages.success(request, f'"{nome}" foi excluída.')
     return redirect("pacientes:lista")
 
 
