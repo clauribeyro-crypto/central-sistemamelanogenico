@@ -62,7 +62,17 @@
                         <td>{{ t.programa }}</td>
                         <td>R$ {{ t.valor_liquido|floatformat:2 }}</td>
                         <td>R$ {{ t.total_recebido|floatformat:2 }}</td>
-                        <td class="no-print"><a href="{% url 'programas:acompanhamento_editar' t.pk %}?next={{ request.get_full_path|urlencode }}">Editar ›</a></td>
+                        <td class="no-print" style="white-space:nowrap;">
+                            <a href="{% url 'programas:acompanhamento_editar' t.pk %}?next={{ request.get_full_path|urlencode }}">Editar ›</a>
+                            {% if usuario_e_administrador %}
+                                <form method="post" action="{% url 'programas:acompanhamento_excluir' t.pk %}" style="display:inline;"
+                                      onsubmit="return confirm('Excluir o tratamento de {{ t.paciente }} ({{ t.programa }}, R$ {{ t.valor_liquido|floatformat:2 }})? Essa ação não pode ser desfeita.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0; margin-left:.5rem; text-decoration:underline; font-size:.85rem;">Excluir</button>
+                                </form>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% endfor %}
                 </tbody>

@@ -198,6 +198,7 @@ def relatorio_fechamentos(request):
         "mes_nome": dict(MESES)[mes],
         "meses": MESES,
         "anos": range(hoje.year - 3, hoje.year + 2),
+        "usuario_e_administrador": usuario_e_administrador(request),
         "tratamentos": tratamentos,
         "qtd_tratamentos": len(tratamentos),
         "total_tratamentos": total_tratamentos,

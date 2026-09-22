@@ -16,6 +16,7 @@ urlpatterns = [
         name="mudar_status_acompanhamento",
     ),
     path("acompanhamentos/<int:pk>/editar/", views.acompanhamento_editar, name="acompanhamento_editar"),
+    path("acompanhamentos/<int:pk>/excluir/", views.acompanhamento_excluir, name="acompanhamento_excluir"),
     path("fases/<int:pk>/", views.fase_detalhe, name="fase_detalhe"),
     path("acompanhamentos/<int:acompanhamento_pk>/feedbacks/novo/", views.feedback_criar, name="feedback_criar"),
     path("feedbacks/<int:pk>/editar/", views.feedback_editar, name="feedback_editar"),

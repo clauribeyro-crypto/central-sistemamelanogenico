@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -199,6 +200,46 @@ def acompanhamento_editar(request, pk):
 
     contexto = {"form": form, "acompanhamento": acompanhamento, "next": proximo}
     return render(request, "programas/acompanhamento_form.html", contexto)
+
+
+@login_required
+@require_POST
+def acompanhamento_excluir(request, pk):
+    """
+    Exclui um tratamento fechado por engano — ex.: "Iniciar protocolo"
+    clicado duas vezes, deixando um programa vazio duplicado. Só permite
+    quando não tem dinheiro recebido nele, mesmo motivo do "Remover
+    cobrança" das consultas: nunca apagar valor que já entrou sem uma ação
+    separada e explícita. Some junto o(s) pagamento(s) vinculados (o
+    acompanhamento em si não os apaga sozinho — a FK é SET_NULL).
+    """
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem excluir tratamentos.")
+        return redirect("pacientes:lista")
+    acompanhamento = get_object_or_404(
+        Acompanhamento.objects.select_related("paciente"), pk=pk, organizacao=org
+    )
+    proximo = request.POST.get("next") or ""
+    paciente_pk = acompanhamento.paciente.pk
+
+    pagamentos = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO)
+    total_recebido = sum((p.total_recebido for p in pagamentos), Decimal("0.00"))
+    if total_recebido > 0:
+        messages.error(
+            request,
+            f'O tratamento de {acompanhamento.paciente} já tem R$ {total_recebido:.2f} recebido — '
+            'exclua o(s) recebimento(s) em "Gerenciar" antes de excluir o tratamento.',
+        )
+    else:
+        nome = str(acompanhamento.paciente)
+        pagamentos.delete()
+        acompanhamento.delete()
+        messages.success(request, f"Tratamento de {nome} excluído.")
+
+    if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        return redirect(proximo)
+    return redirect("pacientes:ficha", pk=paciente_pk)
 
 
 @login_required
