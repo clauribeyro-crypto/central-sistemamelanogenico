@@ -2,7 +2,7 @@ from django import forms
 
 from agenda.models import TipoConsulta
 
-from .models import Feedback, FaseModulacao, FotoEvolucao, Programa
+from .models import Acompanhamento, Feedback, FaseModulacao, FotoEvolucao, Programa
 
 
 class TipoConsultaForm(forms.ModelForm):
@@ -29,6 +29,27 @@ class ProgramaForm(forms.ModelForm):
         widgets = {
             "nome": forms.TextInput(attrs={"placeholder": "Ex.: Programa de 3 meses"}),
         }
+
+
+class AcompanhamentoForm(forms.ModelForm):
+    data_inicio = forms.DateField(
+        label="Data de início", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+    )
+
+    class Meta:
+        model = Acompanhamento
+        # programa fica de fora: trocar de plano não regenera as consultas/kits
+        # já criados (ver Acompanhamento.iniciar), então mudar aqui deixaria o
+        # checklist do programa dessincronizado. status também fica de fora —
+        # tem fluxo próprio (ver mudar_status_acompanhamento).
+        fields = ["data_inicio", "valor_contratado", "desconto", "forma_pagamento", "observacoes"]
+        widgets = {
+            "observacoes": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["data_inicio"].input_formats = ["%Y-%m-%d"]
 
 
 class PlanoFaseForm(forms.ModelForm):

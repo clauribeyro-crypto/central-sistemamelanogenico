@@ -50,7 +50,7 @@
         {% if tratamentos %}
             <table>
                 <thead>
-                    <tr><th>Data</th><th>Paciente</th><th>Programa</th><th>Valor</th><th>Recebido</th></tr>
+                    <tr><th>Data</th><th>Paciente</th><th>Programa</th><th>Valor</th><th>Recebido</th><th class="no-print"></th></tr>
                 </thead>
                 <tbody>
                 {% for t in tratamentos %}
@@ -60,6 +60,7 @@
                         <td>{{ t.programa }}</td>
                         <td>R$ {{ t.valor_liquido|floatformat:2 }}</td>
                         <td>R$ {{ t.total_recebido|floatformat:2 }}</td>
+                        <td class="no-print"><a href="{% url 'programas:acompanhamento_editar' t.pk %}?next={{ request.get_full_path|urlencode }}">Editar ›</a></td>
                     </tr>
                 {% endfor %}
                 </tbody>

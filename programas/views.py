@@ -5,13 +5,16 @@ from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta, TipoConsulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Produto, Recompra
+from financeiro.models import Pagamento
 
 from .forms import (
+    AcompanhamentoForm,
     AvaliacaoFaseForm,
     FeedbackForm,
     FotoEvolucaoForm,
@@ -146,6 +149,50 @@ def mudar_status_acompanhamento(request, pk):
     if acao in ("renovar", "migrar"):
         return redirect("pacientes:iniciar_protocolo", pk=acompanhamento.paciente.pk)
     return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+def acompanhamento_editar(request, pk):
+    """
+    Corrige valor/desconto/forma de pagamento/data de início de um
+    tratamento já fechado — pra quando o lançamento foi feito errado (ex.:
+    valor digitado errado). Programa e status ficam de fora (ver
+    AcompanhamentoForm) — pra isso existem os fluxos próprios.
+    """
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem editar tratamentos fechados.")
+        return redirect("pacientes:lista")
+    acompanhamento = get_object_or_404(
+        Acompanhamento.objects.select_related("paciente", "programa"), pk=pk, organizacao=org
+    )
+    proximo = request.GET.get("next") or request.POST.get("next") or ""
+
+    if request.method == "POST":
+        form = AcompanhamentoForm(request.POST, instance=acompanhamento)
+        if form.is_valid():
+            acompanhamento = form.save(commit=False)
+            acompanhamento.data_termino_prevista = acompanhamento.data_inicio + datetime.timedelta(
+                days=30 * acompanhamento.programa.duracao_meses
+            )
+            acompanhamento.save()
+
+            pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
+            if pagamento:
+                pagamento.valor = acompanhamento.valor_contratado - acompanhamento.desconto
+                pagamento.save(update_fields=["valor", "atualizado_em"])
+                pagamento.recalcular_status()
+
+            messages.success(request, "Tratamento atualizado.")
+            if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+                return redirect(proximo)
+            return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)
+    else:
+        form = AcompanhamentoForm(instance=acompanhamento)
+
+    contexto = {"form": form, "acompanhamento": acompanhamento, "next": proximo}
+    return render(request, "programas/acompanhamento_form.html", contexto)
 
 
 @login_required

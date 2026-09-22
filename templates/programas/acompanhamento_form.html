@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Editar tratamento · Sistema da Clínica{% endblock %}
+{% block content %}
+    {% if next %}
+        <p><a href="{{ next }}">← Voltar</a></p>
+    {% endif %}
+    <div class="card">
+        <h1>Editar tratamento — {{ acompanhamento.paciente }}</h1>
+        <p style="color:var(--text-muted); font-size:.85rem;">
+            Programa: {{ acompanhamento.programa }} · pra trocar de programa ou de status, use as ações na ficha da paciente.
+        </p>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Salvar alterações</button>
+        </form>
+    </div>
+{% endblock %}
