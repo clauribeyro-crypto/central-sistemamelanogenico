@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from contas.utils import organizacao_do_usuario
@@ -385,3 +386,40 @@ def detalhe_consulta(request, pk):
         "next": "",
     }
     return render(request, "agenda/detalhe_consulta.html", contexto)
+
+
+@login_required
+@require_POST
+def consulta_remover_cobranca(request, pk):
+    """
+    Tira a cobrança automática de uma consulta que não devia ter valor
+    próprio — o caso mais comum é a consulta de diagnóstico que já vira um
+    programa fechado, com o mesmo valor do programa duplicado por engano
+    (a receita já está contada no tratamento, não deveria contar de novo
+    aqui). Zera o valor da consulta, o que já cancela sozinho o lançamento
+    pendente vinculado (ver sincronizar_receita_prevista); se já tiver
+    dinheiro recebido nela, não mexe — pede pra tirar o recebimento
+    primeiro em Gerenciar, pra nunca apagar um valor que já entrou sem
+    confirmação explícita.
+    """
+    org = organizacao_do_usuario(request)
+    consulta = get_object_or_404(Consulta.objects.select_related("paciente"), pk=pk, organizacao=org)
+    proximo = request.POST.get("next") or ""
+
+    pagamento = Pagamento.objects.filter(consulta=consulta, organizacao=org).exclude(
+        status=Pagamento.Status.CANCELADO
+    ).first()
+    if pagamento and pagamento.total_recebido > 0:
+        messages.error(
+            request,
+            f'Essa consulta de {consulta.paciente} já tem R$ {pagamento.total_recebido:.2f} recebido — '
+            'exclua o(s) recebimento(s) em "Gerenciar" antes de remover a cobrança.',
+        )
+    else:
+        consulta.valor = None
+        consulta.save(update_fields=["valor", "atualizado_em"])
+        messages.success(request, f"Cobrança removida da consulta de {consulta.paciente}.")
+
+    if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        return redirect(proximo)
+    return redirect("agenda:detalhe_consulta", pk=consulta.pk)
