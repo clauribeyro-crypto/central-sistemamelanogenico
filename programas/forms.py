@@ -23,7 +23,7 @@ class ProgramaForm(forms.ModelForm):
         model = Programa
         fields = [
             "nome", "duracao_meses", "valor", "valor_a_vista", "parcelamento_max",
-            "qtd_consultas", "qtd_modulacoes", "qtd_kits",
+            "qtd_consultas", "intervalo_dias_consultas", "qtd_modulacoes", "qtd_kits",
             "produtos_incluidos", "horario_suporte", "ativo",
         ]
         widgets = {
