@@ -189,6 +189,12 @@ def acompanhamento_editar(request, pk):
                 return redirect(proximo)
             return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)
     else:
+        # Se o valor do pagamento foi corrigido direto no Financeiro (sem
+        # passar por essa tela), reconcilia aqui antes de mostrar o
+        # formulário — senão reabriria mostrando o valor antigo de novo.
+        pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
+        if pagamento and pagamento.valor != acompanhamento.valor_contratado - acompanhamento.desconto:
+            acompanhamento.valor_contratado = pagamento.valor + acompanhamento.desconto
         form = AcompanhamentoForm(instance=acompanhamento)
 
     contexto = {"form": form, "acompanhamento": acompanhamento, "next": proximo}

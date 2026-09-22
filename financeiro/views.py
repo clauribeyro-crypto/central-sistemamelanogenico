@@ -170,8 +170,12 @@ def relatorio_fechamentos(request):
         ).select_related("paciente", "programa").order_by("data_inicio")
     )
     for t in tratamentos:
-        t.valor_liquido = t.valor_contratado - t.desconto
-        pagamento = t.pagamentos.first()
+        # O valor de verdade é o do pagamento vinculado — é ele que pode ter
+        # sido corrigido direto no Financeiro (Relatório por paciente ›
+        # Gerenciar), sem passar pela edição do tratamento. valor_contratado
+        # só entra como reserva se por algum motivo não existir pagamento.
+        pagamento = t.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
+        t.valor_liquido = pagamento.valor if pagamento else (t.valor_contratado - t.desconto)
         t.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
     total_tratamentos = sum((t.valor_liquido for t in tratamentos), Decimal("0.00"))
     total_recebido_tratamentos = sum((t.total_recebido for t in tratamentos), Decimal("0.00"))
@@ -228,7 +232,7 @@ def editar_pagamento(request, pk):
                 return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
 
         elif acao == "adicionar_recebimento":
-            recebimento_form = RecebimentoForm(request.POST, pagamento=pagamento)
+            recebimento_form = RecebimentoForm(request.POST, pagamento=pagamento, prefix="recebimento")
             if recebimento_form.is_valid():
                 recebimento = recebimento_form.save(commit=False)
                 recebimento.organizacao = org
@@ -248,7 +252,7 @@ def editar_pagamento(request, pk):
     if form is None:
         form = PagamentoForm(instance=pagamento)
     if recebimento_form is None:
-        recebimento_form = RecebimentoForm(pagamento=pagamento)
+        recebimento_form = RecebimentoForm(pagamento=pagamento, prefix="recebimento")
 
     contexto = {
         "form": form,
