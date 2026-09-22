@@ -28,12 +28,14 @@
 
     <div class="grid">
         <div class="card stat">
-            <div class="num">R$ {{ total_tratamentos|floatformat:2 }}</div>
+            <div class="num">{{ qtd_tratamentos }}</div>
             <div class="rotulo">Tratamentos fechados no mês</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">R$ {{ total_tratamentos|floatformat:2 }}</div>
         </div>
         <div class="card stat">
-            <div class="num">R$ {{ total_consultas|floatformat:2 }}</div>
+            <div class="num">{{ qtd_consultas }}</div>
             <div class="rotulo">Consultas cobradas no mês</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">R$ {{ total_consultas|floatformat:2 }}</div>
         </div>
         <div class="card stat">
             <div class="num">R$ {{ total_geral|floatformat:2 }}</div>
@@ -46,7 +48,7 @@
     </div>
 
     <div class="card">
-        <h2>Tratamentos/programas fechados no mês</h2>
+        <h2>Tratamentos/programas fechados no mês ({{ qtd_tratamentos }})</h2>
         {% if tratamentos %}
             <table>
                 <thead>
@@ -71,7 +73,7 @@
     </div>
 
     <div class="card">
-        <h2>Consultas cobradas no mês</h2>
+        <h2>Consultas cobradas no mês ({{ qtd_consultas }})</h2>
         {% if consultas %}
             <table>
                 <thead>
