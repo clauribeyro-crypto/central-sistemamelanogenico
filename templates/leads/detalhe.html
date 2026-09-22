@@ -11,11 +11,19 @@
             <span class="badge">Origem: {{ lead.origem }}</span>
         </p>
         <p>
-            📱 WhatsApp: <strong>{{ lead.whatsapp }}</strong>
-            {% if lead.telefone %} · ☎️ {{ lead.telefone }}{% endif %}
+            {% if lead.whatsapp %}📱 WhatsApp: <strong>{{ lead.whatsapp }}</strong>{% endif %}
+            {% if lead.telefone %}{% if lead.whatsapp %} · {% endif %}☎️ {{ lead.telefone }}{% endif %}
+            {% if lead.instagram %}{% if lead.whatsapp or lead.telefone %} · {% endif %}📷 Instagram: <strong>{{ lead.instagram }}</strong>{% endif %}
         </p>
+        {% if falta_contato %}
+            <p style="color:#92400e; font-size:.85rem;">
+                ⚠️ Ainda sem telefone — abordagem só pelo Instagram por enquanto.
+                <a href="{% url 'leads:editar_lead' lead.pk %}">Completar o telefone</a> assim que conseguir.
+            </p>
+        {% endif %}
         <p>Responsável: {{ lead.responsavel|default:"—" }} · Entrou em {{ lead.entrou_em|date:"d/m/Y H:i" }}</p>
         {% if lead.observacoes %}<p><em>{{ lead.observacoes }}</em></p>{% endif %}
+        <p><a href="{% url 'leads:editar_lead' lead.pk %}">✏️ Editar dados</a></p>
         {% if lead.paciente %}
             <p>✅ Vinculado ao paciente <strong>{{ lead.paciente }}</strong></p>
             <p>
@@ -80,7 +88,14 @@
                 <p>Prepara a mensagem, você pode editar antes de enviar.</p>
                 <a class="btn" href="{% url 'leads:enviar_whatsapp' lead.pk %}">Preparar mensagem no WhatsApp</a>
             </div>
+        {% elif falta_contato %}
+            <div class="card">
+                <h2>Chamar no Instagram ({{ lead.get_etapa_display }})</h2>
+                <p>Ainda sem telefone — chame <strong>{{ lead.instagram }}</strong> direto pelo Instagram e registre o resultado abaixo.</p>
+            </div>
+        {% endif %}
 
+        {% if mostrar_resultado_contato %}
             <div class="card">
                 <h2>Resultado do contato</h2>
                 <form method="post" action="{% url 'leads:resultado_contato' lead.pk %}" class="acao">
