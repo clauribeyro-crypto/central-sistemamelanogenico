@@ -294,19 +294,6 @@ def painel(request):
 
         saldo_hoje = _saldo_ate(org, hoje)
 
-        previstos = Lancamento.objects.filter(organizacao=org, status=Lancamento.Status.PREVISTO)
-        previsto_receitas = previstos.filter(
-            categoria__grupo__in=CategoriaFinanceira.GRUPOS_RECEITA
-        ).aggregate(t=Sum("valor"))["t"] or Decimal("0.00")
-        previsto_despesas = previstos.exclude(
-            categoria__grupo__in=CategoriaFinanceira.GRUPOS_RECEITA
-        ).aggregate(t=Sum("valor"))["t"] or Decimal("0.00")
-        saldo_pendente_pacientes = sum(
-            (p.saldo_pendente for p in Pagamento.objects.filter(organizacao=org).exclude(status=Pagamento.Status.CANCELADO)),
-            Decimal("0.00"),
-        )
-        saldo_futuro_previsto = saldo_hoje + previsto_receitas - previsto_despesas + saldo_pendente_pacientes
-
         grafico = []
         maior_valor = Decimal("0.01")
         for numero_mes, nome_mes in MESES:
@@ -327,7 +314,6 @@ def painel(request):
             "despesas_mes": totais_mes["despesas"],
             "resultado_mes": totais_mes["resultado"],
             "saldo_hoje": saldo_hoje,
-            "saldo_futuro_previsto": saldo_futuro_previsto,
             "grafico": grafico,
             "saldo_inicial_financeiro": org.saldo_inicial_financeiro,
         })
