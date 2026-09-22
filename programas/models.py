@@ -21,6 +21,10 @@ class Programa(ModeloDaOrganizacao):
     parcelamento_max = models.PositiveIntegerField(default=12)
 
     qtd_consultas = models.PositiveIntegerField(default=1)
+    intervalo_dias_consultas = models.PositiveIntegerField(
+        default=60,
+        help_text="Quantos dias esperar, depois da consulta anterior, antes de alertar que é hora de agendar a próxima.",
+    )
     qtd_modulacoes = models.PositiveIntegerField(default=1)
     qtd_kits = models.PositiveIntegerField(default=1)
 
@@ -196,7 +200,24 @@ class Acompanhamento(ModeloDaOrganizacao):
             status=ConsultaPrevista.Status.PENDENTE_AGENDAMENTO
         ).order_by("numero").first()
         if primeira_consulta_pendente:
-            alertas.append(f"Consulta {primeira_consulta_pendente.numero} precisa ser agendada.")
+            pode_alertar = True
+            if primeira_consulta_pendente.numero > 1:
+                # Só cobra o agendamento da próxima consulta depois que o
+                # intervalo configurado no plano (ex.: 2 meses) passou desde
+                # a consulta anterior — antes disso a paciente ainda está
+                # dentro do período de acompanhamento da consulta passada.
+                anterior = self.consultas_previstas.filter(
+                    numero=primeira_consulta_pendente.numero - 1
+                ).first()
+                if anterior and anterior.consulta:
+                    data_liberacao = anterior.consulta.data_hora.date() + datetime.timedelta(
+                        days=self.programa.intervalo_dias_consultas
+                    )
+                    pode_alertar = timezone.localdate() >= data_liberacao
+                else:
+                    pode_alertar = False
+            if pode_alertar:
+                alertas.append(f"Consulta {primeira_consulta_pendente.numero} precisa ser agendada.")
 
         consultas_realizadas = self.consultas_previstas.filter(
             status=ConsultaPrevista.Status.REALIZADA
