@@ -18,9 +18,9 @@ from pacientes.models import Paciente
 
 from .forms import (
     AgendarConsultaForm, EnviarWhatsAppForm, NovoLeadForm, OrigemForm, PausarCadenciaForm,
-    PerderLeadForm, RegistrarLigacaoForm, ResultadoContatoForm,
+    PerderLeadForm, RegistrarLigacaoForm, RegistroSocialSellingForm, ResultadoContatoForm,
 )
-from .models import HistoricoLead, Lead, MensagemModelo, Origem, WebhookImportacao
+from .models import HistoricoLead, Lead, MensagemModelo, Origem, RegistroSocialSelling, WebhookImportacao
 
 MENSAGENS_PADRAO = {
     MensagemModelo.Etapa.CONTATO_1: (
@@ -162,6 +162,24 @@ def criar_lead(request):
 
     html = render_to_string("leads/_lead_card.html", {"lead": lead}, request=request)
     return JsonResponse({"ok": True, "html": html, "etapa": lead.etapa})
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+@require_POST
+def registrar_social_selling(request):
+    """Salva (ou atualiza) o registro de social selling de hoje da pessoa logada."""
+    org = organizacao_do_usuario(request)
+    registro, _ = RegistroSocialSelling.objects.get_or_create(
+        organizacao=org, usuario=request.user, data=timezone.localdate(),
+    )
+    form = RegistroSocialSellingForm(request.POST, instance=registro)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Números de hoje atualizados.")
+    else:
+        messages.error(request, "Não deu pra salvar — confira os números.")
+    return redirect("core:home")
 
 
 @login_required

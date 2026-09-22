@@ -1,7 +1,7 @@
 import datetime
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count
+from django.db.models import Count, Sum
 from django.shortcuts import render
 from django.utils import timezone
 
@@ -9,7 +9,8 @@ from agenda.models import Consulta
 from contas.models import Usuario
 from contas.utils import organizacao_do_usuario
 from financeiro.models import Pagamento
-from leads.models import HistoricoLead, Lead
+from leads.forms import RegistroSocialSellingForm
+from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from programas.models import Acompanhamento
 
 BADGE_POR_ETAPA = {
@@ -128,6 +129,30 @@ def home(request):
             "comissao_agendamentos": comissao_agendamentos,
             "total_mes": request.user.comissao_fixo_mensal + comissao_agendamentos,
         }
+        registro_hoje = RegistroSocialSelling.objects.filter(
+            organizacao=org, usuario=request.user, data=hoje,
+        ).first()
+        contexto["form_social_selling"] = RegistroSocialSellingForm(instance=registro_hoje)
+    else:
+        campos_social = ["seguidores_novos", "pessoas_chamadas", "pessoas_responderam", "contatos_conseguidos"]
+        registros_hoje = {
+            r.usuario_id: r for r in RegistroSocialSelling.objects.filter(organizacao=org, data=hoje)
+        }
+        totais_mes = {
+            r["usuario_id"]: r for r in RegistroSocialSelling.objects.filter(
+                organizacao=org, data__year=hoje.year, data__month=hoje.month,
+            ).values("usuario_id").annotate(**{campo: Sum(campo) for campo in campos_social})
+        }
+        equipe_social = [
+            {
+                "usuario": sdr,
+                "hoje": registros_hoje.get(sdr.pk),
+                "mes": totais_mes.get(sdr.pk),
+            }
+            for sdr in Usuario.objects.filter(organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True)
+        ]
+        if equipe_social:
+            contexto["equipe_social_selling"] = equipe_social
 
     return render(request, "core/home.html", contexto)
 
