@@ -1,7 +1,12 @@
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from contas.models import ModeloDaOrganizacao
+
+CAMPOS_MESCLAVEIS = [
+    "cpf", "data_nascimento", "sexo", "telefone", "email",
+    "endereco", "cidade", "profissao", "historico_saude", "observacoes",
+]
 
 
 class Paciente(ModeloDaOrganizacao):
@@ -72,6 +77,62 @@ class Paciente(ModeloDaOrganizacao):
         return self.acompanhamentos.filter(
             status__in=Acompanhamento.STATUS_ATIVOS
         ).order_by("-data_inicio").first()
+
+    @classmethod
+    def mesclar(cls, sobrevivente, duplicada, *, nome_final=None):
+        """
+        Junta os registros de `duplicada` (cadastro repetido por engano) em
+        `sobrevivente` — consultas, pagamentos, leads, prontuário, anamnese
+        (quando só uma das duas tem) — e apaga a duplicada. Levanta ValueError
+        se as duas tiverem anamnese preenchida: nesse caso é preciso decidir
+        manualmente qual anamnese manter antes de mesclar.
+        """
+        from agenda.models import Consulta
+        from estoque.models import Recompra
+        from financeiro.models import Pagamento
+        from leads.models import Lead
+        from programas.models import Acompanhamento
+        from prontuarios.models import Anamnese, Atendimento, Documento, RegistroEvolucao
+
+        if sobrevivente.pk == duplicada.pk:
+            raise ValueError("Não dá pra mesclar uma paciente com ela mesma.")
+        if sobrevivente.organizacao_id != duplicada.organizacao_id:
+            raise ValueError("As duas pacientes precisam ser da mesma organização.")
+
+        tem_anamnese_sobrevivente = Anamnese.objects.filter(paciente=sobrevivente).exists()
+        tem_anamnese_duplicada = Anamnese.objects.filter(paciente=duplicada).exists()
+        if tem_anamnese_sobrevivente and tem_anamnese_duplicada:
+            raise ValueError(
+                "As duas pacientes têm anamnese preenchida — decida qual manter "
+                "antes de mesclar (edite ou apague uma delas na ficha da paciente)."
+            )
+
+        with transaction.atomic():
+            Consulta.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            Pagamento.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            Lead.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            Acompanhamento.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            Atendimento.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            RegistroEvolucao.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            Documento.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            Recompra.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+            if tem_anamnese_duplicada and not tem_anamnese_sobrevivente:
+                Anamnese.objects.filter(paciente=duplicada).update(paciente=sobrevivente)
+
+            campos_atualizados = []
+            for campo in CAMPOS_MESCLAVEIS:
+                if not getattr(sobrevivente, campo) and getattr(duplicada, campo):
+                    setattr(sobrevivente, campo, getattr(duplicada, campo))
+                    campos_atualizados.append(campo)
+            if nome_final and nome_final != sobrevivente.nome:
+                sobrevivente.nome = nome_final
+                campos_atualizados.append("nome")
+            if campos_atualizados:
+                sobrevivente.save(update_fields=campos_atualizados + ["atualizado_em"])
+
+            duplicada.delete()
+
+        return sobrevivente
 
     @property
     def precisa_fechamento(self):

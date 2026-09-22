@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from agenda.models import TipoConsulta
+from agenda.models import Consulta, TipoConsulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Produto, Recompra
 
@@ -19,7 +19,9 @@ from .forms import (
     ProgramaForm,
     TipoConsultaForm,
 )
-from .models import Acompanhamento, Feedback, FaseModulacao, FotoEvolucao, KitPrevisto, KitProdutoItem, Programa
+from .models import (
+    Acompanhamento, ConsultaPrevista, Feedback, FaseModulacao, FotoEvolucao, KitPrevisto, KitProdutoItem, Programa,
+)
 
 
 @login_required
@@ -144,6 +146,33 @@ def mudar_status_acompanhamento(request, pk):
     if acao in ("renovar", "migrar"):
         return redirect("pacientes:iniciar_protocolo", pk=acompanhamento.paciente.pk)
     return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)
+
+
+@login_required
+@require_POST
+def vincular_consulta_prevista(request, pk):
+    """
+    Liga uma consulta que já aconteceu (ex.: a consulta de diagnóstico,
+    agendada antes do protocolo existir) a um item do checklist do
+    programa — pra parar de pedir "agendar a Consulta N" quando ela já
+    ocorreu, sem precisar mexer no admin.
+    """
+    org = organizacao_do_usuario(request)
+    consulta_prevista = get_object_or_404(
+        ConsultaPrevista.objects.select_related("acompanhamento__paciente"),
+        pk=pk, acompanhamento__organizacao=org,
+    )
+    paciente = consulta_prevista.acompanhamento.paciente
+    consulta = get_object_or_404(Consulta, pk=request.POST.get("consulta_id"), organizacao=org, paciente=paciente)
+
+    consulta_prevista.consulta = consulta
+    consulta_prevista.status = ConsultaPrevista.Status.REALIZADA
+    consulta_prevista.save(update_fields=["consulta", "status"])
+    messages.success(
+        request,
+        f"Consulta {consulta_prevista.numero} vinculada à consulta de {consulta.data_hora:%d/%m/%Y} — o alerta some.",
+    )
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=consultas")
 
 
 @login_required
@@ -384,3 +413,25 @@ def kit_montar(request, pk):
     return render(request, "programas/kit_form.html", {
         "paciente": paciente, "kit": kit, "produtos": produtos_disponiveis,
     })
+
+
+@login_required
+@require_POST
+def kit_nao_se_aplica(request, pk):
+    """
+    Marca que esse kit não faz parte do que foi combinado com a paciente
+    (ex.: consulta avulsa, sem produto incluso) — pra parar de aparecer
+    o alerta "Kit N precisa ser enviado" sem precisar montar um kit que
+    não existe.
+    """
+    org = organizacao_do_usuario(request)
+    kit = get_object_or_404(
+        KitPrevisto.objects.select_related("acompanhamento__paciente"),
+        pk=pk, acompanhamento__organizacao=org,
+    )
+    paciente = kit.acompanhamento.paciente
+    if kit.status == KitPrevisto.Status.PENDENTE:
+        kit.status = KitPrevisto.Status.NAO_SE_APLICA
+        kit.save(update_fields=["status"])
+        messages.success(request, f"Kit {kit.numero} marcado como \"não se aplica\" — o alerta some.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=produtos")

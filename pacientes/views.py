@@ -11,7 +11,7 @@ from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
 from leads.models import HistoricoLead
-from programas.models import Acompanhamento, CustoAcompanhamento, FaseModulacao, FotoEvolucao
+from programas.models import Acompanhamento, ConsultaPrevista, CustoAcompanhamento, FaseModulacao, FotoEvolucao
 from prontuarios.models import Anamnese, Documento
 
 from .forms import IniciarProtocoloForm, PacienteRapidoForm
@@ -177,6 +177,7 @@ def lista(request):
     form_rapido = PacienteRapidoForm(initial={"nome": busca} if busca and not pacientes else None)
     return render(request, "pacientes/lista.html", {
         "pacientes": pacientes, "busca": busca, "form_rapido": form_rapido,
+        "usuario_e_administrador": usuario_e_administrador(request),
     })
 
 
@@ -200,6 +201,129 @@ def criar(request):
             "pacientes": pacientes, "busca": busca, "form_rapido": form_rapido,
         })
     return redirect("pacientes:lista")
+
+
+@login_required
+@require_POST
+def excluir(request, pk):
+    """
+    Exclui a paciente definitivamente — a única coisa que nunca é apagada
+    junto é dinheiro que já entrou de verdade (Recebimento) e consultas
+    registradas na Agenda (histórico de horários, mexe com a agenda dos
+    profissionais). Tudo o mais que só pertence a essa paciente —
+    acompanhamento/programa (com tudo que ele gerou: consultas previstas,
+    kits, modulação, fotos), anamnese, check-ins de evolução, atendimentos
+    de prontuário sem consulta vinculada e documentos — é apagado junto,
+    sem exigir nenhuma limpeza manual antes. Pagamentos pendentes (sem
+    nenhum recebimento) também são cancelados junto, já que nada chegou a
+    entrar no caixa por eles.
+    """
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem excluir pacientes.")
+        return redirect("pacientes:ficha", pk=pk)
+    paciente = get_object_or_404(Paciente, organizacao=org, pk=pk)
+
+    bloqueios = []
+    if paciente.consultas.exists():
+        bloqueios.append("consultas registradas na agenda")
+    if Recebimento.objects.filter(pagamento__paciente=paciente).exists():
+        bloqueios.append("pagamentos com dinheiro já recebido")
+
+    if bloqueios:
+        messages.error(
+            request,
+            f'Não dá pra excluir "{paciente.nome}" — ela já tem {", ".join(bloqueios)}. '
+            'Se for um cadastro duplicado (mesma pessoa em duas fichas), use '
+            '"Mesclar com paciente duplicada" na ficha dela.',
+        )
+        return redirect("pacientes:ficha", pk=paciente.pk)
+
+    tinha_acompanhamento = paciente.acompanhamentos.exists()
+    Acompanhamento.objects.filter(paciente=paciente).delete()
+    Anamnese.objects.filter(paciente=paciente).delete()
+    paciente.registros_evolucao.all().delete()
+    paciente.atendimentos.all().delete()
+    paciente.documentos.all().delete()
+    valor_cancelado = Pagamento.objects.filter(paciente=paciente).aggregate(total=Sum("valor"))["total"] or 0
+    Pagamento.objects.filter(paciente=paciente).delete()
+    nome = paciente.nome
+    paciente.delete()
+    if valor_cancelado:
+        extra = " (inclusive o programa/acompanhamento que ela tinha)" if tinha_acompanhamento else ""
+        messages.success(
+            request,
+            f'"{nome}" foi excluída{extra} — e R$ {valor_cancelado:.2f} que estavam pendentes saíram do sistema junto.',
+        )
+    elif tinha_acompanhamento:
+        messages.success(request, f'"{nome}" foi excluída, junto com o programa/acompanhamento que ela tinha.')
+    else:
+        messages.success(request, f'"{nome}" foi excluída.')
+    return redirect("pacientes:lista")
+
+
+@login_required
+def mesclar_selecionar(request, pk):
+    """Passo 1 de mesclar pacientes duplicadas: escolher qual é a outra ficha."""
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem mesclar pacientes.")
+        return redirect("pacientes:ficha", pk=pk)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    busca = request.GET.get("q", "").strip()
+    candidatas = Paciente.objects.none()
+    if busca:
+        candidatas = Paciente.objects.filter(organizacao=org).exclude(pk=paciente.pk).filter(
+            Q(nome__icontains=busca) | Q(telefone__icontains=busca)
+        ).order_by("nome")
+    return render(request, "pacientes/mesclar_selecionar.html", {
+        "paciente": paciente, "busca": busca, "candidatas": candidatas,
+    })
+
+
+def _resumo_registros_paciente(paciente):
+    return {
+        "consultas": paciente.consultas.count(),
+        "pagamentos": paciente.pagamentos.count(),
+        "leads": paciente.leads.count(),
+        "acompanhamentos": paciente.acompanhamentos.count(),
+        "atendimentos": paciente.atendimentos.count(),
+        "checkins": paciente.registros_evolucao.count(),
+        "documentos": paciente.documentos.count(),
+        "tem_anamnese": hasattr(paciente, "anamnese"),
+    }
+
+
+@login_required
+def mesclar_confirmar(request, pk, duplicada_pk):
+    """Passo 2 de mesclar pacientes duplicadas: preview lado a lado e confirmação."""
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem mesclar pacientes.")
+        return redirect("pacientes:ficha", pk=pk)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    duplicada = get_object_or_404(Paciente, pk=duplicada_pk, organizacao=org)
+
+    if request.method == "POST":
+        nome_final = request.POST.get("nome_final", "").strip() or paciente.nome
+        try:
+            Paciente.mesclar(paciente, duplicada, nome_final=nome_final)
+        except ValueError as erro:
+            messages.error(request, str(erro))
+            return redirect("pacientes:mesclar_confirmar", pk=paciente.pk, duplicada_pk=duplicada.pk)
+        messages.success(
+            request,
+            f'"{duplicada.nome}" foi mesclada em "{nome_final}" — tudo junto numa ficha só agora.',
+        )
+        return redirect("pacientes:ficha", pk=paciente.pk)
+
+    return render(request, "pacientes/mesclar_confirmar.html", {
+        "paciente": paciente,
+        "duplicada": duplicada,
+        "resumo_paciente": _resumo_registros_paciente(paciente),
+        "resumo_duplicada": _resumo_registros_paciente(duplicada),
+        "conflito_anamnese": hasattr(paciente, "anamnese") and hasattr(duplicada, "anamnese"),
+    })
 
 
 @login_required
@@ -297,6 +421,12 @@ def ficha(request, pk):
         ).exclude(status=Consulta.Status.CANCELADA).select_related(
             "profissional", "tipo_consulta"
         ).order_by("-data_hora")
+        consulta_ja_vinculada = ConsultaPrevista.objects.exclude(consulta__isnull=True).values_list(
+            "consulta_id", flat=True
+        )
+        contexto["consultas_para_vincular"] = Consulta.objects.filter(
+            organizacao=org, paciente=paciente, status=Consulta.Status.REALIZADA,
+        ).exclude(pk__in=consulta_ja_vinculada).order_by("-data_hora")
 
     if acompanhamento and aba == "produtos":
         contexto["kits"] = acompanhamento.kits_previstos.prefetch_related("itens__produto").order_by("numero")

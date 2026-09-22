@@ -18,6 +18,18 @@
                 {% else %}
                     <span class="badge">Sem programa ativo</span>
                 {% endif %}
+                {% if usuario_e_administrador %}
+                    <p style="margin-top:.6rem; display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+                        <a href="{% url 'pacientes:mesclar_selecionar' paciente.pk %}" style="font-size:.85rem;">
+                            🔗 Mesclar com paciente duplicada
+                        </a>
+                        <form method="post" action="{% url 'pacientes:excluir' paciente.pk %}"
+                              onsubmit="return confirm('Excluir \'{{ paciente.nome|escapejs }}\'? Só funciona se ela não tiver consultas, pagamentos recebidos, anamnese ou outros registros — essa ação não pode ser desfeita.');">
+                            {% csrf_token %}
+                            <button class="btn btn-danger" style="padding:.2rem .6rem; font-size:.8rem;" type="submit">🗑️ Excluir paciente</button>
+                        </form>
+                    </p>
+                {% endif %}
             </div>
             {% if acompanhamento %}
                 <div style="text-align:right; font-size:.85rem; color:var(--text-muted);">
@@ -142,12 +154,18 @@
                     <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:.75rem 0 .25rem;">Produtos</p>
                     <ul class="checklist">
                         {% for k in acompanhamento.kits_previstos.all %}
-                            <li class="{% if k.status == 'ENVIADO' %}feito{% endif %}">
-                                <span class="caixa">{% if k.status == 'ENVIADO' %}✓{% endif %}</span>
+                            <li class="{% if k.status == 'ENVIADO' or k.status == 'NAO_SE_APLICA' %}feito{% endif %}">
+                                <span class="caixa">{% if k.status == 'ENVIADO' or k.status == 'NAO_SE_APLICA' %}✓{% endif %}</span>
                                 {% if k.status == 'ENVIADO' %}
                                     Kit {{ k.numero }} entregue
+                                {% elif k.status == 'NAO_SE_APLICA' %}
+                                    Kit {{ k.numero }} — não se aplica
                                 {% else %}
                                     <a href="{% url 'programas:kit_montar' k.pk %}">Kit {{ k.numero }} — marcar como entregue ›</a>
+                                    <form method="post" action="{% url 'programas:kit_nao_se_aplica' k.pk %}" style="display:inline; margin-left:.4rem;">
+                                        {% csrf_token %}
+                                        <button type="submit" style="color:var(--text-muted); background:none; border:none; padding:0; cursor:pointer; font-size:.78rem; text-decoration:underline;">não se aplica</button>
+                                    </form>
                                 {% endif %}
                             </li>
                         {% endfor %}
@@ -461,6 +479,16 @@
                                     <td>
                                         {% if cp.consulta %}
                                             <a href="{% url 'agenda:detalhe_consulta' cp.consulta.pk %}">Ver ›</a>
+                                        {% elif consultas_para_vincular %}
+                                            <form method="post" action="{% url 'programas:vincular_consulta_prevista' cp.pk %}" style="display:flex; gap:.35rem; align-items:center;">
+                                                {% csrf_token %}
+                                                <select name="consulta_id" style="padding:.3rem; border:1px solid #ddd5ee; border-radius:6px; font-size:.8rem;">
+                                                    {% for c in consultas_para_vincular %}
+                                                        <option value="{{ c.pk }}">{{ c.data_hora|date:"d/m/Y" }} — {{ c.profissional }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Já aconteceu — vincular</button>
+                                            </form>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -645,6 +673,10 @@
                             <td>
                                 {% if k.status == "PENDENTE" %}
                                     <a href="{% url 'programas:kit_montar' k.pk %}">Montar/Enviar kit ›</a>
+                                    <form method="post" action="{% url 'programas:kit_nao_se_aplica' k.pk %}" style="display:inline; margin-left:.5rem;">
+                                        {% csrf_token %}
+                                        <button type="submit" style="color:var(--text-muted); background:none; border:none; padding:0; cursor:pointer; font-size:.82rem; text-decoration:underline;">Não se aplica</button>
+                                    </form>
                                 {% endif %}
                             </td>
                         </tr>

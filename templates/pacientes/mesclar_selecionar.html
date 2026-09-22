@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Mesclar paciente duplicada · {{ paciente.nome }}{% endblock %}
+{% block content %}
+    <p><a href="{% url 'pacientes:ficha' paciente.pk %}">← Voltar pra ficha de {{ paciente.nome }}</a></p>
+    <div class="card">
+        <h1>Mesclar paciente duplicada em "{{ paciente.nome }}"</h1>
+        <p style="font-size:.85rem; color:var(--text-muted);">
+            Busque a ficha duplicada (o cadastro errado/repetido). Na próxima tela você confere tudo antes de confirmar —
+            nada é apagado ainda.
+        </p>
+        <form method="get" class="acao" style="max-width:400px;">
+            <div>
+                <label for="q">Nome ou telefone da duplicada</label>
+                <input type="text" id="q" name="q" value="{{ busca }}" autofocus placeholder="Ex.: Patrícia">
+            </div>
+            <button class="btn" type="submit">Buscar</button>
+        </form>
+    </div>
+
+    {% if busca %}
+        <div class="card">
+            {% if candidatas %}
+                <ul class="fila">
+                    {% for candidata in candidatas %}
+                        <li>
+                            <a class="linha" href="{% url 'pacientes:mesclar_confirmar' paciente.pk candidata.pk %}">
+                                <div>
+                                    <div class="nome">{{ candidata.nome }}</div>
+                                    <div class="meta">{{ candidata.telefone|default:"sem telefone" }}</div>
+                                </div>
+                                <span class="seta">›</span>
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>Nenhuma outra paciente encontrada com esse nome/telefone.</p>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}
