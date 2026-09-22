@@ -90,6 +90,15 @@ class Usuario(AbstractUser):
         ),
     )
 
+    comissao_fixo_mensal = models.DecimalField(
+        "fixo mensal", max_digits=10, decimal_places=2, default=0, blank=True,
+        help_text="Valor fixo por mês (relevante pra quem tem papel Comercial) — aparece no painel \"O que fazer hoje\" dessa pessoa.",
+    )
+    comissao_por_agendamento = models.DecimalField(
+        "comissão por agendamento", max_digits=10, decimal_places=2, default=0, blank=True,
+        help_text="Valor pago por cada consulta agendada a partir de um lead que essa pessoa trabalhou no CRM.",
+    )
+
     class Meta:
         verbose_name = "usuário"
         verbose_name_plural = "usuários"
