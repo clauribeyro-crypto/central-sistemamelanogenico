@@ -183,6 +183,37 @@
         </div>
     </div>
 
+    {% if fila_fechamento %}
+        <div class="card">
+            <h2>🤝 Fila de fechamento ({{ total_fila_fechamento }})</h2>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+                Já fizeram a consulta de diagnóstico e ainda não iniciaram um programa — não deixe esfriar.
+            </p>
+            <table>
+                <thead>
+                    <tr><th>Paciente</th><th>Última consulta</th><th>Profissional</th><th>Ações</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in fila_fechamento %}
+                        <tr>
+                            <td><a href="{% url 'pacientes:ficha' item.paciente.pk %}">{{ item.paciente.nome }}</a></td>
+                            <td>{{ item.consulta.data_hora|date:"d/m/Y" }}</td>
+                            <td>{{ item.consulta.profissional }}</td>
+                            <td style="white-space:nowrap;">
+                                <a class="btn" style="padding:.3rem .6rem; font-size:.8rem;" href="{% url 'pacientes:iniciar_protocolo' item.paciente.pk %}">Iniciar protocolo</a>
+                                <form method="post" action="{% url 'pacientes:descartar_fechamento' item.paciente.pk %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="proximo" value="{% url 'core:home' %}">
+                                    <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Não vai continuar</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
     {% if org.modulo_programas_ativo %}
     <div class="grid">
         <div class="card stat stat-em-breve">

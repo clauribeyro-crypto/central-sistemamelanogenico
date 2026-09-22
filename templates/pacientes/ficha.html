@@ -92,6 +92,23 @@
                     <p>Esta paciente ainda não tem um programa de acompanhamento — as abas de anamnese, documentos e consultas já funcionam normalmente.</p>
                     <a class="btn" href="{% url 'pacientes:iniciar_protocolo' paciente.pk %}">Iniciar protocolo de acompanhamento</a>
                 {% endif %}
+
+                {% if paciente.fechamento_descartado_em %}
+                    <p style="margin-top:1rem; font-size:.85rem; color:var(--text-muted);">
+                        Marcado como "não vai continuar" em {{ paciente.fechamento_descartado_em|date:"d/m/Y H:i" }}
+                        {% if paciente.fechamento_descartado_motivo %} — {{ paciente.fechamento_descartado_motivo }}{% endif %}
+                    </p>
+                    <form method="post" action="{% url 'pacientes:reabrir_fechamento' paciente.pk %}">
+                        {% csrf_token %}
+                        <button class="btn btn-secondary" type="submit">Voltar pra fila de fechamento</button>
+                    </form>
+                {% elif paciente.precisa_fechamento %}
+                    <form method="post" action="{% url 'pacientes:descartar_fechamento' paciente.pk %}" style="margin-top:1rem;">
+                        {% csrf_token %}
+                        <input type="text" name="motivo" placeholder="Motivo (opcional)" style="padding:.4rem; border:1px solid #ddd5ee; border-radius:8px; margin-right:.5rem;">
+                        <button class="btn btn-secondary" type="submit">Não vai continuar — tirar da fila de fechamento</button>
+                    </form>
+                {% endif %}
             </div>
         {% else %}
             <div class="card">
