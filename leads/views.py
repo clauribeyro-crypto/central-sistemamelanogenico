@@ -256,6 +256,12 @@ def painel_marketing(request):
             organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
         ).values("entrou_em__date").annotate(total=Count("id"))
     }
+    origens = list(Origem.objects.filter(organizacao=org, ativo=True).order_by("nome"))
+    leads_por_dia_e_origem = {}
+    for row in Lead.objects.filter(
+        organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
+    ).values("entrou_em__date", "origem_id").annotate(total=Count("id")):
+        leads_por_dia_e_origem.setdefault(row["entrou_em__date"], {})[row["origem_id"]] = row["total"]
     reunioes_por_dia = {
         row["data_hora__date"]: row["total"]
         for row in Consulta.objects.filter(
@@ -274,10 +280,12 @@ def painel_marketing(request):
     linhas = []
     for form in formset:
         data_linha = form.instance.data
+        origens_do_dia = leads_por_dia_e_origem.get(data_linha, {})
         linhas.append({
             "form": form,
             "data": data_linha,
             "leads": leads_por_dia.get(data_linha, 0),
+            "leads_por_origem": [origens_do_dia.get(o.pk, 0) for o in origens],
             "reunioes": reunioes_por_dia.get(data_linha, 0),
             "vendas": vendas_por_dia.get(data_linha, 0),
             "valor": valor_por_dia.get(data_linha, Decimal("0.00")),
@@ -289,6 +297,9 @@ def painel_marketing(request):
         "cliques": sum((l["form"].instance.cliques for l in linhas), 0),
         "pageviews": sum((l["form"].instance.pageviews for l in linhas), 0),
         "leads": sum((l["leads"] for l in linhas), 0),
+        "leads_por_origem": [
+            sum((l["leads_por_origem"][i] for l in linhas), 0) for i in range(len(origens))
+        ],
         "reunioes": sum((l["reunioes"] for l in linhas), 0),
         "vendas": sum((l["vendas"] for l in linhas), 0),
         "valor": sum((l["valor"] for l in linhas), Decimal("0.00")),
@@ -298,6 +309,7 @@ def painel_marketing(request):
         "formset": formset,
         "linhas": linhas,
         "totais": totais,
+        "origens": origens,
         "ano": ano,
         "mes": mes,
         "mes_nome": dict(MESES)[mes],
