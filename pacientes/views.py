@@ -3,7 +3,7 @@ import datetime
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum
+from django.db.models import Exists, OuterRef, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -175,7 +175,11 @@ def _financeiro_do_acompanhamento(acompanhamento):
 def lista(request):
     org = organizacao_do_usuario(request)
     busca = request.GET.get("q", "").strip()
-    pacientes = Paciente.objects.filter(organizacao=org, ativo=True).order_by("nome")
+    pacientes = Paciente.objects.filter(organizacao=org, ativo=True).annotate(
+        tem_acompanhamento_ativo=Exists(
+            Acompanhamento.objects.filter(paciente=OuterRef("pk"), status__in=Acompanhamento.STATUS_ATIVOS)
+        )
+    ).order_by("-tem_acompanhamento_ativo", "nome")
     if busca:
         pacientes = pacientes.filter(Q(nome__icontains=busca) | Q(telefone__icontains=busca))
     form_rapido = PacienteRapidoForm(initial={"nome": busca} if busca and not pacientes else None)
@@ -198,11 +202,16 @@ def criar(request):
             return redirect("pacientes:ficha", pk=paciente.pk)
         messages.error(request, "Não deu pra cadastrar — confira o formulário.")
         busca = request.POST.get("nome", "")
-        pacientes = Paciente.objects.filter(organizacao=org, ativo=True).order_by("nome")
+        pacientes = Paciente.objects.filter(organizacao=org, ativo=True).annotate(
+            tem_acompanhamento_ativo=Exists(
+                Acompanhamento.objects.filter(paciente=OuterRef("pk"), status__in=Acompanhamento.STATUS_ATIVOS)
+            )
+        ).order_by("-tem_acompanhamento_ativo", "nome")
         if busca:
             pacientes = pacientes.filter(Q(nome__icontains=busca) | Q(telefone__icontains=busca))
         return render(request, "pacientes/lista.html", {
             "pacientes": pacientes, "busca": busca, "form_rapido": form_rapido,
+            "usuario_e_administrador": usuario_e_administrador(request),
         })
     return redirect("pacientes:lista")
 
