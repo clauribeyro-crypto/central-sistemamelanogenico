@@ -489,3 +489,34 @@ class WebhookImportacao(ModeloDaOrganizacao):
         self.ultimo_recebido_em = timezone.now()
         self.save(update_fields=["total_recebidos", "ultimo_recebido_em"])
         return lead, True, ""
+
+
+class RegistroMarketingDiario(ModeloDaOrganizacao):
+    """
+    Números diários de mídia paga (investimento, impressões, cliques,
+    pageview) — o sistema não tem integração com Meta/Google Ads, então
+    esses quatro campos são lançados manualmente pela gestora de tráfego.
+    O resto do funil (leads, reuniões, vendas) já existe no CRM e não
+    precisa ser digitado de novo — ver `leads.views.painel_marketing`.
+    """
+
+    data = models.DateField(default=timezone.localdate)
+
+    investimento = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    impressoes = models.PositiveIntegerField("impressões", default=0)
+    cliques = models.PositiveIntegerField(default=0)
+    pageviews = models.PositiveIntegerField("pageviews", default=0)
+
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "registro diário de marketing"
+        verbose_name_plural = "registros diários de marketing"
+        ordering = ["-data"]
+        constraints = [
+            models.UniqueConstraint(fields=["organizacao", "data"], name="marketing_diario_unico_por_dia"),
+        ]
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} — R$ {self.investimento}"
+        return lead, True, ""

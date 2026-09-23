@@ -4,15 +4,19 @@ from django.shortcuts import redirect
 from .models import Usuario
 
 APPS_LIVRES_COMERCIAL = {"agenda", "leads"}
-ROTAS_LIVRES_COMERCIAL = {("core", "home"), ("", "login"), ("", "logout")}
+ROTAS_LIVRES_COMERCIAL = {
+    ("core", "home"), ("", "login"), ("", "logout"),
+    ("pacientes", "crm_fechamento"),
+}
 
 
 class RestringirAcessoComercialMiddleware:
     """
-    Um usuário com papel "Comercial" (ex.: SDR/social selling) só acessa
-    Agenda, CRM de leads e o painel "O que fazer hoje" — pedido pra dar
-    acesso a uma pessoa da equipe sem expor ficha da paciente, prontuários,
-    financeiro, indicadores, estoque, profissionais ou programas.
+    Um usuário com papel "Comercial" (ex.: SDR/social selling, gestora de
+    tráfego) só acessa Agenda, CRM de leads, CRM de fechamento e o painel
+    "O que fazer hoje" — pedido pra dar acesso a uma pessoa da equipe sem
+    expor ficha da paciente, prontuários, financeiro, indicadores, estoque,
+    profissionais ou programas.
 
     Centralizado aqui como middleware (em vez de decorator em cada view)
     porque a restrição cobre apps inteiros de uma vez, sem precisar tocar
@@ -37,5 +41,5 @@ class RestringirAcessoComercialMiddleware:
         if app_name in APPS_LIVRES_COMERCIAL or (app_name, url_name) in ROTAS_LIVRES_COMERCIAL:
             return None
 
-        messages.error(request, "Seu acesso é restrito à Agenda e ao CRM de leads.")
+        messages.error(request, "Seu acesso é restrito à Agenda, ao CRM de leads e ao CRM de fechamento.")
         return redirect("core:home")
