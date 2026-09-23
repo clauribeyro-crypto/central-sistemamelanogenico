@@ -1,16 +1,17 @@
 import datetime
 from decimal import Decimal
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from agenda.models import Consulta
-from contas.models import Usuario
+from contas.models import Organizacao, Usuario
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento
-from financeiro.views import totais_fechamentos_mes
+from financeiro.views import MESES, totais_fechamentos_mes
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
@@ -237,6 +238,56 @@ def indicadores(request):
         ],
     }
     return render(request, "core/indicadores.html", contexto)
+
+
+@login_required
+def painel_mentoradas(request):
+    """
+    Visão geral só pra administradora geral (mentora) — os números
+    principais de cada clínica mentorada lado a lado, sem precisar entrar
+    organização por organização nem vasculhar o /admin/ bruto.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode ver o painel de mentoradas.")
+        return redirect("core:home")
+
+    hoje = timezone.localdate()
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+
+    clinicas = []
+    for org in Organizacao.objects.filter(ativo=True).order_by("nome"):
+        totais = totais_fechamentos_mes(org, ano, mes)
+        faturado = totais["total_recebido_geral"]
+        meta = org.meta_faturamento_mensal
+        clinicas.append({
+            "org": org,
+            "faturado": faturado,
+            "meta": meta,
+            "percentual_meta": min(round(faturado / meta * 100) if meta else 0, 100),
+            "qtd_consultas": totais["qtd_consultas"],
+            "meta_consultas": org.meta_consultas_mensal,
+            "qtd_fechamentos": totais["qtd_tratamentos"],
+            "meta_fechamentos": org.meta_fechamentos_mensal,
+        })
+
+    contexto = {
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+        "clinicas": clinicas,
+    }
+    return render(request, "core/painel_mentoradas.html", contexto)
 
 
 @login_required
