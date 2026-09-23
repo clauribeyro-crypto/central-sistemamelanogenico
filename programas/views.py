@@ -153,6 +153,34 @@ def mudar_status_acompanhamento(request, pk):
 
 
 @login_required
+@require_POST
+def reabrir_acompanhamento(request, pk):
+    """
+    Desfaz um "Finalizar"/"Renovar"/"Migrar"/"Cancelar" clicado por engano —
+    volta o acompanhamento pra "Em acompanhamento", sem precisar recriar o
+    programa nem os pagamentos já lançados.
+    """
+    org = organizacao_do_usuario(request)
+    acompanhamento = get_object_or_404(
+        Acompanhamento.objects.select_related("paciente"), pk=pk, organizacao=org
+    )
+    atual = acompanhamento.paciente.acompanhamento_atual
+    if atual and atual.pk != acompanhamento.pk:
+        messages.error(
+            request,
+            f"{acompanhamento.paciente} já tem um acompanhamento ativo ({atual.programa}) — "
+            "finalize ou coloque esse em manutenção antes de reabrir o outro.",
+        )
+        return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)
+
+    acompanhamento.status = Acompanhamento.Status.EM_ACOMPANHAMENTO
+    acompanhamento.status_atualizado_em = timezone.now()
+    acompanhamento.save(update_fields=["status", "status_atualizado_em"])
+    messages.success(request, "Acompanhamento reaberto.")
+    return redirect("pacientes:ficha", pk=acompanhamento.paciente.pk)
+
+
+@login_required
 @modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def acompanhamento_editar(request, pk):
     """

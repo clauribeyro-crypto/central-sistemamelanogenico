@@ -344,6 +344,9 @@ def ficha(request, pk):
         "paciente": paciente,
         "acompanhamento": acompanhamento,
         "tem_algum_acompanhamento": paciente.acompanhamentos.exists(),
+        "acompanhamentos_anteriores": paciente.acompanhamentos.exclude(
+            pk=acompanhamento.pk if acompanhamento else None
+        ).select_related("programa").order_by("-data_inicio"),
         "usuario_e_administrador": usuario_e_administrador(request),
         "abas": ABAS,
         "aba_atual": aba,
