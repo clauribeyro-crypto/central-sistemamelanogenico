@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models, transaction
 from django.utils import timezone
 
@@ -151,3 +152,35 @@ class Paciente(ModeloDaOrganizacao):
                 status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True
             ).exists()
         )
+
+
+class HistoricoFechamento(models.Model):
+    """
+    Registro permanente de cada "não vai continuar"/"voltou pra fila" de
+    uma paciente na fila de fechamento — ao contrário dos campos
+    fechamento_descartado_em/motivo (que só guardam o estado atual e são
+    limpos ao reabrir), esse histórico nunca é apagado. Serve pra, se a
+    paciente voltar meses depois, dar pra ver o que já rolou: quando foi
+    a última tentativa de fechamento, o que foi combinado/oferecido e por
+    que ela não seguiu na ocasião.
+    """
+
+    class Tipo(models.TextChoices):
+        PERDA = "PERDA", "Marcada como não vai continuar"
+        REABERTURA = "REABERTURA", "Voltou pra fila de fechamento"
+
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="historico_fechamento")
+    data_hora = models.DateTimeField(auto_now_add=True)
+    tipo = models.CharField(max_length=15, choices=Tipo.choices)
+    motivo = models.CharField(max_length=500, blank=True)
+    responsavel = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+
+    class Meta:
+        verbose_name = "histórico de fechamento"
+        verbose_name_plural = "histórico de fechamentos"
+        ordering = ["-data_hora"]
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} — {self.paciente} em {self.data_hora:%d/%m/%Y}"

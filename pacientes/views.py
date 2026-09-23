@@ -15,7 +15,7 @@ from programas.models import Acompanhamento, ConsultaPrevista, CustoAcompanhamen
 from prontuarios.models import Anamnese, Documento
 
 from .forms import IniciarProtocoloForm, PacienteRapidoForm
-from .models import Paciente
+from .models import HistoricoFechamento, Paciente
 
 ABAS = [
     ("geral", "Visão geral"),
@@ -346,6 +346,7 @@ def ficha(request, pk):
         "aba_pronta": aba in ABAS_PRONTAS,
         "jornada": acompanhamento.jornada() if acompanhamento else None,
         "alertas": acompanhamento.alertas() if acompanhamento else [],
+        "historico_fechamento": paciente.historico_fechamento.select_related("responsavel"),
     }
 
     if acompanhamento and aba == "financeiro":
@@ -530,9 +531,14 @@ def descartar_fechamento(request, pk):
     """Marca que a paciente decidiu não continuar após a consulta — tira ela da fila de fechamento."""
     org = organizacao_do_usuario(request)
     paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    motivo = request.POST.get("motivo", "").strip()
     paciente.fechamento_descartado_em = timezone.now()
-    paciente.fechamento_descartado_motivo = request.POST.get("motivo", "").strip()
+    paciente.fechamento_descartado_motivo = motivo
     paciente.save(update_fields=["fechamento_descartado_em", "fechamento_descartado_motivo", "atualizado_em"])
+    HistoricoFechamento.objects.create(
+        paciente=paciente, tipo=HistoricoFechamento.Tipo.PERDA, motivo=motivo,
+        responsavel=request.user if request.user.is_authenticated else None,
+    )
     messages.success(request, "Marcado — essa paciente não aparece mais na fila de fechamento.")
     proximo = request.POST.get("proximo")
     if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
@@ -550,5 +556,9 @@ def reabrir_fechamento(request, pk):
     paciente.fechamento_descartado_em = None
     paciente.fechamento_descartado_motivo = ""
     paciente.save(update_fields=["fechamento_descartado_em", "fechamento_descartado_motivo", "atualizado_em"])
+    HistoricoFechamento.objects.create(
+        paciente=paciente, tipo=HistoricoFechamento.Tipo.REABERTURA,
+        responsavel=request.user if request.user.is_authenticated else None,
+    )
     messages.success(request, "Paciente voltou pra fila de fechamento.")
     return redirect("pacientes:ficha", pk=paciente.pk)
