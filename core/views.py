@@ -119,22 +119,27 @@ def home(request):
 
     if org.modulo_financeiro_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         totais_mes_atual = totais_fechamentos_mes(org, hoje.year, hoje.month)
-        faltam_faturamento = max(org.meta_faturamento_mensal - totais_mes_atual["total_geral"], Decimal("0.00"))
-        faltam_consultas = max(org.meta_consultas_mensal - totais_mes_atual["qtd_consultas"], 0)
-        faltam_fechamentos = max(org.meta_fechamentos_mensal - totais_mes_atual["qtd_tratamentos"], 0)
+        # A meta é sobre dinheiro em caixa, não sobre valor fechado/contratado —
+        # tratamento ou consulta com saldo a receber não entra até ser pago.
+        faturado = totais_mes_atual["total_recebido_geral"]
+        qtd_fechamentos_pagos = sum(1 for t in totais_mes_atual["tratamentos"] if t.total_recebido > 0)
+        qtd_consultas_pagas = sum(1 for c in totais_mes_atual["consultas"] if c.total_recebido > 0)
+        faltam_faturamento = max(org.meta_faturamento_mensal - faturado, Decimal("0.00"))
+        faltam_consultas = max(org.meta_consultas_mensal - qtd_consultas_pagas, 0)
+        faltam_fechamentos = max(org.meta_fechamentos_mensal - qtd_fechamentos_pagos, 0)
         contexto["meta_mes"] = {
             "meta_faturamento": org.meta_faturamento_mensal,
-            "faturado": totais_mes_atual["total_geral"],
+            "faturado": faturado,
             "faltam_faturamento": faltam_faturamento,
             "percentual_faturamento": min(
-                round(totais_mes_atual["total_geral"] / org.meta_faturamento_mensal * 100) if org.meta_faturamento_mensal else 0,
+                round(faturado / org.meta_faturamento_mensal * 100) if org.meta_faturamento_mensal else 0,
                 100,
             ),
             "meta_consultas": org.meta_consultas_mensal,
-            "qtd_consultas": totais_mes_atual["qtd_consultas"],
+            "qtd_consultas": qtd_consultas_pagas,
             "faltam_consultas": faltam_consultas,
             "meta_fechamentos": org.meta_fechamentos_mensal,
-            "qtd_fechamentos": totais_mes_atual["qtd_tratamentos"],
+            "qtd_fechamentos": qtd_fechamentos_pagos,
             "faltam_fechamentos": faltam_fechamentos,
         }
 

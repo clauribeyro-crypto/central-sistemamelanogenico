@@ -9,19 +9,19 @@
             <div class="grid">
                 <div class="card stat">
                     <div class="num">R$ {{ meta_mes.faturado|floatformat:2 }}</div>
-                    <div class="rotulo">Faturado este mês (tratamentos + consultas)</div>
+                    <div class="rotulo">Recebido este mês (só o que já caiu no caixa)</div>
                 </div>
                 <div class="card stat" style="background:#6366f111;">
                     <div class="num">R$ {{ meta_mes.faltam_faturamento|floatformat:2 }}</div>
-                    <div class="rotulo">Falta para bater a meta</div>
+                    <div class="rotulo">Falta receber para bater a meta</div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
-                    <div class="rotulo">Consultas cobradas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                    <div class="rotulo">Consultas já pagas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_fechamentos }} / {{ meta_mes.meta_fechamentos }}</div>
-                    <div class="rotulo">Tratamentos fechados este mês (faltam {{ meta_mes.faltam_fechamentos }})</div>
+                    <div class="rotulo">Tratamentos já pagos este mês (faltam {{ meta_mes.faltam_fechamentos }})</div>
                 </div>
             </div>
             <div style="background:#e5e7eb; border-radius:999px; height:10px; overflow:hidden; margin:.75rem 0;">
