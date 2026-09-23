@@ -5,6 +5,20 @@ from profissionais.models import Profissional
 
 from .models import SATISFACOES, SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, RegistroEvolucao
 
+
+class DecimalVirgulaField(forms.DecimalField):
+    """
+    Aceita "68,5" além de "68.5" — vírgula é o separador decimal usado no
+    Brasil, mas um <input type="number"> só aceita ponto, então quem digita
+    vírgula no celular vê o campo rejeitar o valor (ou o navegador barrar o
+    envio) sem nenhum aviso claro do que está errado.
+    """
+
+    def to_python(self, value):
+        if isinstance(value, str):
+            value = value.replace(",", ".")
+        return super().to_python(value)
+
 CAMPOS_TEXTO_LONGO = (
     "queixa_principal", "historico_atual", "exame_fisico",
     "diagnostico", "conduta", "prescricao", "observacoes",
@@ -86,6 +100,15 @@ class AtendimentoForm(forms.ModelForm):
 
 
 class AnamneseForm(forms.ModelForm):
+    peso = DecimalVirgulaField(
+        label="peso (kg)", max_digits=5, decimal_places=1, required=False,
+        widget=forms.TextInput(attrs={"inputmode": "decimal", "placeholder": "Ex.: 68,5"}),
+    )
+    altura = DecimalVirgulaField(
+        label="altura (cm)", max_digits=5, decimal_places=1, required=False,
+        widget=forms.TextInput(attrs={"inputmode": "decimal", "placeholder": "Ex.: 165"}),
+    )
+
     class Meta:
         model = Anamnese
         fields = CAMPOS_ANAMNESE
