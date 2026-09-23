@@ -18,10 +18,29 @@ class PagamentoForm(forms.ModelForm):
         # status, forma_pagamento e data_pagamento não entram aqui — são
         # calculados automaticamente a partir dos recebimentos (ver
         # Pagamento.recalcular_status).
-        fields = ["valor", "data_vencimento", "observacoes"]
+        fields = ["valor", "data_vencimento", "acompanhamento", "observacoes"]
+        labels = {"acompanhamento": "Tratamento/programa vinculado"}
+        help_texts = {
+            "acompanhamento": (
+                "A que tratamento essa cobrança pertence. Corrige o caso de um "
+                "recebimento ter sido registrado no lançamento errado (ex.: numa "
+                "consulta em vez do programa) — o dinheiro já recebido não se "
+                "perde, só passa a contar pro tratamento certo."
+            ),
+        }
         widgets = {
             "observacoes": forms.Textarea(attrs={"rows": 2}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from programas.models import Acompanhamento
+
+        self.fields["acompanhamento"].required = False
+        self.fields["acompanhamento"].queryset = Acompanhamento.objects.filter(
+            paciente=self.instance.paciente
+        ).select_related("programa").order_by("-data_inicio")
+        self.fields["acompanhamento"].empty_label = "Nenhum (sem tratamento vinculado)"
 
 
 class RecebimentoForm(forms.ModelForm):
