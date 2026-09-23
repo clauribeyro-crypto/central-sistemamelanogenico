@@ -295,9 +295,9 @@
                 {% endif %}
                 {% if request.user.papel != "COMERCIAL" %}
                 <a class="{% if request.resolver_match.app_name == 'pacientes' and request.resolver_match.url_name != 'crm_fechamento' %}ativo{% endif %}" href="{% url 'pacientes:lista' %}"><span class="icone">📄</span> Ficha da paciente</a>
+                {% endif %}
                 {% if request.user.organizacao.modulo_programas_ativo %}
                 <a class="{% if request.resolver_match.url_name == 'crm_fechamento' %}ativo{% endif %}" href="{% url 'pacientes:crm_fechamento' %}"><span class="icone">🤝</span> CRM de fechamento</a>
-                {% endif %}
                 {% endif %}
                 <a class="{% if request.resolver_match.app_name == 'agenda' %}ativo{% endif %}" href="{% url 'agenda:semana' %}"><span class="icone">📅</span> Agenda</a>
                 {% if request.user.papel != "COMERCIAL" %}
