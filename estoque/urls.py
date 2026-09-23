@@ -13,4 +13,6 @@ urlpatterns = [
     path("producao/<int:pk>/pronto/", views.producao_marcar_pronto, name="producao_marcar_pronto"),
     path("recompras/novo/", views.recompra_criar, name="recompra_criar"),
     path("recompras/<int:pk>/comprou/", views.recompra_marcar_comprada, name="recompra_marcar_comprada"),
+    path("vendas/nova/", views.venda_criar, name="venda_criar"),
+    path("vendas/<int:pk>/excluir/", views.venda_excluir, name="venda_excluir"),
 ]

@@ -19,6 +19,14 @@ class Produto(ModeloDaOrganizacao):
         default=0,
         help_text="Abaixo disso, o produto aparece como estoque baixo/crítico na Visão geral.",
     )
+    preco_pix = models.DecimalField(
+        "preço no Pix/dinheiro", max_digits=8, decimal_places=2, default=0,
+        help_text="Usado para sugerir o valor ao registrar uma venda — pode ser ajustado na hora.",
+    )
+    preco_cartao = models.DecimalField(
+        "preço no cartão", max_digits=8, decimal_places=2, default=0,
+        help_text="Usado para sugerir o valor ao registrar uma venda — pode ser ajustado na hora.",
+    )
     duracao_estimada_dias = models.PositiveIntegerField(
         blank=True, null=True,
         help_text=(
@@ -125,3 +133,35 @@ class Recompra(ModeloDaOrganizacao):
                 organizacao=self.organizacao, paciente=self.paciente, produto=self.produto,
                 data_prevista=hoje + datetime.timedelta(days=self.produto.duracao_estimada_dias),
             )
+
+
+class VendaProduto(ModeloDaOrganizacao):
+    """
+    Venda de um produto de prateleira (sabonete, hidratante...) — diferente
+    de Recompra (que é só um lembrete de quando a paciente vai precisar
+    comprar de novo). Registrar aqui é o que desconta do estoque; sem isso o
+    estoque_atual do Produto nunca refletia o que realmente saiu vendido.
+    """
+
+    class FormaPagamento(models.TextChoices):
+        PIX = "PIX", "Pix/dinheiro"
+        CARTAO = "CARTAO", "Cartão"
+
+    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="vendas")
+    paciente = models.ForeignKey(
+        Paciente, on_delete=models.SET_NULL, blank=True, null=True, related_name="compras_produtos",
+    )
+    quantidade = models.PositiveIntegerField(default=1)
+    forma_pagamento = models.CharField(max_length=10, choices=FormaPagamento.choices, default=FormaPagamento.PIX)
+    valor_total = models.DecimalField(max_digits=10, decimal_places=2)
+    data = models.DateField(default=timezone.localdate)
+    observacoes = models.CharField(max_length=255, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "venda de produto"
+        verbose_name_plural = "vendas de produtos"
+        ordering = ["-data", "-criado_em"]
+
+    def __str__(self):
+        return f"{self.quantidade}x {self.produto} — R$ {self.valor_total} ({self.data:%d/%m/%Y})"
