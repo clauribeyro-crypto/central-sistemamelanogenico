@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum
@@ -7,8 +8,9 @@ from django.utils import timezone
 
 from agenda.models import Consulta
 from contas.models import Usuario
-from contas.utils import organizacao_do_usuario
+from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento
+from financeiro.views import totais_fechamentos_mes
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
@@ -89,6 +91,7 @@ def home(request):
 
     contexto = {
         "org": org,
+        "usuario_e_administrador": usuario_e_administrador(request),
         "novos_hoje": leads_ativos.filter(etapa=Lead.Etapa.NOVO, entrou_em__date=hoje).count(),
         "contato_1": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_1).count(),
         "contato_2": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_2).count(),
@@ -114,34 +117,54 @@ def home(request):
         ).order_by("data_vencimento")[:10],
     }
 
+    if org.modulo_financeiro_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
+        totais_mes_atual = totais_fechamentos_mes(org, hoje.year, hoje.month)
+        # A meta é sobre dinheiro em caixa, não sobre valor fechado/contratado —
+        # tratamento ou consulta com saldo a receber não entra até ser pago.
+        faturado = totais_mes_atual["total_recebido_geral"]
+        qtd_fechamentos_pagos = sum(1 for t in totais_mes_atual["tratamentos"] if t.total_recebido > 0)
+        qtd_consultas_pagas = sum(1 for c in totais_mes_atual["consultas"] if c.total_recebido > 0)
+        faltam_faturamento = max(org.meta_faturamento_mensal - faturado, Decimal("0.00"))
+        faltam_consultas = max(org.meta_consultas_mensal - qtd_consultas_pagas, 0)
+        faltam_fechamentos = max(org.meta_fechamentos_mensal - qtd_fechamentos_pagos, 0)
+        contexto["meta_mes"] = {
+            "meta_faturamento": org.meta_faturamento_mensal,
+            "faturado": faturado,
+            "faltam_faturamento": faltam_faturamento,
+            "percentual_faturamento": min(
+                round(faturado / org.meta_faturamento_mensal * 100) if org.meta_faturamento_mensal else 0,
+                100,
+            ),
+            "meta_consultas": org.meta_consultas_mensal,
+            "qtd_consultas": qtd_consultas_pagas,
+            "faltam_consultas": faltam_consultas,
+            "meta_fechamentos": org.meta_fechamentos_mensal,
+            "qtd_fechamentos": qtd_fechamentos_pagos,
+            "faltam_fechamentos": faltam_fechamentos,
+        }
+
     if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
-        pacientes_candidatas = Paciente.objects.filter(
+        contexto["total_fila_fechamento"] = Paciente.objects.filter(
             organizacao=org,
             consultas__status=Consulta.Status.REALIZADA,
             consultas__tipo_consulta__conta_para_fechamento=True,
             fechamento_descartado_em__isnull=True,
         ).exclude(
             acompanhamentos__status__in=Acompanhamento.STATUS_ATIVOS
-        ).distinct()
-        fila_fechamento = []
-        for paciente in pacientes_candidatas:
-            ultima_consulta = paciente.consultas.filter(
-                status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True
-            ).select_related("profissional", "tipo_consulta").order_by("-data_hora").first()
-            if ultima_consulta:
-                fila_fechamento.append({"paciente": paciente, "consulta": ultima_consulta})
-        fila_fechamento.sort(key=lambda item: item["consulta"].data_hora, reverse=True)
-        contexto["fila_fechamento"] = fila_fechamento[:20]
-        contexto["total_fila_fechamento"] = len(fila_fechamento)
+        ).distinct().count()
 
     if request.user.papel == Usuario.Papel.COMERCIAL:
+        # .distinct("lead_id") em vez de .count() direto: se a mesma lead for
+        # reagendada mais de uma vez no mês (ex.: a consulta foi excluída por
+        # engano e recriada), só a primeira agendada conta comissão — senão
+        # corrigir um agendamento vira comissão em dobro pela mesma lead.
         agendamentos_mes = HistoricoLead.objects.filter(
             lead__organizacao=org,
             tipo=HistoricoLead.Tipo.AGENDAMENTO,
             responsavel=request.user,
             data_hora__year=hoje.year,
             data_hora__month=hoje.month,
-        ).count()
+        ).values("lead_id").distinct().count()
         comissao_agendamentos = agendamentos_mes * request.user.comissao_por_agendamento
         contexto["remuneracao"] = {
             "fixo_mensal": request.user.comissao_fixo_mensal,

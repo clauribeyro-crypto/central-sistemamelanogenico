@@ -46,6 +46,14 @@
         }
         .btn-enviar:hover { background: #6a4aa8; }
         .erro { color: #8f2e45; font-size: .82rem; margin-top: .25rem; }
+        .aviso-erro {
+            max-width: 640px; margin: 1.2rem auto 0; padding: .9rem 1.1rem;
+            background: #fbe8ee; border: 1px solid #e0a8bb; border-radius: 10px;
+            color: #8f2e45; font-size: .9rem; font-weight: 600;
+        }
+        .campo:has(.erro) input, .campo:has(.erro) textarea, .campo:has(.erro) select {
+            border-color: #8f2e45;
+        }
     </style>
 </head>
 <body>
@@ -53,6 +61,11 @@
         <h1>Anamnese</h1>
         <p>Olá, {{ paciente.nome }}! Preencha com calma — pode deixar em branco o que não souber ou não se aplicar. Suas respostas vão direto pra sua ficha na clínica.</p>
     </div>
+    {% if form.errors %}
+        <div class="aviso-erro" id="aviso-erro">
+            ⚠️ Tem um ou mais campos que não foram salvos — veja os destacados em vermelho abaixo e corrija pra poder enviar.
+        </div>
+    {% endif %}
     <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         {% for secao in secoes %}
@@ -80,5 +93,10 @@
         {% endfor %}
         <button class="btn-enviar" type="submit">Enviar anamnese</button>
     </form>
+    {% if form.errors %}
+        <script>
+            document.getElementById("aviso-erro").scrollIntoView({ behavior: "smooth", block: "start" });
+        </script>
+    {% endif %}
 </body>
 </html>

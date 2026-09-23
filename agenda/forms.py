@@ -1,5 +1,6 @@
 from django import forms
 
+from leads.models import Origem
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
@@ -12,11 +13,22 @@ class ConsultaRapidaForm(forms.Form):
     agenda. Aceita uma paciente já cadastrada (campo `paciente`) OU os dados
     básicos para cadastrar uma paciente nova na hora (`nova_paciente_nome` +
     `nova_paciente_telefone`) — exatamente um dos dois precisa vir preenchido.
+
+    Pra paciente nova, pede também a origem do lead: agendar direto aqui
+    (sem passar pelo CRM primeiro) não pode significar perder de vista de
+    onde esse lead veio nem deixar de contar a comissão de quem agendou —
+    então a origem é obrigatória nesse caso, e um Lead é criado por trás
+    das cenas (ver agenda.views.criar_consulta_rapida).
     """
 
     paciente = forms.ModelChoiceField(queryset=Paciente.objects.none(), required=False)
     nova_paciente_nome = forms.CharField(max_length=150, required=False)
     nova_paciente_telefone = forms.CharField(max_length=20, required=False)
+    origem = forms.ModelChoiceField(
+        queryset=Origem.objects.none(), required=False,
+        label="Origem do lead",
+        help_text="De onde essa pessoa veio — obrigatório pra paciente nova, pra não perder a origem do lead nem a comissão de quem agendou.",
+    )
 
     profissional = forms.ModelChoiceField(queryset=Profissional.objects.none())
     tipo_consulta = forms.ModelChoiceField(queryset=TipoConsulta.objects.none())
@@ -34,6 +46,9 @@ class ConsultaRapidaForm(forms.Form):
         self.fields["paciente"].queryset = Paciente.objects.filter(
             organizacao=organizacao, ativo=True
         ).order_by("nome")
+        self.fields["origem"].queryset = Origem.objects.filter(
+            organizacao=organizacao, ativo=True
+        ).order_by("nome")
         self.fields["profissional"].queryset = Profissional.objects.filter(
             organizacao=organizacao, ativo=True
         ).order_by("nome")
@@ -49,6 +64,8 @@ class ConsultaRapidaForm(forms.Form):
             raise forms.ValidationError(
                 "Selecione uma paciente existente ou informe o nome da nova paciente."
             )
+        if nome_nova and not paciente and not cleaned.get("origem"):
+            self.add_error("origem", "Obrigatório pra paciente nova.")
         return cleaned
 
 

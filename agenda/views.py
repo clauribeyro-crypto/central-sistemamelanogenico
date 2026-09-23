@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from contas.utils import organizacao_do_usuario
 from financeiro.forms import PagamentoForm, RecebimentoForm
 from financeiro.models import Pagamento, Recebimento
+from leads.models import Lead, Origem
 from pacientes.models import Paciente
 from profissionais.models import Profissional
 
@@ -143,6 +144,7 @@ def semana(request):
         "profissional_selecionado": profissional_selecionado,
         "tipos_consulta": TipoConsulta.objects.filter(organizacao=org, ativo=True),
         "motivos_bloqueio": HorarioBloqueado.Motivo.choices,
+        "origens": Origem.objects.filter(organizacao=org, ativo=True).order_by("nome"),
         "pacientes_json": list(
             Paciente.objects.filter(organizacao=org, ativo=True)
             .order_by("nome")
@@ -178,11 +180,23 @@ def criar_consulta_rapida(request):
     )
 
     paciente = form.cleaned_data["paciente"]
+    novo_lead = None
     if not paciente:
         paciente = Paciente.objects.create(
             organizacao=org,
             nome=form.cleaned_data["nova_paciente_nome"].strip(),
             telefone=form.cleaned_data.get("nova_paciente_telefone", "").strip(),
+        )
+        # Agendar direto na Agenda (sem passar pelo CRM primeiro) não pode
+        # significar perder a origem do lead nem a comissão de quem agendou
+        # — então cria o lead aqui também, já na aba "Agendados".
+        novo_lead = Lead.objects.create(
+            organizacao=org,
+            nome=paciente.nome,
+            whatsapp=paciente.telefone,
+            origem=form.cleaned_data["origem"],
+            responsavel=request.user,
+            paciente=paciente,
         )
 
     consulta = Consulta.objects.create(
@@ -190,11 +204,15 @@ def criar_consulta_rapida(request):
         paciente=paciente,
         profissional=form.cleaned_data["profissional"],
         tipo_consulta=form.cleaned_data["tipo_consulta"],
+        lead=novo_lead,
         data_hora=data_hora,
         duracao_minutos=form.cleaned_data["duracao_minutos"],
         valor=form.cleaned_data["valor"],
         observacoes=form.cleaned_data["observacoes"],
     )
+
+    if novo_lead:
+        novo_lead.marcar_agendada(consulta=consulta, responsavel=request.user)
 
     # Se a paciente já tem um programa ativo com uma consulta do checklist
     # ainda pendente de agendamento, essa consulta nova já é aquela —

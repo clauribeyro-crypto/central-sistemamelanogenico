@@ -3,6 +3,59 @@
 {% block content %}
     <h1>O que preciso fazer hoje?</h1>
 
+    {% if meta_mes %}
+        <div class="card" style="border:2px solid #6366f1;">
+            <h2>🎯 Meta do mês — R$ {{ meta_mes.meta_faturamento|floatformat:0 }}</h2>
+            <div class="grid">
+                <div class="card stat">
+                    <div class="num">R$ {{ meta_mes.faturado|floatformat:2 }}</div>
+                    <div class="rotulo">Recebido este mês (só o que já caiu no caixa)</div>
+                </div>
+                <div class="card stat" style="background:#6366f111;">
+                    <div class="num">R$ {{ meta_mes.faltam_faturamento|floatformat:2 }}</div>
+                    <div class="rotulo">Falta receber para bater a meta</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
+                    <div class="rotulo">Consultas já pagas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ meta_mes.qtd_fechamentos }} / {{ meta_mes.meta_fechamentos }}</div>
+                    <div class="rotulo">Tratamentos já pagos este mês (faltam {{ meta_mes.faltam_fechamentos }})</div>
+                </div>
+            </div>
+            <div style="background:#e5e7eb; border-radius:999px; height:10px; overflow:hidden; margin:.75rem 0;">
+                <div style="background:#6366f1; height:100%; width:{{ meta_mes.percentual_faturamento }}%;"></div>
+            </div>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
+                {{ meta_mes.percentual_faturamento }}% da meta batida este mês.
+            </p>
+
+            {% if usuario_e_administrador %}
+                <details style="margin-top:.75rem;">
+                    <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">Ajustar meta</summary>
+                    <form method="post" action="{% url 'financeiro:salvar_meta_mes' %}"
+                          style="display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:.5rem;">
+                        {% csrf_token %}
+                        <div>
+                            <label style="display:block; font-size:.8rem; color:var(--text-muted);">Meta de faturamento (R$)</label>
+                            <input type="number" step="0.01" name="meta_faturamento_mensal" value="{{ meta_mes.meta_faturamento }}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:.8rem; color:var(--text-muted);">Meta de consultas</label>
+                            <input type="number" step="1" name="meta_consultas_mensal" value="{{ meta_mes.meta_consultas }}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:.8rem; color:var(--text-muted);">Meta de fechamentos</label>
+                            <input type="number" step="1" name="meta_fechamentos_mensal" value="{{ meta_mes.meta_fechamentos }}">
+                        </div>
+                        <button type="submit" class="btn">Salvar</button>
+                    </form>
+                </details>
+            {% endif %}
+        </div>
+    {% endif %}
+
     {% if form_social_selling %}
         <div class="card">
             <h2>📲 Social selling de hoje (Instagram)</h2>
@@ -183,37 +236,19 @@
         </div>
     </div>
 
-    {% if fila_fechamento %}
-        <div class="card">
-            <h2>🤝 Fila de fechamento ({{ total_fila_fechamento }})</h2>
-            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
-                Já fizeram a consulta de diagnóstico e ainda não iniciaram um programa — não deixe esfriar.
-            </p>
-            <table>
-                <thead>
-                    <tr><th>Paciente</th><th>Última consulta</th><th>Profissional</th><th>Ações</th></tr>
-                </thead>
-                <tbody>
-                    {% for item in fila_fechamento %}
-                        <tr>
-                            <td><a href="{% url 'pacientes:ficha' item.paciente.pk %}">{{ item.paciente.nome }}</a></td>
-                            <td>{{ item.consulta.data_hora|date:"d/m/Y" }}</td>
-                            <td>{{ item.consulta.profissional }}</td>
-                            <td style="white-space:nowrap;">
-                                <a class="btn" style="padding:.3rem .6rem; font-size:.8rem;" href="{% url 'pacientes:iniciar_protocolo' item.paciente.pk %}">Iniciar protocolo</a>
-                                <form method="post" action="{% url 'pacientes:descartar_fechamento' item.paciente.pk %}" style="display:inline;"
-                                      onsubmit="this.querySelector('[name=motivo]').value = prompt('Por que {{ item.paciente.nome|escapejs }} não vai continuar? (fica registrado no histórico dela)', '') || ''; return true;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="proximo" value="{% url 'core:home' %}">
-                                    <input type="hidden" name="motivo" value="">
-                                    <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Não vai continuar</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    {% if org.modulo_programas_ativo and total_fila_fechamento is not None %}
+        <a class="card" href="{% url 'pacientes:crm_fechamento' %}" style="text-decoration:none; display:flex; align-items:center; justify-content:space-between; gap:1rem;">
+            <div>
+                <h2 style="margin-bottom:.25rem;">🤝 CRM de fechamento</h2>
+                <p style="font-size:.85rem; color:var(--text-muted); margin:0;">
+                    Quem já fez a consulta de diagnóstico e ainda não fechou — e quantas pessoas estão sendo fechadas ou perdidas no mês.
+                </p>
+            </div>
+            <div style="text-align:center; flex-shrink:0;">
+                <div class="num" style="font-size:1.8rem;">{{ total_fila_fechamento }}</div>
+                <div class="rotulo">na fila</div>
+            </div>
+        </a>
     {% endif %}
 
     {% if org.modulo_programas_ativo %}

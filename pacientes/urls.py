@@ -14,4 +14,5 @@ urlpatterns = [
     path("<int:pk>/iniciar-protocolo/", views.iniciar_protocolo, name="iniciar_protocolo"),
     path("<int:pk>/descartar-fechamento/", views.descartar_fechamento, name="descartar_fechamento"),
     path("<int:pk>/reabrir-fechamento/", views.reabrir_fechamento, name="reabrir_fechamento"),
+    path("crm/fechamento/", views.crm_fechamento, name="crm_fechamento"),
 ]

@@ -50,6 +50,22 @@ class Organizacao(models.Model):
         help_text="Desmarque para esconder Programas e o início de protocolo de acompanhamento dessa organização.",
     )
 
+    meta_faturamento_mensal = models.DecimalField(
+        max_digits=10, decimal_places=2, default=50000,
+        verbose_name="meta de faturamento mensal",
+        help_text="Valor que a organização quer bater por mês (tratamentos fechados + consultas cobradas) — aparece no card \"Meta do mês\" da tela inicial.",
+    )
+    meta_consultas_mensal = models.PositiveIntegerField(
+        default=25,
+        verbose_name="meta de consultas por mês",
+        help_text="Quantidade mínima de consultas cobradas no mês pra bater a meta de faturamento.",
+    )
+    meta_fechamentos_mensal = models.PositiveIntegerField(
+        default=8,
+        verbose_name="meta de fechamentos por mês",
+        help_text="Quantidade mínima de tratamentos/programas fechados no mês pra bater a meta de faturamento.",
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:

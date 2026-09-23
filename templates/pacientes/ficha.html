@@ -143,6 +143,36 @@
             </div>
         {% endif %}
 
+        {% if acompanhamentos_anteriores %}
+            <div class="card">
+                <h2 style="margin-top:0;">Programas anteriores</h2>
+                <table>
+                    <thead>
+                        <tr><th>Programa</th><th>Status</th><th>Início</th><th>Valor</th><th class="no-print"></th></tr>
+                    </thead>
+                    <tbody>
+                        {% for anterior in acompanhamentos_anteriores %}
+                            <tr>
+                                <td>{{ anterior.programa.nome }}</td>
+                                <td>{{ anterior.get_status_display }}</td>
+                                <td>{{ anterior.data_inicio|date:"d/m/Y" }}</td>
+                                <td>R$ {{ anterior.valor_contratado|floatformat:2 }}</td>
+                                <td class="no-print">
+                                    {% if usuario_e_administrador %}
+                                        <form method="post" action="{% url 'programas:reabrir_acompanhamento' anterior.pk %}"
+                                              onsubmit="return confirm('Reabrir este acompanhamento ({{ anterior.programa.nome }}, iniciado em {{ anterior.data_inicio|date:'d/m/Y' }})? Ele volta a aparecer como o programa ativo dessa paciente.');">
+                                            {% csrf_token %}
+                                            <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Reabrir</button>
+                                        </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
         <div class="tabs">
             {% for slug, label in abas %}
                 <a class="{% if slug == aba_atual %}ativo{% endif %}" href="?aba={{ slug }}">{{ label }}</a>

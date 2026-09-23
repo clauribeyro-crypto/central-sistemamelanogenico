@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}CRM de fechamento · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>🤝 CRM de fechamento</h1>
+    <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
+        Acompanhamento de quem já fez a consulta de diagnóstico — quantas pessoas a gente está
+        conseguindo fechar e quantas está perdendo, mês a mês.
+    </p>
+
+    <form class="filtro no-print" method="get">
+        <div>
+            <label for="mes">Mês</label>
+            <select id="mes" name="mes">
+                {% for numero, nome in meses %}
+                    <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ano">Ano</label>
+            <select id="ano" name="ano">
+                {% for a in anos %}
+                    <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <h2 style="margin-bottom:.5rem;">{{ mes_nome }}/{{ ano|stringformat:'d' }}</h2>
+    <div class="grid">
+        <div class="card stat">
+            <div class="num">{{ consultas_no_mes }}</div>
+            <div class="rotulo">Consultas de diagnóstico realizadas no mês</div>
+        </div>
+        <div class="card stat" style="background:#22c55e11;">
+            <div class="num">{{ fechados_no_mes }}</div>
+            <div class="rotulo">Fechamentos no mês</div>
+        </div>
+        <div class="card stat" style="background:#ef444411;">
+            <div class="num">{{ perdidos_no_mes }}</div>
+            <div class="rotulo">Perdidos no mês</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{% if taxa_conversao is not None %}{{ taxa_conversao }}%{% else %}—{% endif %}</div>
+            <div class="rotulo">Taxa de conversão (fechados ÷ fechados+perdidos)</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Fila de fechamento ({{ total_fila_fechamento }})</h2>
+        <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+            Já fizeram a consulta de diagnóstico e ainda não iniciaram um programa nem foram marcadas como perdidas.
+        </p>
+        {% if fila_fechamento %}
+            <table>
+                <thead>
+                    <tr><th>Paciente</th><th>Última consulta</th><th>Profissional</th><th>Ações</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in fila_fechamento %}
+                        <tr>
+                            <td><a href="{% url 'pacientes:ficha' item.paciente.pk %}">{{ item.paciente.nome }}</a></td>
+                            <td>{{ item.consulta.data_hora|date:"d/m/Y" }}</td>
+                            <td>{{ item.consulta.profissional }}</td>
+                            <td style="white-space:nowrap;">
+                                <a class="btn" style="padding:.3rem .6rem; font-size:.8rem;" href="{% url 'pacientes:iniciar_protocolo' item.paciente.pk %}">Iniciar protocolo</a>
+                                <form method="post" action="{% url 'pacientes:descartar_fechamento' item.paciente.pk %}" style="display:inline;"
+                                      onsubmit="this.querySelector('[name=motivo]').value = prompt('Por que {{ item.paciente.nome|escapejs }} não vai continuar? (fica registrado no histórico dela)', '') || ''; return true;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="proximo" value="{% url 'pacientes:crm_fechamento' %}">
+                                    <input type="hidden" name="motivo" value="">
+                                    <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Não vai continuar</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Ninguém esperando follow-up agora. 🎉</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Perdidos em {{ mes_nome|lower }} ({{ perdidos_no_mes }})</h2>
+        {% if lista_perdidos %}
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Paciente</th><th>Motivo</th><th>Responsável</th></tr>
+                </thead>
+                <tbody>
+                    {% for item in lista_perdidos %}
+                        <tr>
+                            <td>{{ item.data_hora|date:"d/m/Y" }}</td>
+                            <td><a href="{% url 'pacientes:ficha' item.paciente.pk %}">{{ item.paciente.nome }}</a></td>
+                            <td>{{ item.motivo|default:"—" }}</td>
+                            <td>{{ item.responsavel|default:"—" }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhuma paciente marcada como perdida nesse mês.</p>
+        {% endif %}
+    </div>
+{% endblock %}
