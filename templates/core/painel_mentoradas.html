@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Painel de mentoradas · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>👩‍🏫 Painel de mentoradas</h1>
+    <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
+        Números principais de cada clínica, lado a lado — cada uma com os dados dela, isolados das outras.
+    </p>
+
+    <form class="filtro no-print" method="get">
+        <div>
+            <label for="mes">Mês</label>
+            <select id="mes" name="mes">
+                {% for numero, nome in meses %}
+                    <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ano">Ano</label>
+            <select id="ano" name="ano">
+                {% for a in anos %}
+                    <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <h2 style="margin-bottom:.5rem;">{{ mes_nome }}/{{ ano|stringformat:'d' }}</h2>
+
+    {% if clinicas %}
+        <div class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Clínica</th>
+                        <th>Recebido no mês</th>
+                        <th>Meta</th>
+                        <th>% da meta</th>
+                        <th>Consultas</th>
+                        <th>Fechamentos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in clinicas %}
+                        <tr>
+                            <td>{{ item.org.nome }}</td>
+                            <td>R$ {{ item.faturado|floatformat:2 }}</td>
+                            <td>R$ {{ item.meta|floatformat:2 }}</td>
+                            <td>
+                                <div style="display:flex; align-items:center; gap:.5rem;">
+                                    <div style="background:#e5e7eb; border-radius:999px; height:8px; width:80px; overflow:hidden;">
+                                        <div style="background:#6366f1; height:100%; width:{{ item.percentual_meta }}%;"></div>
+                                    </div>
+                                    <span style="font-size:.85rem; color:var(--text-muted);">{{ item.percentual_meta }}%</span>
+                                </div>
+                            </td>
+                            <td>{{ item.qtd_consultas }} / {{ item.meta_consultas }}</td>
+                            <td>{{ item.qtd_fechamentos }} / {{ item.meta_fechamentos }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="card"><p>Nenhuma clínica ativa cadastrada ainda.</p></div>
+    {% endif %}
+{% endblock %}
