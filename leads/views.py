@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Count, F, Sum
+from django.db.models import Count
 from django.forms import modelformset_factory
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -19,6 +19,7 @@ from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
+from financeiro.models import Pagamento
 from financeiro.views import MESES
 from pacientes.models import Paciente
 from programas.models import Acompanhamento
@@ -269,13 +270,23 @@ def painel_marketing(request):
             data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
         ).values("data_hora__date").annotate(total=Count("id"))
     }
-    fechamentos_do_periodo = list(
-        Acompanhamento.objects.filter(
-            organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
-        ).values("data_inicio").annotate(total=Count("id"), valor=Sum(F("valor_contratado") - F("desconto")))
-    )
-    vendas_por_dia = {row["data_inicio"]: row["total"] for row in fechamentos_do_periodo}
-    valor_por_dia = {row["data_inicio"]: row["valor"] or Decimal("0.00") for row in fechamentos_do_periodo}
+    fechamentos_do_periodo = Acompanhamento.objects.filter(
+        organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
+    ).prefetch_related("pagamentos")
+    vendas_por_dia = {}
+    valor_por_dia = {}
+    for acompanhamento in fechamentos_do_periodo:
+        # Mesma regra do relatório de fechamentos (financeiro.views.totais_fechamentos_mes):
+        # o valor de verdade é o do pagamento vinculado, que pode ter sido corrigido
+        # direto no Financeiro — valor_contratado só entra se não existir pagamento.
+        pagamento = next(
+            (p for p in acompanhamento.pagamentos.all() if p.status != Pagamento.Status.CANCELADO), None
+        )
+        valor_liquido = pagamento.valor if pagamento else (acompanhamento.valor_contratado - acompanhamento.desconto)
+        vendas_por_dia[acompanhamento.data_inicio] = vendas_por_dia.get(acompanhamento.data_inicio, 0) + 1
+        valor_por_dia[acompanhamento.data_inicio] = (
+            valor_por_dia.get(acompanhamento.data_inicio, Decimal("0.00")) + valor_liquido
+        )
 
     linhas = []
     for form in formset:
