@@ -137,29 +137,14 @@ def relatorio(request):
     return render(request, "financeiro/relatorio.html", contexto)
 
 
-@login_required
-@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
-def relatorio_fechamentos(request):
+def totais_fechamentos_mes(org, ano, mes):
     """
-    Relatório do mês pra imprimir: programas/tratamentos fechados (contratos
-    assinados no período) de um lado, consultas cobradas do outro — são
-    duas fontes de faturamento bem diferentes e a Cláudia quer ver cada uma
-    separada, não misturada num total só de "pagamentos".
+    Tratamentos/programas fechados (contratos assinados no período) e
+    consultas cobradas nesse mês — duas fontes de faturamento bem
+    diferentes. Reaproveitado pelo relatório de fechamentos e pelo card
+    de meta mensal da home, pra não calcular esse número de dois jeitos
+    diferentes em dois lugares.
     """
-    org = organizacao_do_usuario(request)
-    hoje = datetime.date.today()
-
-    try:
-        ano = int(request.GET.get("ano", hoje.year))
-    except ValueError:
-        ano = hoje.year
-    try:
-        mes = int(request.GET.get("mes", hoje.month))
-    except ValueError:
-        mes = hoje.month
-    if mes < 1 or mes > 12:
-        mes = hoje.month
-
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)
     data_fim = datetime.date(ano, mes, ultimo_dia)
@@ -192,13 +177,7 @@ def relatorio_fechamentos(request):
     total_consultas = sum((c.valor for c in consultas), Decimal("0.00"))
     total_recebido_consultas = sum((c.total_recebido for c in consultas), Decimal("0.00"))
 
-    contexto = {
-        "ano": ano,
-        "mes": mes,
-        "mes_nome": dict(MESES)[mes],
-        "meses": MESES,
-        "anos": range(hoje.year - 3, hoje.year + 2),
-        "usuario_e_administrador": usuario_e_administrador(request),
+    return {
         "tratamentos": tratamentos,
         "qtd_tratamentos": len(tratamentos),
         "total_tratamentos": total_tratamentos,
@@ -209,6 +188,40 @@ def relatorio_fechamentos(request):
         "total_recebido_consultas": total_recebido_consultas,
         "total_geral": total_tratamentos + total_consultas,
         "total_recebido_geral": total_recebido_tratamentos + total_recebido_consultas,
+    }
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+def relatorio_fechamentos(request):
+    """
+    Relatório do mês pra imprimir: programas/tratamentos fechados de um
+    lado, consultas cobradas do outro — são duas fontes de faturamento
+    bem diferentes e a Cláudia quer ver cada uma separada, não misturada
+    num total só de "pagamentos".
+    """
+    org = organizacao_do_usuario(request)
+    hoje = datetime.date.today()
+
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+
+    contexto = {
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+        "usuario_e_administrador": usuario_e_administrador(request),
+        **totais_fechamentos_mes(org, ano, mes),
     }
     return render(request, "financeiro/relatorio_fechamentos.html", contexto)
 
@@ -429,6 +442,31 @@ def salvar_saldo_inicial(request):
     org.save(update_fields=["saldo_inicial_financeiro"])
     messages.success(request, "Saldo inicial atualizado.")
     return redirect(f"{reverse('financeiro:painel')}?aba=geral")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+@require_POST
+def salvar_meta_mes(request):
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem alterar a meta do mês.")
+        return redirect("core:home")
+
+    try:
+        meta_faturamento = Decimal(request.POST.get("meta_faturamento_mensal", "0").replace(",", "."))
+        meta_consultas = int(request.POST.get("meta_consultas_mensal", "0"))
+        meta_fechamentos = int(request.POST.get("meta_fechamentos_mensal", "0"))
+    except Exception:
+        messages.error(request, "Valor inválido.")
+        return redirect("core:home")
+
+    org.meta_faturamento_mensal = meta_faturamento
+    org.meta_consultas_mensal = meta_consultas
+    org.meta_fechamentos_mensal = meta_fechamentos
+    org.save(update_fields=["meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal"])
+    messages.success(request, "Meta do mês atualizada.")
+    return redirect("core:home")
 
 
 @login_required

@@ -3,6 +3,59 @@
 {% block content %}
     <h1>O que preciso fazer hoje?</h1>
 
+    {% if meta_mes %}
+        <div class="card" style="border:2px solid #6366f1;">
+            <h2>🎯 Meta do mês — R$ {{ meta_mes.meta_faturamento|floatformat:0 }}</h2>
+            <div class="grid">
+                <div class="card stat">
+                    <div class="num">R$ {{ meta_mes.faturado|floatformat:2 }}</div>
+                    <div class="rotulo">Faturado este mês (tratamentos + consultas)</div>
+                </div>
+                <div class="card stat" style="background:#6366f111;">
+                    <div class="num">R$ {{ meta_mes.faltam_faturamento|floatformat:2 }}</div>
+                    <div class="rotulo">Falta para bater a meta</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
+                    <div class="rotulo">Consultas cobradas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ meta_mes.qtd_fechamentos }} / {{ meta_mes.meta_fechamentos }}</div>
+                    <div class="rotulo">Tratamentos fechados este mês (faltam {{ meta_mes.faltam_fechamentos }})</div>
+                </div>
+            </div>
+            <div style="background:#e5e7eb; border-radius:999px; height:10px; overflow:hidden; margin:.75rem 0;">
+                <div style="background:#6366f1; height:100%; width:{{ meta_mes.percentual_faturamento }}%;"></div>
+            </div>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
+                {{ meta_mes.percentual_faturamento }}% da meta batida este mês.
+            </p>
+
+            {% if usuario_e_administrador %}
+                <details style="margin-top:.75rem;">
+                    <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">Ajustar meta</summary>
+                    <form method="post" action="{% url 'financeiro:salvar_meta_mes' %}"
+                          style="display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:.5rem;">
+                        {% csrf_token %}
+                        <div>
+                            <label style="display:block; font-size:.8rem; color:var(--text-muted);">Meta de faturamento (R$)</label>
+                            <input type="number" step="0.01" name="meta_faturamento_mensal" value="{{ meta_mes.meta_faturamento }}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:.8rem; color:var(--text-muted);">Meta de consultas</label>
+                            <input type="number" step="1" name="meta_consultas_mensal" value="{{ meta_mes.meta_consultas }}">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:.8rem; color:var(--text-muted);">Meta de fechamentos</label>
+                            <input type="number" step="1" name="meta_fechamentos_mensal" value="{{ meta_mes.meta_fechamentos }}">
+                        </div>
+                        <button type="submit" class="btn">Salvar</button>
+                    </form>
+                </details>
+            {% endif %}
+        </div>
+    {% endif %}
+
     {% if form_social_selling %}
         <div class="card">
             <h2>📲 Social selling de hoje (Instagram)</h2>

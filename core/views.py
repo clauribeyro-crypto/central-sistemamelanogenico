@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum
@@ -7,8 +8,9 @@ from django.utils import timezone
 
 from agenda.models import Consulta
 from contas.models import Usuario
-from contas.utils import organizacao_do_usuario
+from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento
+from financeiro.views import totais_fechamentos_mes
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
@@ -89,6 +91,7 @@ def home(request):
 
     contexto = {
         "org": org,
+        "usuario_e_administrador": usuario_e_administrador(request),
         "novos_hoje": leads_ativos.filter(etapa=Lead.Etapa.NOVO, entrou_em__date=hoje).count(),
         "contato_1": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_1).count(),
         "contato_2": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_2).count(),
@@ -113,6 +116,27 @@ def home(request):
             organizacao=org, status=Pagamento.Status.PENDENTE
         ).order_by("data_vencimento")[:10],
     }
+
+    if org.modulo_financeiro_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
+        totais_mes_atual = totais_fechamentos_mes(org, hoje.year, hoje.month)
+        faltam_faturamento = max(org.meta_faturamento_mensal - totais_mes_atual["total_geral"], Decimal("0.00"))
+        faltam_consultas = max(org.meta_consultas_mensal - totais_mes_atual["qtd_consultas"], 0)
+        faltam_fechamentos = max(org.meta_fechamentos_mensal - totais_mes_atual["qtd_tratamentos"], 0)
+        contexto["meta_mes"] = {
+            "meta_faturamento": org.meta_faturamento_mensal,
+            "faturado": totais_mes_atual["total_geral"],
+            "faltam_faturamento": faltam_faturamento,
+            "percentual_faturamento": min(
+                round(totais_mes_atual["total_geral"] / org.meta_faturamento_mensal * 100) if org.meta_faturamento_mensal else 0,
+                100,
+            ),
+            "meta_consultas": org.meta_consultas_mensal,
+            "qtd_consultas": totais_mes_atual["qtd_consultas"],
+            "faltam_consultas": faltam_consultas,
+            "meta_fechamentos": org.meta_fechamentos_mensal,
+            "qtd_fechamentos": totais_mes_atual["qtd_tratamentos"],
+            "faltam_fechamentos": faltam_fechamentos,
+        }
 
     if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         pacientes_candidatas = Paciente.objects.filter(
