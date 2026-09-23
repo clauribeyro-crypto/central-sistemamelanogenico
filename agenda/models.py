@@ -29,6 +29,17 @@ class TipoConsulta(ModeloDaOrganizacao):
     )
     ativo = models.BooleanField(default=True)
     ordem = models.PositiveIntegerField(default=0)
+    conta_para_fechamento = models.BooleanField(
+        "conta para a fila de fechamento",
+        default=True,
+        help_text=(
+            "Quando uma consulta desse tipo é realizada e a paciente ainda não "
+            "tem programa ativo, ela entra na 'Fila de fechamento' da home, "
+            "pedindo follow-up pra fechar a venda. Desmarque para tipos que "
+            "não costumam virar programa — consulta de retorno de quem só "
+            "compra produtos, consulta avulsa, etc."
+        ),
+    )
 
     class Meta:
         verbose_name = "tipo de consulta"
