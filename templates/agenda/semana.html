@@ -94,6 +94,16 @@
                         <label for="fr-nova-telefone">WhatsApp/telefone</label>
                         <input type="text" id="fr-nova-telefone" name="nova_paciente_telefone">
                     </div>
+                    <div>
+                        <label for="fr-origem">Origem do lead</label>
+                        <select id="fr-origem" name="origem">
+                            <option value="">Selecione…</option>
+                            {% for o in origens %}
+                                <option value="{{ o.pk }}">{{ o.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <p style="font-size:.78rem; color:var(--text-muted); margin:.25rem 0 0;">De onde essa pessoa veio — cria o registro dela no CRM de leads também, já na aba "Agendados", contando a comissão pra quem agendou.</p>
+                    </div>
                     <p style="margin:.35rem 0 0;">
                         <a href="#" id="link-paciente-existente" style="font-size:.82rem;">← Usar paciente já cadastrada</a>
                     </p>
@@ -236,6 +246,7 @@
         const blocoNovaPaciente = document.getElementById("bloco-nova-paciente");
         const campoNovaNome = document.getElementById("fr-nova-nome");
         const campoNovaTelefone = document.getElementById("fr-nova-telefone");
+        const campoOrigem = document.getElementById("fr-origem");
 
         function mostrarModoNovaPaciente() {
             blocoBuscaPaciente.hidden = true;
@@ -243,6 +254,7 @@
             buscaInput.value = "";
             pacienteIdInput.value = "";
             resultadosDiv.hidden = true;
+            campoOrigem.required = true;
         }
 
         function mostrarModoPacienteExistente() {
@@ -250,6 +262,8 @@
             blocoBuscaPaciente.hidden = false;
             campoNovaNome.value = "";
             campoNovaTelefone.value = "";
+            campoOrigem.value = "";
+            campoOrigem.required = false;
         }
 
         document.getElementById("link-nova-paciente").addEventListener("click", function (ev) {
