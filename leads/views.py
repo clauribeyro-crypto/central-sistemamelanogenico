@@ -792,21 +792,35 @@ def webhook_importar_lead(request, token):
         "nome", "name", "telefone", "whatsapp", "phone", "origem",
         "data", "data_primeiro_contato", "timestamp",
     }
+    # Chave normalizada (sem espaço nas pontas, minúscula) pra reconhecer nome/telefone/origem/data
+    # não importa como a planilha escreveu o cabeçalho (ex.: "Nome", "Telefone ") — sem isso, um
+    # cabeçalho com maiúscula não batia com "nome"/"telefone" e a lead nem chegava a ser criada,
+    # além de vazar como se fosse resposta de formulário.
+    dados_normalizados = {str(chave).strip().lower(): valor for chave, valor in dados.items()}
     dados_extras = {
         chave: valor for chave, valor in dados.items()
-        if chave not in CAMPOS_RECONHECIDOS and str(valor).strip()
+        if str(chave).strip().lower() not in CAMPOS_RECONHECIDOS and str(valor).strip()
     }
 
-    nome = dados.get("nome") or dados.get("name") or ""
-    telefone = dados.get("telefone") or dados.get("whatsapp") or dados.get("phone") or ""
+    nome = dados_normalizados.get("nome") or dados_normalizados.get("name") or ""
+    telefone = (
+        dados_normalizados.get("telefone")
+        or dados_normalizados.get("whatsapp")
+        or dados_normalizados.get("phone")
+        or ""
+    )
 
     origem = None
-    nome_origem = (dados.get("origem") or "").strip()
+    nome_origem = str(dados_normalizados.get("origem") or "").strip()
     if nome_origem:
         origem = Origem.objects.filter(organizacao=webhook.organizacao, nome__iexact=nome_origem).first()
 
     data_primeiro_contato = None
-    valor_data = dados.get("data") or dados.get("data_primeiro_contato") or dados.get("timestamp")
+    valor_data = (
+        dados_normalizados.get("data")
+        or dados_normalizados.get("data_primeiro_contato")
+        or dados_normalizados.get("timestamp")
+    )
     if valor_data:
         data_primeiro_contato = parse_datetime(valor_data)
         if not data_primeiro_contato:
