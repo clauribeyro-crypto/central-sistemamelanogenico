@@ -14,44 +14,51 @@
         <button class="btn" type="submit">Buscar</button>
     </form>
 
-    <div class="card">
-        {% if pacientes %}
-            <table>
-                <thead><tr><th>Nome</th><th>Telefone</th><th>Programa atual</th><th></th>{% if usuario_e_administrador %}<th></th>{% endif %}</tr></thead>
-                <tbody>
-                {% for p in pacientes %}
-                    <tr>
-                        <td>{{ p.nome }}</td>
-                        <td>{{ p.telefone|default:"—" }}</td>
-                        <td>
-                            {% with acomp=p.acompanhamento_atual %}
-                                {% if acomp %}
-                                    <span class="badge">{{ acomp.programa.nome }}</span>
-                                {% else %}
-                                    <span style="color:var(--text-muted);">sem programa ativo</span>
-                                {% endif %}
-                            {% endwith %}
-                        </td>
-                        <td><a href="{% url 'pacientes:ficha' p.pk %}">Abrir ficha ›</a></td>
-                        {% if usuario_e_administrador %}
+    {% if pacientes %}
+        {% regroup pacientes by tem_acompanhamento_ativo as grupos_pacientes %}
+        {% for grupo in grupos_pacientes %}
+            <div class="card">
+                <h2 style="margin-top:0;">
+                    {% if grupo.grouper %}🟢 Em acompanhamento{% else %}Sem programa ativo{% endif %}
+                    ({{ grupo.list|length }})
+                </h2>
+                <table>
+                    <thead><tr><th>Nome</th><th>Telefone</th><th>Programa atual</th><th></th>{% if usuario_e_administrador %}<th></th>{% endif %}</tr></thead>
+                    <tbody>
+                    {% for p in grupo.list %}
+                        <tr>
+                            <td>{{ p.nome }}</td>
+                            <td>{{ p.telefone|default:"—" }}</td>
                             <td>
-                                <form method="post" action="{% url 'pacientes:excluir' p.pk %}"
-                                      onsubmit="return confirm('Excluir \'{{ p.nome|escapejs }}\'? Só funciona se ela não tiver consultas, pagamentos recebidos, anamnese ou outros registros — essa ação não pode ser desfeita.');">
-                                    {% csrf_token %}
-                                    <button class="btn btn-danger" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">🗑️ Excluir</button>
-                                </form>
+                                {% with acomp=p.acompanhamento_atual %}
+                                    {% if acomp %}
+                                        <span class="badge">{{ acomp.programa.nome }}</span>
+                                    {% else %}
+                                        <span style="color:var(--text-muted);">sem programa ativo</span>
+                                    {% endif %}
+                                {% endwith %}
                             </td>
-                        {% endif %}
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        {% elif busca %}
-            <p>Nenhuma paciente encontrada pra "{{ busca }}". Cadastre agora mesmo abaixo.</p>
-        {% else %}
-            <p>Nenhuma paciente cadastrada ainda.</p>
-        {% endif %}
-    </div>
+                            <td><a href="{% url 'pacientes:ficha' p.pk %}">Abrir ficha ›</a></td>
+                            {% if usuario_e_administrador %}
+                                <td>
+                                    <form method="post" action="{% url 'pacientes:excluir' p.pk %}"
+                                          onsubmit="return confirm('Excluir \'{{ p.nome|escapejs }}\'? Só funciona se ela não tiver consultas, pagamentos recebidos, anamnese ou outros registros — essa ação não pode ser desfeita.');">
+                                        {% csrf_token %}
+                                        <button class="btn btn-danger" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">🗑️ Excluir</button>
+                                    </form>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endfor %}
+    {% elif busca %}
+        <div class="card"><p>Nenhuma paciente encontrada pra "{{ busca }}". Cadastre agora mesmo abaixo.</p></div>
+    {% else %}
+        <div class="card"><p>Nenhuma paciente cadastrada ainda.</p></div>
+    {% endif %}
 
     <div class="card" id="cadastro-rapido">
         <h2>Cadastro rápido</h2>
