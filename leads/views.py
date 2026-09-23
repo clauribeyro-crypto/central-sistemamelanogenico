@@ -1,8 +1,13 @@
+import calendar
+import datetime
 import json
+from decimal import Decimal
 from urllib.parse import quote
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count, F, Sum
+from django.forms import modelformset_factory
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -14,14 +19,19 @@ from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
+from financeiro.views import MESES
 from pacientes.models import Paciente
+from programas.models import Acompanhamento
 
 from .forms import (
     AgendarConsultaForm, EditarLeadForm, EnviarWhatsAppForm, NovoLeadForm, OrigemForm,
-    PausarCadenciaForm, PerderLeadForm, RegistrarLigacaoForm, RegistroSocialSellingForm,
-    ResultadoContatoForm,
+    PausarCadenciaForm, PerderLeadForm, RegistrarLigacaoForm, RegistroMarketingDiarioForm,
+    RegistroSocialSellingForm, ResultadoContatoForm,
 )
-from .models import HistoricoLead, Lead, MensagemModelo, Origem, RegistroSocialSelling, WebhookImportacao
+from .models import (
+    HistoricoLead, Lead, MensagemModelo, Origem, RegistroMarketingDiario, RegistroSocialSelling,
+    WebhookImportacao,
+)
 
 MENSAGENS_PADRAO = {
     MensagemModelo.Etapa.CONTATO_1: (
@@ -181,6 +191,120 @@ def registrar_social_selling(request):
     else:
         messages.error(request, "Não deu pra salvar — confira os números.")
     return redirect("core:home")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+def painel_marketing(request):
+    """
+    Visão diária de marketing e funil comercial pra gestora de tráfego.
+    Investimento/impressões/cliques/pageview são lançados manualmente (o
+    sistema não tem integração com Meta/Google Ads); leads, reuniões
+    realizadas, vendas e valor são calculados a partir do que já existe no
+    CRM de leads e no CRM de fechamento — não duplica lançamento nem corre
+    o risco desses números baterem diferente do resto do sistema.
+    """
+    org = organizacao_do_usuario(request)
+    hoje = timezone.localdate()
+
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+
+    ultimo_dia_mes = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = min(datetime.date(ano, mes, ultimo_dia_mes), hoje)
+
+    if data_fim >= data_inicio:
+        dias_ja = set(RegistroMarketingDiario.objects.filter(
+            organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+        ).values_list("data", flat=True))
+        dia_atual = data_inicio
+        novos = []
+        while dia_atual <= data_fim:
+            if dia_atual not in dias_ja:
+                novos.append(RegistroMarketingDiario(organizacao=org, data=dia_atual))
+            dia_atual += datetime.timedelta(days=1)
+        if novos:
+            RegistroMarketingDiario.objects.bulk_create(novos)
+
+    queryset = RegistroMarketingDiario.objects.filter(
+        organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+    ).order_by("data")
+    FormSet = modelformset_factory(RegistroMarketingDiario, form=RegistroMarketingDiarioForm, extra=0)
+
+    if request.method == "POST":
+        formset = FormSet(request.POST, queryset=queryset)
+        if formset.is_valid():
+            formset.save()
+            messages.success(request, "Números de marketing salvos.")
+            return redirect(f"{reverse('leads:painel_marketing')}?ano={ano}&mes={mes}")
+        messages.error(request, "Não deu pra salvar — confira os números.")
+    else:
+        formset = FormSet(queryset=queryset)
+
+    leads_por_dia = {
+        row["entrou_em__date"]: row["total"]
+        for row in Lead.objects.filter(
+            organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
+        ).values("entrou_em__date").annotate(total=Count("id"))
+    }
+    reunioes_por_dia = {
+        row["data_hora__date"]: row["total"]
+        for row in Consulta.objects.filter(
+            organizacao=org, status=Consulta.Status.REALIZADA,
+            data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+        ).values("data_hora__date").annotate(total=Count("id"))
+    }
+    fechamentos_do_periodo = list(
+        Acompanhamento.objects.filter(
+            organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
+        ).values("data_inicio").annotate(total=Count("id"), valor=Sum(F("valor_contratado") - F("desconto")))
+    )
+    vendas_por_dia = {row["data_inicio"]: row["total"] for row in fechamentos_do_periodo}
+    valor_por_dia = {row["data_inicio"]: row["valor"] or Decimal("0.00") for row in fechamentos_do_periodo}
+
+    linhas = []
+    for form in formset:
+        data_linha = form.instance.data
+        linhas.append({
+            "form": form,
+            "data": data_linha,
+            "leads": leads_por_dia.get(data_linha, 0),
+            "reunioes": reunioes_por_dia.get(data_linha, 0),
+            "vendas": vendas_por_dia.get(data_linha, 0),
+            "valor": valor_por_dia.get(data_linha, Decimal("0.00")),
+        })
+
+    totais = {
+        "investimento": sum((l["form"].instance.investimento for l in linhas), Decimal("0.00")),
+        "impressoes": sum((l["form"].instance.impressoes for l in linhas), 0),
+        "cliques": sum((l["form"].instance.cliques for l in linhas), 0),
+        "pageviews": sum((l["form"].instance.pageviews for l in linhas), 0),
+        "leads": sum((l["leads"] for l in linhas), 0),
+        "reunioes": sum((l["reunioes"] for l in linhas), 0),
+        "vendas": sum((l["vendas"] for l in linhas), 0),
+        "valor": sum((l["valor"] for l in linhas), Decimal("0.00")),
+    }
+
+    contexto = {
+        "formset": formset,
+        "linhas": linhas,
+        "totais": totais,
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+    }
+    return render(request, "leads/painel_marketing.html", contexto)
 
 
 @login_required

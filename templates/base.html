@@ -291,7 +291,8 @@
             <nav>
                 <a class="{% if request.resolver_match.app_name == 'core' and request.resolver_match.url_name == 'home' %}ativo{% endif %}" href="{% url 'core:home' %}"><span class="icone">🗓️</span> O que fazer hoje</a>
                 {% if request.user.organizacao.modulo_leads_ativo %}
-                <a class="{% if request.resolver_match.app_name == 'leads' %}ativo{% endif %}" href="{% url 'leads:kanban' %}"><span class="icone">👥</span> CRM de leads</a>
+                <a class="{% if request.resolver_match.app_name == 'leads' and request.resolver_match.url_name != 'painel_marketing' %}ativo{% endif %}" href="{% url 'leads:kanban' %}"><span class="icone">👥</span> CRM de leads</a>
+                <a class="{% if request.resolver_match.url_name == 'painel_marketing' %}ativo{% endif %}" href="{% url 'leads:painel_marketing' %}"><span class="icone">📈</span> Marketing</a>
                 {% endif %}
                 {% if request.user.papel != "COMERCIAL" %}
                 <a class="{% if request.resolver_match.app_name == 'pacientes' and request.resolver_match.url_name != 'crm_fechamento' %}ativo{% endif %}" href="{% url 'pacientes:lista' %}"><span class="icone">📄</span> Ficha da paciente</a>

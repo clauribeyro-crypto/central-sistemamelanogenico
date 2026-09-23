@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Marketing · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>📈 Marketing</h1>
+    <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
+        Investimento, impressões, cliques e pageview são lançados manualmente — o resto (leads, reuniões, vendas e valor)
+        já vem do CRM de leads e do CRM de fechamento, sem precisar digitar de novo.
+    </p>
+
+    <form class="filtro no-print" method="get">
+        <div>
+            <label for="mes">Mês</label>
+            <select id="mes" name="mes">
+                {% for numero, nome in meses %}
+                    <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ano">Ano</label>
+            <select id="ano" name="ano">
+                {% for a in anos %}
+                    <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <h2 style="margin-bottom:.5rem;">{{ mes_nome }}/{{ ano|stringformat:'d' }}</h2>
+
+    <div class="grid">
+        <div class="card stat">
+            <div class="num">R$ {{ totais.investimento|floatformat:2 }}</div>
+            <div class="rotulo">Investido no mês</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ totais.leads }}</div>
+            <div class="rotulo">Leads no mês</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ totais.reunioes }}</div>
+            <div class="rotulo">Reuniões realizadas</div>
+        </div>
+        <div class="card stat" style="background:#22c55e11;">
+            <div class="num">{{ totais.vendas }}</div>
+            <div class="rotulo">Vendas (R$ {{ totais.valor|floatformat:2 }})</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <form method="post">
+            {% csrf_token %}
+            {{ formset.management_form }}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Investimento</th>
+                        <th>Impressões</th>
+                        <th>Cliques</th>
+                        <th>Pageview</th>
+                        <th>Leads</th>
+                        <th>Reunião realizada</th>
+                        <th>Vendas</th>
+                        <th>Valor (R$)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas %}
+                        <tr>
+                            <td>{{ linha.data|date:"d/m" }}</td>
+                            <td>
+                                {{ linha.form.id }}
+                                {{ linha.form.data }}
+                                {{ linha.form.investimento }}
+                            </td>
+                            <td>{{ linha.form.impressoes }}</td>
+                            <td>{{ linha.form.cliques }}</td>
+                            <td>{{ linha.form.pageviews }}</td>
+                            <td>{{ linha.leads }}</td>
+                            <td>{{ linha.reunioes }}</td>
+                            <td>{{ linha.vendas }}</td>
+                            <td>R$ {{ linha.valor|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight:600;">
+                        <td>Total</td>
+                        <td>R$ {{ totais.investimento|floatformat:2 }}</td>
+                        <td>{{ totais.impressoes }}</td>
+                        <td>{{ totais.cliques }}</td>
+                        <td>{{ totais.pageviews }}</td>
+                        <td>{{ totais.leads }}</td>
+                        <td>{{ totais.reunioes }}</td>
+                        <td>{{ totais.vendas }}</td>
+                        <td>R$ {{ totais.valor|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <button class="btn" type="submit" style="margin-top:1rem;">Salvar</button>
+        </form>
+    </div>
+{% endblock %}

@@ -3,7 +3,7 @@ from django import forms
 from agenda.models import TipoConsulta
 from profissionais.models import Profissional
 
-from .models import Lead, MotivoPerda, Origem, RegistroSocialSelling
+from .models import Lead, MotivoPerda, Origem, RegistroMarketingDiario, RegistroSocialSelling
 
 
 class OrigemForm(forms.ModelForm):
@@ -36,6 +36,26 @@ class RegistroSocialSellingForm(forms.ModelForm):
                 "style": "width:80px; padding:.4rem; border:1px solid #ddd5ee; border-radius:8px;",
             })
             for campo in ["seguidores_novos", "pessoas_chamadas", "pessoas_responderam", "contatos_conseguidos"]
+        }
+
+
+class RegistroMarketingDiarioForm(forms.ModelForm):
+    class Meta:
+        model = RegistroMarketingDiario
+        fields = ["data", "investimento", "impressoes", "cliques", "pageviews"]
+        widgets = {
+            "data": forms.HiddenInput(),
+            "investimento": forms.NumberInput(attrs={
+                "min": 0, "step": "0.01", "inputmode": "decimal",
+                "style": "width:100px; padding:.3rem; border:1px solid #ddd5ee; border-radius:6px;",
+            }),
+            **{
+                campo: forms.NumberInput(attrs={
+                    "min": 0, "inputmode": "numeric",
+                    "style": "width:90px; padding:.3rem; border:1px solid #ddd5ee; border-radius:6px;",
+                })
+                for campo in ["impressoes", "cliques", "pageviews"]
+            },
         }
 
 
