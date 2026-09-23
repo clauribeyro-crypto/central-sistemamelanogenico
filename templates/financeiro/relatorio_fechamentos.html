@@ -30,12 +30,18 @@
         <div class="card stat">
             <div class="num">{{ qtd_tratamentos }}</div>
             <div class="rotulo">Tratamentos fechados no mês</div>
-            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">R$ {{ total_tratamentos|floatformat:2 }}</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                Fechado: R$ {{ total_tratamentos|floatformat:2 }}<br>
+                Recebido: R$ {{ total_recebido_tratamentos|floatformat:2 }}
+            </div>
         </div>
         <div class="card stat">
             <div class="num">{{ qtd_consultas }}</div>
             <div class="rotulo">Consultas cobradas no mês</div>
-            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">R$ {{ total_consultas|floatformat:2 }}</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                Cobrado: R$ {{ total_consultas|floatformat:2 }}<br>
+                Recebido: R$ {{ total_recebido_consultas|floatformat:2 }}
+            </div>
         </div>
         <div class="card stat">
             <div class="num">R$ {{ total_geral|floatformat:2 }}</div>
