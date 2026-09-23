@@ -154,13 +154,17 @@ def home(request):
         ).distinct().count()
 
     if request.user.papel == Usuario.Papel.COMERCIAL:
+        # .distinct("lead_id") em vez de .count() direto: se a mesma lead for
+        # reagendada mais de uma vez no mês (ex.: a consulta foi excluída por
+        # engano e recriada), só a primeira agendada conta comissão — senão
+        # corrigir um agendamento vira comissão em dobro pela mesma lead.
         agendamentos_mes = HistoricoLead.objects.filter(
             lead__organizacao=org,
             tipo=HistoricoLead.Tipo.AGENDAMENTO,
             responsavel=request.user,
             data_hora__year=hoje.year,
             data_hora__month=hoje.month,
-        ).count()
+        ).values("lead_id").distinct().count()
         comissao_agendamentos = agendamentos_mes * request.user.comissao_por_agendamento
         contexto["remuneracao"] = {
             "fixo_mensal": request.user.comissao_fixo_mensal,
