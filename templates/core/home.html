@@ -201,9 +201,11 @@
                             <td>{{ item.consulta.profissional }}</td>
                             <td style="white-space:nowrap;">
                                 <a class="btn" style="padding:.3rem .6rem; font-size:.8rem;" href="{% url 'pacientes:iniciar_protocolo' item.paciente.pk %}">Iniciar protocolo</a>
-                                <form method="post" action="{% url 'pacientes:descartar_fechamento' item.paciente.pk %}" style="display:inline;">
+                                <form method="post" action="{% url 'pacientes:descartar_fechamento' item.paciente.pk %}" style="display:inline;"
+                                      onsubmit="this.querySelector('[name=motivo]').value = prompt('Por que {{ item.paciente.nome|escapejs }} não vai continuar? (fica registrado no histórico dela)', '') || ''; return true;">
                                     {% csrf_token %}
                                     <input type="hidden" name="proximo" value="{% url 'core:home' %}">
+                                    <input type="hidden" name="motivo" value="">
                                     <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Não vai continuar</button>
                                 </form>
                             </td>

@@ -121,6 +121,21 @@
                         <button class="btn btn-secondary" type="submit">Não vai continuar — tirar da fila de fechamento</button>
                     </form>
                 {% endif %}
+
+                {% if historico_fechamento %}
+                    <div style="margin-top:1.25rem; border-top:1px solid #efeaf6; padding-top:1rem;">
+                        <h3 style="font-size:.85rem; margin:0 0 .5rem;">Histórico de fechamento</h3>
+                        <ul style="list-style:none; padding:0; margin:0; font-size:.82rem; color:var(--text-muted);">
+                            {% for item in historico_fechamento %}
+                                <li style="margin-bottom:.4rem;">
+                                    {{ item.data_hora|date:"d/m/Y H:i" }} — {{ item.get_tipo_display }}
+                                    {% if item.responsavel %} (por {{ item.responsavel.get_full_name|default:item.responsavel.username }}){% endif %}
+                                    {% if item.motivo %}<br><span style="color:var(--text);">"{{ item.motivo }}"</span>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
             </div>
         {% else %}
             <div class="card">
