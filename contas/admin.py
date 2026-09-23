@@ -8,6 +8,7 @@ from .models import Organizacao, Usuario
 class OrganizacaoAdmin(admin.ModelAdmin):
     list_display = (
         "nome", "slug", "ativo",
+        "meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal",
         "modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo",
         "criado_em",
     )
@@ -19,6 +20,10 @@ class OrganizacaoAdmin(admin.ModelAdmin):
         ("Agenda", {"fields": ("agenda_hora_inicio", "agenda_hora_fim", "agenda_intervalo_minutos")}),
         ("Leads", {"fields": ("dias_lead_parado",)}),
         ("Financeiro", {"fields": ("saldo_inicial_financeiro",)}),
+        ("Meta do mês", {
+            "fields": ("meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal"),
+            "description": "Meta que aparece no card \"Meta do mês\" da tela inicial dessa organização.",
+        }),
         ("Módulos ativos", {
             "fields": ("modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo"),
             "description": "Desmarque um módulo pra escondê-lo do menu e bloquear o acesso pra essa organização.",
