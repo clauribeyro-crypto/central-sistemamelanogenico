@@ -61,6 +61,9 @@
                         <th>Cliques</th>
                         <th>Pageview</th>
                         <th>Leads</th>
+                        {% for origem in origens %}
+                            <th>{{ origem.nome }}</th>
+                        {% endfor %}
                         <th>Reunião realizada</th>
                         <th>Vendas</th>
                         <th>Valor (R$)</th>
@@ -79,6 +82,9 @@
                             <td>{{ linha.form.cliques }}</td>
                             <td>{{ linha.form.pageviews }}</td>
                             <td>{{ linha.leads }}</td>
+                            {% for total_origem in linha.leads_por_origem %}
+                                <td>{{ total_origem }}</td>
+                            {% endfor %}
                             <td>{{ linha.reunioes }}</td>
                             <td>{{ linha.vendas }}</td>
                             <td>R$ {{ linha.valor|floatformat:2 }}</td>
@@ -93,6 +99,9 @@
                         <td>{{ totais.cliques }}</td>
                         <td>{{ totais.pageviews }}</td>
                         <td>{{ totais.leads }}</td>
+                        {% for total_origem in totais.leads_por_origem %}
+                            <td>{{ total_origem }}</td>
+                        {% endfor %}
                         <td>{{ totais.reunioes }}</td>
                         <td>{{ totais.vendas }}</td>
                         <td>R$ {{ totais.valor|floatformat:2 }}</td>
