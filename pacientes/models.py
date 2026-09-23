@@ -137,13 +137,17 @@ class Paciente(ModeloDaOrganizacao):
     @property
     def precisa_fechamento(self):
         """
-        Já teve consulta realizada, não tem acompanhamento ativo e ninguém
-        marcou que ela decidiu não continuar — precisa de follow-up pra
-        fechar (ou não perder) a venda.
+        Já teve consulta realizada de um tipo que costuma virar programa
+        (ver TipoConsulta.conta_para_fechamento — descarta consulta de
+        retorno e avulsa), não tem acompanhamento ativo e ninguém marcou
+        que ela decidiu não continuar — precisa de follow-up pra fechar
+        (ou não perder) a venda.
         """
         from agenda.models import Consulta
         return (
             self.fechamento_descartado_em is None
             and self.acompanhamento_atual is None
-            and self.consultas.filter(status=Consulta.Status.REALIZADA).exists()
+            and self.consultas.filter(
+                status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True
+            ).exists()
         )

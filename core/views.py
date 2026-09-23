@@ -118,6 +118,7 @@ def home(request):
         pacientes_candidatas = Paciente.objects.filter(
             organizacao=org,
             consultas__status=Consulta.Status.REALIZADA,
+            consultas__tipo_consulta__conta_para_fechamento=True,
             fechamento_descartado_em__isnull=True,
         ).exclude(
             acompanhamentos__status__in=Acompanhamento.STATUS_ATIVOS
@@ -125,7 +126,7 @@ def home(request):
         fila_fechamento = []
         for paciente in pacientes_candidatas:
             ultima_consulta = paciente.consultas.filter(
-                status=Consulta.Status.REALIZADA
+                status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True
             ).select_related("profissional", "tipo_consulta").order_by("-data_hora").first()
             if ultima_consulta:
                 fila_fechamento.append({"paciente": paciente, "consulta": ultima_consulta})

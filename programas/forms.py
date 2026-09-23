@@ -8,7 +8,7 @@ from .models import Acompanhamento, Feedback, FaseModulacao, FotoEvolucao, Progr
 class TipoConsultaForm(forms.ModelForm):
     class Meta:
         model = TipoConsulta
-        fields = ["nome", "cor", "duracao_padrao_minutos", "valor", "ordem", "ativo"]
+        fields = ["nome", "cor", "duracao_padrao_minutos", "valor", "ordem", "conta_para_fechamento", "ativo"]
         widgets = {
             "cor": forms.TextInput(attrs={"type": "color"}),
             "nome": forms.TextInput(attrs={"placeholder": "Ex.: Consulta inicial"}),
