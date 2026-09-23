@@ -236,37 +236,19 @@
         </div>
     </div>
 
-    {% if fila_fechamento %}
-        <div class="card">
-            <h2>🤝 Fila de fechamento ({{ total_fila_fechamento }})</h2>
-            <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
-                Já fizeram a consulta de diagnóstico e ainda não iniciaram um programa — não deixe esfriar.
-            </p>
-            <table>
-                <thead>
-                    <tr><th>Paciente</th><th>Última consulta</th><th>Profissional</th><th>Ações</th></tr>
-                </thead>
-                <tbody>
-                    {% for item in fila_fechamento %}
-                        <tr>
-                            <td><a href="{% url 'pacientes:ficha' item.paciente.pk %}">{{ item.paciente.nome }}</a></td>
-                            <td>{{ item.consulta.data_hora|date:"d/m/Y" }}</td>
-                            <td>{{ item.consulta.profissional }}</td>
-                            <td style="white-space:nowrap;">
-                                <a class="btn" style="padding:.3rem .6rem; font-size:.8rem;" href="{% url 'pacientes:iniciar_protocolo' item.paciente.pk %}">Iniciar protocolo</a>
-                                <form method="post" action="{% url 'pacientes:descartar_fechamento' item.paciente.pk %}" style="display:inline;"
-                                      onsubmit="this.querySelector('[name=motivo]').value = prompt('Por que {{ item.paciente.nome|escapejs }} não vai continuar? (fica registrado no histórico dela)', '') || ''; return true;">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="proximo" value="{% url 'core:home' %}">
-                                    <input type="hidden" name="motivo" value="">
-                                    <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Não vai continuar</button>
-                                </form>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+    {% if org.modulo_programas_ativo and total_fila_fechamento is not None %}
+        <a class="card" href="{% url 'pacientes:crm_fechamento' %}" style="text-decoration:none; display:flex; align-items:center; justify-content:space-between; gap:1rem;">
+            <div>
+                <h2 style="margin-bottom:.25rem;">🤝 CRM de fechamento</h2>
+                <p style="font-size:.85rem; color:var(--text-muted); margin:0;">
+                    Quem já fez a consulta de diagnóstico e ainda não fechou — e quantas pessoas estão sendo fechadas ou perdidas no mês.
+                </p>
+            </div>
+            <div style="text-align:center; flex-shrink:0;">
+                <div class="num" style="font-size:1.8rem;">{{ total_fila_fechamento }}</div>
+                <div class="rotulo">na fila</div>
+            </div>
+        </a>
     {% endif %}
 
     {% if org.modulo_programas_ativo %}

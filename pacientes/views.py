@@ -1,3 +1,6 @@
+import calendar
+import datetime
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
@@ -10,6 +13,7 @@ from django.views.decorators.http import require_POST
 from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from financeiro.models import Pagamento, Recebimento
+from financeiro.views import MESES
 from leads.models import HistoricoLead
 from programas.models import Acompanhamento, ConsultaPrevista, CustoAcompanhamento, FaseModulacao, FotoEvolucao
 from prontuarios.models import Anamnese, Documento
@@ -562,3 +566,83 @@ def reabrir_fechamento(request, pk):
     )
     messages.success(request, "Paciente voltou pra fila de fechamento.")
     return redirect("pacientes:ficha", pk=paciente.pk)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+def crm_fechamento(request):
+    """
+    CRM separado do de leads: acompanha só quem já passou pela consulta de
+    diagnóstico com o Fábio e ainda não fechou nem foi marcada como perdida
+    — e mostra, mês a mês, quantas pessoas a clínica está conseguindo
+    fechar contra quantas está perdendo, pra medir a taxa de conversão do
+    follow-up (não só listar quem falta chamar).
+    """
+    org = organizacao_do_usuario(request)
+    hoje = timezone.localdate()
+
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    inicio_dt = timezone.make_aware(datetime.datetime.combine(data_inicio, datetime.time.min))
+    fim_dt = timezone.make_aware(datetime.datetime.combine(data_fim, datetime.time.max))
+
+    pacientes_candidatas = Paciente.objects.filter(
+        organizacao=org,
+        consultas__status=Consulta.Status.REALIZADA,
+        consultas__tipo_consulta__conta_para_fechamento=True,
+        fechamento_descartado_em__isnull=True,
+    ).exclude(
+        acompanhamentos__status__in=Acompanhamento.STATUS_ATIVOS
+    ).distinct()
+    fila = []
+    for paciente in pacientes_candidatas:
+        ultima_consulta = paciente.consultas.filter(
+            status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True
+        ).select_related("profissional", "tipo_consulta").order_by("-data_hora").first()
+        if ultima_consulta:
+            fila.append({"paciente": paciente, "consulta": ultima_consulta})
+    fila.sort(key=lambda item: item["consulta"].data_hora, reverse=True)
+
+    consultas_no_mes = Consulta.objects.filter(
+        organizacao=org, status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True,
+        data_hora__gte=inicio_dt, data_hora__lte=fim_dt,
+    ).count()
+    fechados_no_mes = Acompanhamento.objects.filter(
+        organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
+    ).count()
+    perdidos_qs = HistoricoFechamento.objects.filter(
+        paciente__organizacao=org, tipo=HistoricoFechamento.Tipo.PERDA,
+        data_hora__gte=inicio_dt, data_hora__lte=fim_dt,
+    ).select_related("paciente", "responsavel").order_by("-data_hora")
+    perdidos_no_mes = perdidos_qs.count()
+
+    total_decisoes = fechados_no_mes + perdidos_no_mes
+    taxa_conversao = round(fechados_no_mes / total_decisoes * 100) if total_decisoes else None
+
+    contexto = {
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+        "fila_fechamento": fila,
+        "total_fila_fechamento": len(fila),
+        "consultas_no_mes": consultas_no_mes,
+        "fechados_no_mes": fechados_no_mes,
+        "perdidos_no_mes": perdidos_no_mes,
+        "taxa_conversao": taxa_conversao,
+        "lista_perdidos": perdidos_qs[:50],
+    }
+    return render(request, "pacientes/crm_fechamento.html", contexto)
