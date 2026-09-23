@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Leads duplicadas · Sistema da Clínica{% endblock %}
+{% block content %}
+    <h1>Leads duplicadas</h1>
+    <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
+        Leads que parecem ser a mesma pessoa cadastrada mais de uma vez — primeiro pelo telefone (WhatsApp ou
+        telefone), depois pelo nome. Marque qual lead quer manter e clique em "Mesclar": os dados e o histórico
+        das outras são combinados nela, e as duplicatas são excluídas. Se preferir só apagar uma sem mesclar, use
+        "Excluir" na ficha dela.
+    </p>
+
+    {% if not grupos_telefone and not grupos_nome %}
+        <div class="card">
+            <p>Nenhuma lead duplicada encontrada — nem por telefone, nem por nome. 🎉</p>
+        </div>
+    {% endif %}
+
+    {% if grupos_telefone %}
+        <h2>Mesmo telefone ({{ grupos_telefone|length }})</h2>
+        {% for grupo in grupos_telefone %}
+            <div class="card">
+                <form method="post" action="{% url 'leads:mesclar_duplicados' %}">
+                    {% csrf_token %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Manter</th><th>Nome</th><th>WhatsApp</th><th>Telefone</th>
+                                <th>Origem</th><th>Etapa/Status</th><th>Entrou em</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for lead in grupo %}
+                            <tr>
+                                <td><input type="radio" name="manter" value="{{ lead.pk }}" {% if forloop.first %}checked{% endif %} required></td>
+                                <td><input type="hidden" name="grupo" value="{{ lead.pk }}">{{ lead.nome }}</td>
+                                <td>{{ lead.whatsapp|default:"—" }}</td>
+                                <td>{{ lead.telefone|default:"—" }}</td>
+                                <td>{{ lead.origem }}</td>
+                                <td>{{ lead.get_etapa_display }} / {{ lead.get_status_display }}</td>
+                                <td>{{ lead.entrou_em|date:"d/m/Y" }}</td>
+                                <td><a href="{% url 'leads:detalhe' lead.pk %}">Ver ficha ›</a></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <button class="btn" type="submit" style="margin-top:.75rem;"
+                            onclick="return confirm('Mesclar essas leads? A marcada em \'Manter\' fica com os dados e o histórico combinados; as outras são excluídas. Essa ação não pode ser desfeita.');">
+                        Mesclar
+                    </button>
+                </form>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if grupos_nome %}
+        <h2>Mesmo nome, telefones diferentes ({{ grupos_nome|length }})</h2>
+        <p style="font-size:.82rem; color:var(--text-muted); margin-top:-.5rem;">
+            Confira antes de mesclar — nome igual não garante que seja a mesma pessoa.
+        </p>
+        {% for grupo in grupos_nome %}
+            <div class="card">
+                <form method="post" action="{% url 'leads:mesclar_duplicados' %}">
+                    {% csrf_token %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Manter</th><th>Nome</th><th>WhatsApp</th><th>Telefone</th>
+                                <th>Origem</th><th>Etapa/Status</th><th>Entrou em</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for lead in grupo %}
+                            <tr>
+                                <td><input type="radio" name="manter" value="{{ lead.pk }}" {% if forloop.first %}checked{% endif %} required></td>
+                                <td><input type="hidden" name="grupo" value="{{ lead.pk }}">{{ lead.nome }}</td>
+                                <td>{{ lead.whatsapp|default:"—" }}</td>
+                                <td>{{ lead.telefone|default:"—" }}</td>
+                                <td>{{ lead.origem }}</td>
+                                <td>{{ lead.get_etapa_display }} / {{ lead.get_status_display }}</td>
+                                <td>{{ lead.entrou_em|date:"d/m/Y" }}</td>
+                                <td><a href="{% url 'leads:detalhe' lead.pk %}">Ver ficha ›</a></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    <button class="btn" type="submit" style="margin-top:.75rem;"
+                            onclick="return confirm('Mesclar essas leads? A marcada em \'Manter\' fica com os dados e o histórico combinados; as outras são excluídas. Essa ação não pode ser desfeita.');">
+                        Mesclar
+                    </button>
+                </form>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endblock %}
