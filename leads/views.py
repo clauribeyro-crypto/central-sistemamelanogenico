@@ -30,8 +30,8 @@ from .forms import (
     RegistroSocialSellingForm, ResultadoContatoForm,
 )
 from .models import (
-    HistoricoLead, Lead, MensagemModelo, Origem, RegistroMarketingDiario, RegistroSocialSelling,
-    WebhookImportacao,
+    HistoricoLead, Lead, MensagemModelo, Origem, PausaLead, RegistroMarketingDiario,
+    RegistroSocialSelling, WebhookImportacao,
 )
 
 MENSAGENS_PADRAO = {
@@ -599,6 +599,110 @@ def excluir(request, pk):
     return redirect("leads:kanban")
 
 
+def _normalizar_telefone(valor):
+    return "".join(ch for ch in (valor or "") if ch.isdigit())
+
+
+def _normalizar_nome(valor):
+    return " ".join((valor or "").split()).strip().lower()
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+def duplicados(request):
+    """
+    Agrupa leads que parecem ser a mesma pessoa cadastrada mais de uma vez —
+    primeiro por telefone (WhatsApp ou telefone, normalizado sem formatação),
+    o sinal mais confiável; leads sem telefone em comum mas com o mesmo nome
+    entram num segundo grupo, pra não se perder entre cadastros repetidos.
+    """
+    leads_qs, org = _leads_do_usuario(request)
+    leads = list(leads_qs.select_related("origem").order_by("-entrou_em"))
+
+    por_telefone = {}
+    for lead in leads:
+        chave = _normalizar_telefone(lead.whatsapp) or _normalizar_telefone(lead.telefone)
+        if chave:
+            por_telefone.setdefault(chave, []).append(lead)
+    grupos_telefone = [grupo for grupo in por_telefone.values() if len(grupo) > 1]
+
+    pks_ja_agrupados = {lead.pk for grupo in grupos_telefone for lead in grupo}
+    por_nome = {}
+    for lead in leads:
+        if lead.pk in pks_ja_agrupados:
+            continue
+        chave = _normalizar_nome(lead.nome)
+        if chave:
+            por_nome.setdefault(chave, []).append(lead)
+    grupos_nome = [grupo for grupo in por_nome.values() if len(grupo) > 1]
+
+    return render(request, "leads/duplicados.html", {
+        "grupos_telefone": grupos_telefone,
+        "grupos_nome": grupos_nome,
+    })
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+@require_POST
+def mesclar_duplicados(request):
+    """
+    Mescla um grupo de leads duplicadas numa só: transfere histórico, pausas
+    e consultas vinculadas das descartadas para a mantida, preenche na
+    mantida os campos que ela não tinha e as outras tinham, e por fim apaga
+    as duplicatas.
+    """
+    leads_qs, org = _leads_do_usuario(request)
+    try:
+        manter_pk = int(request.POST.get("manter"))
+        grupo_pks = [int(pk) for pk in request.POST.getlist("grupo")]
+    except (TypeError, ValueError):
+        messages.error(request, "Não deu pra mesclar — dados inválidos.")
+        return redirect("leads:duplicados")
+
+    if manter_pk not in grupo_pks:
+        messages.error(request, "Não deu pra mesclar — dados inválidos.")
+        return redirect("leads:duplicados")
+
+    manter = get_object_or_404(leads_qs, pk=manter_pk)
+    descartar_pks = [pk for pk in grupo_pks if pk != manter_pk]
+    descartados = list(leads_qs.filter(pk__in=descartar_pks))
+    if not descartados:
+        messages.info(request, "Nada pra mesclar.")
+        return redirect("leads:duplicados")
+
+    for descartar in descartados:
+        HistoricoLead.objects.filter(lead=descartar).update(lead=manter)
+        PausaLead.objects.filter(lead=descartar).update(lead=manter)
+        Consulta.objects.filter(lead=descartar).update(lead=manter)
+        for campo in ("whatsapp", "telefone", "instagram", "cidade", "estado"):
+            if not getattr(manter, campo) and getattr(descartar, campo):
+                setattr(manter, campo, getattr(descartar, campo))
+        if descartar.observacoes:
+            separador = "\n\n" if manter.observacoes else ""
+            manter.observacoes = (
+                f"{manter.observacoes}{separador}[De \"{descartar.nome}\", mesclado] {descartar.observacoes}"
+            )
+        if descartar.dados_formulario:
+            manter.dados_formulario = {**descartar.dados_formulario, **manter.dados_formulario}
+        if descartar.paciente_id and not manter.paciente_id:
+            manter.paciente = descartar.paciente
+        nome_descartado = descartar.nome
+        descartar.delete()
+        manter.registrar_historico(
+            HistoricoLead.Tipo.NOTA,
+            f"Mesclado com lead duplicada \"{nome_descartado}\" (dados combinados, duplicata excluída).",
+            request.user,
+        )
+
+    manter.save()
+    messages.success(
+        request,
+        f"Mesclado! \"{manter.nome}\" agora reúne os dados de {len(descartados)} lead(s) duplicada(s).",
+    )
+    return redirect("leads:duplicados")
+
+
 @login_required
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def perder(request, pk):
@@ -688,21 +792,35 @@ def webhook_importar_lead(request, token):
         "nome", "name", "telefone", "whatsapp", "phone", "origem",
         "data", "data_primeiro_contato", "timestamp",
     }
+    # Chave normalizada (sem espaço nas pontas, minúscula) pra reconhecer nome/telefone/origem/data
+    # não importa como a planilha escreveu o cabeçalho (ex.: "Nome", "Telefone ") — sem isso, um
+    # cabeçalho com maiúscula não batia com "nome"/"telefone" e a lead nem chegava a ser criada,
+    # além de vazar como se fosse resposta de formulário.
+    dados_normalizados = {str(chave).strip().lower(): valor for chave, valor in dados.items()}
     dados_extras = {
         chave: valor for chave, valor in dados.items()
-        if chave not in CAMPOS_RECONHECIDOS and str(valor).strip()
+        if str(chave).strip().lower() not in CAMPOS_RECONHECIDOS and str(valor).strip()
     }
 
-    nome = dados.get("nome") or dados.get("name") or ""
-    telefone = dados.get("telefone") or dados.get("whatsapp") or dados.get("phone") or ""
+    nome = dados_normalizados.get("nome") or dados_normalizados.get("name") or ""
+    telefone = (
+        dados_normalizados.get("telefone")
+        or dados_normalizados.get("whatsapp")
+        or dados_normalizados.get("phone")
+        or ""
+    )
 
     origem = None
-    nome_origem = (dados.get("origem") or "").strip()
+    nome_origem = str(dados_normalizados.get("origem") or "").strip()
     if nome_origem:
         origem = Origem.objects.filter(organizacao=webhook.organizacao, nome__iexact=nome_origem).first()
 
     data_primeiro_contato = None
-    valor_data = dados.get("data") or dados.get("data_primeiro_contato") or dados.get("timestamp")
+    valor_data = (
+        dados_normalizados.get("data")
+        or dados_normalizados.get("data_primeiro_contato")
+        or dados_normalizados.get("timestamp")
+    )
     if valor_data:
         data_primeiro_contato = parse_datetime(valor_data)
         if not data_primeiro_contato:

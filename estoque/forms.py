@@ -2,13 +2,16 @@ from django import forms
 
 from pacientes.models import Paciente
 
-from .models import Produto, ProducaoPendente, Recompra
+from .models import Produto, ProducaoPendente, Recompra, VendaProduto
 
 
 class ProdutoForm(forms.ModelForm):
     class Meta:
         model = Produto
-        fields = ["nome", "estoque_atual", "estoque_minimo", "duracao_estimada_dias", "ativo"]
+        fields = [
+            "nome", "preco_pix", "preco_cartao",
+            "estoque_atual", "estoque_minimo", "duracao_estimada_dias", "ativo",
+        ]
 
 
 class EntradaEstoqueForm(forms.Form):
@@ -42,3 +45,20 @@ class RecompraForm(forms.ModelForm):
         self.fields["produto"].queryset = Produto.objects.filter(
             organizacao=organizacao, ativo=True
         ).order_by("nome")
+
+
+class VendaProdutoForm(forms.ModelForm):
+    class Meta:
+        model = VendaProduto
+        fields = ["produto", "paciente", "quantidade", "forma_pagamento", "valor_total", "data", "observacoes"]
+        widgets = {"data": forms.DateInput(attrs={"type": "date"})}
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["produto"].queryset = Produto.objects.filter(
+            organizacao=organizacao, ativo=True
+        ).order_by("nome")
+        self.fields["paciente"].queryset = Paciente.objects.filter(
+            organizacao=organizacao, ativo=True
+        ).order_by("nome")
+        self.fields["paciente"].required = False

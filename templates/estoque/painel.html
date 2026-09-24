@@ -8,6 +8,7 @@
         <a class="{% if aba_atual == 'estoque' %}ativo{% endif %}" href="?aba=estoque">Estoque atual</a>
         <a class="{% if aba_atual == 'producao' %}ativo{% endif %}" href="?aba=producao">Produção pendente</a>
         <a class="{% if aba_atual == 'recompras' %}ativo{% endif %}" href="?aba=recompras">Recompras das pacientes</a>
+        <a class="{% if aba_atual == 'vendas' %}ativo{% endif %}" href="?aba=vendas">Vendas</a>
     </div>
 
     {% if aba_atual == "geral" %}
@@ -90,11 +91,13 @@
         <div class="card">
             {% if produtos %}
                 <table>
-                    <thead><tr><th>Produto</th><th>Estoque atual</th><th>Estoque mínimo</th><th>Duração estimada</th><th>Nível</th><th></th></tr></thead>
+                    <thead><tr><th>Produto</th><th>Preço Pix</th><th>Preço cartão</th><th>Estoque atual</th><th>Estoque mínimo</th><th>Duração estimada</th><th>Nível</th><th></th></tr></thead>
                     <tbody>
                     {% for p in produtos %}
                         <tr>
                             <td>{{ p.nome }}</td>
+                            <td>R$ {{ p.preco_pix|floatformat:2 }}</td>
+                            <td>R$ {{ p.preco_cartao|floatformat:2 }}</td>
                             <td>{{ p.estoque_atual }} un</td>
                             <td>{{ p.estoque_minimo }} un</td>
                             <td>{% if p.duracao_estimada_dias %}{{ p.duracao_estimada_dias }} dias{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
@@ -183,6 +186,67 @@
                 </table>
             {% else %}
                 <p>Nenhuma recompra em aberto no momento.</p>
+            {% endif %}
+        </div>
+
+    {% elif aba_atual == "vendas" %}
+        <form class="filtro no-print" method="get" style="margin-bottom:1rem;">
+            <input type="hidden" name="aba" value="vendas">
+            <div>
+                <label for="mes">Mês</label>
+                <select id="mes" name="mes">
+                    {% for numero, nome in meses %}
+                        <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="ano">Ano</label>
+                <select id="ano" name="ano">
+                    {% for a in anos %}
+                        <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit">Filtrar</button>
+        </form>
+
+        <div class="grid">
+            <div class="card stat"><div class="num">{{ vendas_do_mes|length }}</div><div class="rotulo">Vendas em {{ mes_nome }}/{{ ano|stringformat:'d' }}</div></div>
+            <div class="card stat"><div class="num">{{ total_unidades_mes }}</div><div class="rotulo">Unidades vendidas</div></div>
+            <div class="card stat"><div class="num">R$ {{ total_vendido_mes|floatformat:2 }}</div><div class="rotulo">Total vendido no mês</div></div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; margin-bottom:1rem;">
+            <a class="btn" href="{% url 'estoque:venda_criar' %}">+ Nova venda</a>
+        </div>
+
+        <div class="card">
+            {% if vendas_do_mes %}
+                <table>
+                    <thead><tr><th>Data</th><th>Produto</th><th>Paciente</th><th>Qtd.</th><th>Forma</th><th>Valor</th><th></th></tr></thead>
+                    <tbody>
+                    {% for v in vendas_do_mes %}
+                        <tr>
+                            <td>{{ v.data|date:"d/m/Y" }}</td>
+                            <td>{{ v.produto.nome }}</td>
+                            <td>{{ v.paciente.nome|default:"—" }}</td>
+                            <td>{{ v.quantidade }}</td>
+                            <td>{{ v.get_forma_pagamento_display }}</td>
+                            <td>R$ {{ v.valor_total|floatformat:2 }}</td>
+                            <td>
+                                <form method="post" action="{% url 'estoque:venda_excluir' v.pk %}" style="display:inline;"
+                                      onsubmit="return confirm('Excluir essa venda de {{ v.produto.nome }}? A quantidade volta pro estoque.');">
+                                    {% csrf_token %}
+                                    <button type="submit" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0; text-decoration:underline; font-size:.85rem;">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>Nenhuma venda registrada em {{ mes_nome }}/{{ ano|stringformat:'d' }}.</p>
             {% endif %}
         </div>
     {% endif %}

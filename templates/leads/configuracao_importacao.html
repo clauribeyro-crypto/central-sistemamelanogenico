@@ -72,7 +72,7 @@
         <div class="card">
             <h2 style="margin-top:0;">Formato esperado</h2>
             <p style="font-size:.85rem; color:var(--text-muted);">
-                O POST pode ser form-urlencoded ou JSON, com estes campos:
+                O POST pode ser form-urlencoded ou JSON, com estes campos (maiúscula/minúscula não importa):
             </p>
             <table>
                 <thead><tr><th>Campo</th><th>Obrigatório</th><th>Observação</th></tr></thead>
@@ -83,6 +83,13 @@
                     <tr><td><code>data</code></td><td>Não</td><td>Data/hora do primeiro contato (ex.: <code>2026-09-14 10:00:00</code> ou <code>14/09/2026 10:00:00</code>); se não vier, usa o momento do recebimento.</td></tr>
                 </tbody>
             </table>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-top:1rem;">
+                <strong>Qualquer outro campo enviado</strong> (cidade, há quanto tempo tem melasma, orçamento,
+                idade — o que tiver na planilha) é guardado automaticamente e aparece no card
+                "Respostas do formulário" da lead, sem precisar abrir a planilha. Ou seja: pra essas respostas
+                aparecerem no CRM, o envio (Apps Script/Respondi) precisa estar mandando essas colunas também,
+                não só nome/telefone/origem.
+            </p>
         </div>
     {% endif %}
 {% endblock %}

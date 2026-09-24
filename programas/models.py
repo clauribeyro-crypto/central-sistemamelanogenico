@@ -232,6 +232,25 @@ class Acompanhamento(ModeloDaOrganizacao):
                 alertas.append(f"Faltam {dias} dias para o término do acompanhamento.")
             elif dias < 0:
                 alertas.append("O acompanhamento já passou da data prevista de término.")
+
+            # Só cobra check-in de quem realmente tem o link (gerado manualmente na
+            # ficha) — sem isso, toda paciente sem o link geraria alerta pra sempre,
+            # mesmo nunca tendo recebido o convite pra preencher.
+            if hasattr(self.paciente, "link_checkin"):
+                hoje = timezone.localdate()
+                ultimo_checkin = self.paciente.registros_evolucao.order_by("-criado_em").first()
+                if ultimo_checkin:
+                    dias_sem_checkin = (hoje - timezone.localtime(ultimo_checkin.criado_em).date()).days
+                    if dias_sem_checkin >= 2:
+                        alertas.append(f"Sem check-in de evolução há {dias_sem_checkin} dias.")
+                else:
+                    dias_desde_link = (
+                        hoje - timezone.localtime(self.paciente.link_checkin.criado_em).date()
+                    ).days
+                    if dias_desde_link >= 2:
+                        alertas.append(
+                            f"Nunca preencheu o check-in de evolução (link enviado há {dias_desde_link} dias)."
+                        )
         return alertas
 
 
