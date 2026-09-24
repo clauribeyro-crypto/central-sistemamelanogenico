@@ -543,7 +543,7 @@ def iniciar_protocolo(request, pk):
     if request.method == "POST":
         form = IniciarProtocoloForm(request.POST, organizacao=org)
         if form.is_valid():
-            Acompanhamento.iniciar(
+            acompanhamento = Acompanhamento.iniciar(
                 paciente=paciente,
                 programa=form.cleaned_data["programa"],
                 data_inicio=form.cleaned_data["data_inicio"],
@@ -552,6 +552,14 @@ def iniciar_protocolo(request, pk):
                 forma_pagamento=form.cleaned_data["forma_pagamento"],
                 observacoes=form.cleaned_data["observacoes"],
             )
+            valor_recebido = form.cleaned_data.get("valor_recebido_agora")
+            if valor_recebido:
+                pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
+                Recebimento.objects.create(
+                    organizacao=org, pagamento=pagamento, valor=valor_recebido,
+                    forma_pagamento=form.cleaned_data["forma_recebimento"],
+                    data=form.cleaned_data["data_inicio"],
+                )
             messages.success(request, "Protocolo de acompanhamento iniciado.")
             return redirect("pacientes:ficha", pk=paciente.pk)
     else:
