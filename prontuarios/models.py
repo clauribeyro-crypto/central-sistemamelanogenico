@@ -673,6 +673,36 @@ class RegistroEvolucao(ModeloDaOrganizacao):
         ]
         return sum(vals) / len(vals) if vals else None
 
+    @property
+    def secoes_preenchidas(self):
+        """
+        [{"titulo": ..., "itens": [(rótulo, valor), ...], "melhora": N ou None,
+        "observacao": "..."}, ...] só das seções (e campos) já respondidos —
+        mesma lógica de Anamnese.secoes_preenchidas — pra mostrar o check-in
+        inteiro de uma vez, tanto na Ficha da Paciente quanto na versão pra
+        imprimir/exportar o histórico.
+        """
+        secoes = []
+        for secao in SECOES_CHECKIN:
+            itens = []
+            for campo in secao["campos"]:
+                valor = getattr(self, campo)
+                if valor in (None, ""):
+                    continue
+                exibir = getattr(self, f"get_{campo}_display", None)
+                itens.append((
+                    self._meta.get_field(campo).verbose_name.capitalize(),
+                    exibir() if exibir else valor,
+                ))
+            melhora = getattr(self, secao["melhora"])
+            observacao = getattr(self, secao["observacao"])
+            if itens or melhora is not None or observacao:
+                secoes.append({
+                    "titulo": secao["titulo"], "itens": itens,
+                    "melhora": melhora, "observacao": observacao,
+                })
+        return secoes
+
 
 class LinkCheckin(models.Model):
     """

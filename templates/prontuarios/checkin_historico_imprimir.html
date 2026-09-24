@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Histórico de check-ins · {{ paciente.nome }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #f7f4fb; --card-bg: #ffffff; --accent: #7c5cbf; --accent-soft: #efe8fb;
+            --accent-soft-text: #5b3a94; --text: #2b2635; --text-muted: #766f85;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            margin: 0; background: var(--bg); color: var(--text);
+        }
+        h1, h2 { font-family: "Playfair Display", Georgia, serif; font-weight: 600; margin: 0 0 .3rem; }
+        .pagina { max-width: 720px; margin: 0 auto; padding: 2rem 1.2rem 3rem; }
+        .topo { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; margin-bottom: 1.2rem; }
+        .topo p { color: var(--text-muted); font-size: .85rem; margin: .2rem 0 0; }
+        .btn-imprimir {
+            border: none; border-radius: 8px; background: var(--accent); color: #fff;
+            padding: .6rem 1rem; font-size: .9rem; font-weight: 600; cursor: pointer;
+        }
+        .btn-imprimir:hover { background: #6a4aa8; }
+        .registro { margin-bottom: 2rem; break-inside: avoid-page; }
+        .registro-topo { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.5rem; margin-bottom: .6rem; border-bottom: 2px solid var(--accent-soft); padding-bottom: .4rem; }
+        .registro-topo h2 { font-size: 1.05rem; }
+        .origem { font-size: .78rem; color: var(--text-muted); }
+        .card { background: var(--card-bg); border-radius: 12px; padding: .8rem 1.1rem; margin-bottom: .6rem; box-shadow: 0 1px 3px rgba(43,38,53,.06); }
+        .card h3 { font-size: .9rem; color: var(--accent-soft-text); margin: 0 0 .3rem; font-family: inherit; font-weight: 600; }
+        dl { margin: .3rem 0 0; }
+        dt { font-size: .78rem; color: var(--text-muted); margin-top: .4rem; }
+        dd { margin: 0; font-size: .92rem; }
+        .melhora { font-size: .85rem; font-weight: 600; margin-top: .4rem; }
+        .observacao { font-size: .85rem; color: var(--text-muted); margin-top: .3rem; font-style: italic; }
+        @media print {
+            body { background: #fff; }
+            .no-print { display: none !important; }
+            .card { box-shadow: none; border: 1px solid #e5e0ee; }
+            .registro { break-inside: avoid-page; }
+        }
+    </style>
+</head>
+<body>
+    <div class="pagina">
+        <div class="topo">
+            <div>
+                <h1>Histórico de check-ins</h1>
+                <p>{{ paciente.nome }} · {{ registros|length }} registro{{ registros|length|pluralize }}</p>
+            </div>
+            <button class="btn-imprimir no-print" onclick="window.print();">Imprimir / Salvar PDF</button>
+        </div>
+
+        {% for r in registros %}
+            <div class="registro">
+                <div class="registro-topo">
+                    <h2>{{ r.criado_em|date:"d/m/Y H:i" }}</h2>
+                    <span class="origem">
+                        {% if r.origem == "PACIENTE" %}📱 Preenchido pela paciente{% else %}👩‍⚕️ Registrado pela equipe{% if r.criado_por %} ({{ r.criado_por }}){% endif %}{% endif %}
+                    </span>
+                </div>
+                {% for secao in r.secoes_preenchidas %}
+                    <div class="card">
+                        <h3>{{ secao.titulo }}</h3>
+                        {% if secao.itens %}
+                            <dl>
+                                {% for rotulo, valor in secao.itens %}
+                                    <dt>{{ rotulo }}</dt>
+                                    <dd>{{ valor }}</dd>
+                                {% endfor %}
+                            </dl>
+                        {% endif %}
+                        {% if secao.melhora != None %}
+                            <p class="melhora">Melhora: {{ secao.melhora }}/10</p>
+                        {% endif %}
+                        {% if secao.observacao %}
+                            <p class="observacao">Obs.: {{ secao.observacao|linebreaksbr }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% empty %}
+            <p>Nenhum check-in registrado ainda para esta paciente.</p>
+        {% endfor %}
+    </div>
+</body>
+</html>

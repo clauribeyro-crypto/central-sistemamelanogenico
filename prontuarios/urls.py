@@ -25,6 +25,10 @@ urlpatterns = [
     ),
     path("pacientes/<int:paciente_pk>/checkin/novo/", views.checkin_criar, name="checkin_criar"),
     path("checkin/<int:pk>/excluir/", views.checkin_excluir, name="checkin_excluir"),
+    path(
+        "pacientes/<int:paciente_pk>/checkin/historico/imprimir/",
+        views.checkin_historico_imprimir, name="checkin_historico_imprimir",
+    ),
     path("checkin/publico/<uuid:token>/", views.checkin_publico, name="checkin_publico"),
     path("pacientes/<int:paciente_pk>/documentos/novo/", views.documento_criar, name="documento_criar"),
     path("documentos/<int:pk>/excluir/", views.documento_excluir, name="documento_excluir"),
