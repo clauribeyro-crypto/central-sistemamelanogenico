@@ -158,6 +158,12 @@
             <div class="num">{{ consultas_hoje|length }}</div>
             <div class="rotulo">Consultas agendadas hoje</div>
         </a>
+        {% if valor_vendas_produtos_hoje != None %}
+        <a class="card stat" href="{% url 'estoque:painel' %}?aba=vendas" style="text-decoration:none;">
+            <div class="num">R$ {{ valor_vendas_produtos_hoje|floatformat:2 }}</div>
+            <div class="rotulo">Vendido em produtos hoje ({{ qtd_vendas_produtos_hoje }} compra{{ qtd_vendas_produtos_hoje|pluralize }}) — não entra na meta do mês</div>
+        </a>
+        {% endif %}
         {% if org.modulo_leads_ativo %}
         <div class="card stat">
             <div class="num">{{ atrasados|length }}</div>
