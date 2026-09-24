@@ -10,6 +10,7 @@ from django.utils import timezone
 from agenda.models import Consulta
 from contas.models import Organizacao, Usuario
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
+from estoque.models import Venda
 from financeiro.models import Pagamento
 from financeiro.views import MESES, totais_fechamentos_mes
 from leads.forms import RegistroSocialSellingForm
@@ -117,6 +118,13 @@ def home(request):
             organizacao=org, status=Pagamento.Status.PENDENTE
         ).order_by("data_vencimento")[:10],
     }
+
+    if request.user.papel != Usuario.Papel.COMERCIAL:
+        # Valor de produtos vendidos hoje — só pra dar uma visão do dia aqui
+        # na home, sem entrar na meta do mês (que é só de tratamento/consulta).
+        vendas_hoje = list(Venda.objects.filter(organizacao=org, data=hoje).prefetch_related("itens"))
+        contexto["qtd_vendas_produtos_hoje"] = len(vendas_hoje)
+        contexto["valor_vendas_produtos_hoje"] = sum((v.valor_total for v in vendas_hoje), Decimal("0.00"))
 
     if org.modulo_financeiro_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         totais_mes_atual = totais_fechamentos_mes(org, hoje.year, hoje.month)
