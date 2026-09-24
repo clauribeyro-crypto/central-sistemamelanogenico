@@ -237,7 +237,14 @@
                                 {% endfor %}
                             </td>
                             <td>{{ v.get_forma_pagamento_display }}</td>
-                            <td>R$ {{ v.valor_total|floatformat:2 }}</td>
+                            <td>
+                                R$ {{ v.valor_total|floatformat:2 }}
+                                {% if v.desconto %}
+                                    <br><span style="font-size:.78rem; color:var(--text-muted);">
+                                        (R$ {{ v.valor_bruto|floatformat:2 }} com desconto de R$ {{ v.desconto|floatformat:2 }})
+                                    </span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if pagamento %}
                                     <a href="{% url 'financeiro:editar_pagamento' pagamento.pk %}?next={{ request.get_full_path|urlencode }}">
