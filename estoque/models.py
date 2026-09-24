@@ -162,6 +162,10 @@ class Venda(ModeloDaOrganizacao):
         max_length=10, choices=FormaPagamento.choices, default=FormaPagamento.PIX,
         help_text="Usada pra calcular o preço de cada item (tabela Pix ou cartão) no momento da venda.",
     )
+    desconto = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text="Pra indicação, presente ou qualquer outro desconto combinado — anote o motivo em Observações.",
+    )
     data = models.DateField(default=timezone.localdate)
     observacoes = models.CharField(max_length=255, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -179,8 +183,12 @@ class Venda(ModeloDaOrganizacao):
         return self.paciente.nome if self.paciente_id else (self.nome_comprador_avulso or "—")
 
     @property
-    def valor_total(self):
+    def valor_bruto(self):
         return sum((item.valor_total for item in self.itens.all()), Decimal("0.00"))
+
+    @property
+    def valor_total(self):
+        return self.valor_bruto - self.desconto
 
     @property
     def quantidade_total(self):

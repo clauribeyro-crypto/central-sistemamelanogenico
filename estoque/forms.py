@@ -64,13 +64,14 @@ class VendaForm(forms.ModelForm):
 
     class Meta:
         model = Venda
-        fields = ["paciente", "nome_comprador_avulso", "forma_pagamento", "data", "observacoes"]
+        fields = ["paciente", "nome_comprador_avulso", "forma_pagamento", "desconto", "data", "observacoes"]
         widgets = {
             # format="%Y-%m-%d" força o formato que o <input type="date"> do
             # navegador entende — sem isso, o formato padrão de pt-br
             # (dd/mm/aaaa) faz o navegador simplesmente ignorar o valor
             # inicial e mostrar o campo em branco.
             "data": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "desconto": forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal"}),
         }
 
     def __init__(self, *args, organizacao=None, **kwargs):

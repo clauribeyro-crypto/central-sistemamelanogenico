@@ -76,6 +76,14 @@
             </p>
 
             <div>
+                <label for="{{ form.desconto.id_for_label }}">{{ form.desconto.label }}</label>
+                {{ form.desconto }}
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">{{ form.desconto.help_text }}</p>
+                {% for error in form.desconto.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+            </div>
+            <p id="valor-com-desconto" style="font-size:.85rem; font-weight:600; margin-top:-.5rem;"></p>
+
+            <div>
                 <label for="{{ form.data.id_for_label }}">{{ form.data.label }}</label>
                 {{ form.data }}
             </div>
@@ -125,6 +133,8 @@
         (function () {
             var precos = JSON.parse(document.getElementById("precos-produtos").textContent);
             var campoForma = document.getElementById("{{ form.forma_pagamento.id_for_label }}");
+            var campoDesconto = document.getElementById("{{ form.desconto.id_for_label }}");
+            var elementoValorComDesconto = document.getElementById("valor-com-desconto");
 
             function atualizarValores() {
                 var total = 0;
@@ -144,6 +154,14 @@
                     total += valorLinha;
                 });
                 document.getElementById("valor-total-estimado").textContent = "R$ " + total.toFixed(2).replace(".", ",");
+
+                var desconto = parseFloat(campoDesconto.value) || 0;
+                if (desconto > 0) {
+                    var totalComDesconto = Math.max(total - desconto, 0);
+                    elementoValorComDesconto.textContent = "Com o desconto: R$ " + totalComDesconto.toFixed(2).replace(".", ",");
+                } else {
+                    elementoValorComDesconto.textContent = "";
+                }
             }
 
             document.querySelectorAll('select[name$="-produto"], input[name$="-quantidade"]').forEach(function (campo) {
@@ -151,6 +169,7 @@
                 campo.addEventListener("input", atualizarValores);
             });
             campoForma.addEventListener("change", atualizarValores);
+            campoDesconto.addEventListener("input", atualizarValores);
             atualizarValores();
 
             // ---- Nova paciente (cadastro rápido sem sair da tela) ----

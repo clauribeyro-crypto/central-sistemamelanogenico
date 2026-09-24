@@ -216,14 +216,26 @@ def venda_criar(request):
             itens_preenchidos = [
                 dados for dados in formset.cleaned_data if dados.get("produto")
             ]
+            forma_pagamento = form.cleaned_data["forma_pagamento"]
+            preco_campo = "preco_cartao" if forma_pagamento == Venda.FormaPagamento.CARTAO else "preco_pix"
+            valor_bruto = sum(
+                (getattr(dados["produto"], preco_campo) * dados["quantidade"] for dados in itens_preenchidos),
+                Decimal("0.00"),
+            )
+            desconto = form.cleaned_data.get("desconto") or Decimal("0.00")
+
             if not itens_preenchidos:
                 messages.error(request, "Adicione pelo menos um produto à compra.")
+            elif desconto > valor_bruto:
+                messages.error(
+                    request,
+                    f"O desconto (R$ {desconto}) não pode ser maior que o valor da compra (R$ {valor_bruto}).",
+                )
             else:
                 venda = form.save(commit=False)
                 venda.organizacao = org
                 venda.save()
 
-                preco_campo = "preco_cartao" if venda.forma_pagamento == Venda.FormaPagamento.CARTAO else "preco_pix"
                 estoques_negativos = []
                 for dados in itens_preenchidos:
                     produto = dados["produto"]
