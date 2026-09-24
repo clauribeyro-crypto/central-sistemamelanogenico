@@ -4,6 +4,7 @@ import datetime
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Exists, OuterRef, Q, Sum
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -214,6 +215,25 @@ def criar(request):
             "usuario_e_administrador": usuario_e_administrador(request),
         })
     return redirect("pacientes:lista")
+
+
+@login_required
+@require_POST
+def criar_rapido_json(request):
+    """
+    Cadastro rápido de paciente por AJAX, sem sair da tela onde a pessoa
+    estava (ex.: no meio de registrar uma venda de produto pra uma paciente
+    antiga que ainda não tinha cadastro no sistema). Mesmo form enxuto da
+    tela de lista — nome, telefone, cidade.
+    """
+    org = organizacao_do_usuario(request)
+    form = PacienteRapidoForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": form.errors.get_json_data()}, status=400)
+    paciente = form.save(commit=False)
+    paciente.organizacao = org
+    paciente.save()
+    return JsonResponse({"ok": True, "id": paciente.pk, "nome": paciente.nome})
 
 
 @login_required

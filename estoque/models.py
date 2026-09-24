@@ -151,6 +151,10 @@ class VendaProduto(ModeloDaOrganizacao):
     paciente = models.ForeignKey(
         Paciente, on_delete=models.SET_NULL, blank=True, null=True, related_name="compras_produtos",
     )
+    nome_comprador_avulso = models.CharField(
+        "nome (quem não é paciente cadastrada)", max_length=150, blank=True,
+        help_text="Pra quem só quer comprar o produto, sem ser paciente — não cria cadastro nenhum.",
+    )
     quantidade = models.PositiveIntegerField(default=1)
     forma_pagamento = models.CharField(max_length=10, choices=FormaPagamento.choices, default=FormaPagamento.PIX)
     valor_total = models.DecimalField(max_digits=10, decimal_places=2)

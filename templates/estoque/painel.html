@@ -230,7 +230,7 @@
                         <tr>
                             <td>{{ v.data|date:"d/m/Y" }}</td>
                             <td>{{ v.produto.nome }}</td>
-                            <td>{{ v.paciente.nome|default:"—" }}</td>
+                            <td>{{ v.paciente.nome|default:v.nome_comprador_avulso|default:"—" }}</td>
                             <td>{{ v.quantidade }}</td>
                             <td>{{ v.get_forma_pagamento_display }}</td>
                             <td>R$ {{ v.valor_total|floatformat:2 }}</td>

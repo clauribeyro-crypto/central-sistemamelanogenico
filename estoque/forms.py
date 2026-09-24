@@ -50,7 +50,10 @@ class RecompraForm(forms.ModelForm):
 class VendaProdutoForm(forms.ModelForm):
     class Meta:
         model = VendaProduto
-        fields = ["produto", "paciente", "quantidade", "forma_pagamento", "valor_total", "data", "observacoes"]
+        fields = [
+            "produto", "paciente", "nome_comprador_avulso",
+            "quantidade", "forma_pagamento", "valor_total", "data", "observacoes",
+        ]
         widgets = {"data": forms.DateInput(attrs={"type": "date"})}
 
     def __init__(self, *args, organizacao=None, **kwargs):
