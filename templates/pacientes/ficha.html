@@ -744,12 +744,29 @@
                         <thead><tr><th>Vencimento</th><th>Valor</th><th>Forma</th><th>Status</th></tr></thead>
                         <tbody>
                         {% for p in pagamentos %}
-                            <tr><td>{{ p.data_vencimento|date:"d/m/Y" }}</td><td>R$ {{ p.valor|floatformat:2 }}</td><td>{{ p.get_forma_pagamento_display }}</td><td>{{ p.get_status_display }}</td></tr>
+                            <tr>
+                                <td>{{ p.data_vencimento|date:"d/m/Y" }}</td>
+                                <td>R$ {{ p.valor|floatformat:2 }}</td>
+                                <td>{{ p.get_forma_pagamento_display }}</td>
+                                <td>
+                                    <a href="{% url 'financeiro:editar_pagamento' p.pk %}?next={{ request.get_full_path|urlencode }}">
+                                        {% if p.status == "PAGO" %}
+                                            <span class="badge">Pago</span>
+                                        {% elif p.status == "PARCIAL" %}
+                                            <span class="badge badge-parcial">Parcial — falta R$ {{ p.saldo_pendente|floatformat:2 }}</span>
+                                        {% elif p.status == "CANCELADO" %}
+                                            <span class="badge badge-atrasado">Cancelado</span>
+                                        {% else %}
+                                            <span class="badge badge-atrasado">Pendente — registrar recebimento</span>
+                                        {% endif %}
+                                    </a>
+                                </td>
+                            </tr>
                         {% endfor %}
                         </tbody>
                     </table>
                 {% else %}
-                    <p>Nenhum pagamento lançado para este programa ainda. Lance pelo <a href="/admin/financeiro/pagamento/add/">admin</a> vinculando ao acompanhamento.</p>
+                    <p>Nenhum pagamento lançado para este programa ainda.</p>
                 {% endif %}
             </div>
             <div class="card">
