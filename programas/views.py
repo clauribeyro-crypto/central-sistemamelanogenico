@@ -197,6 +197,7 @@ def acompanhamento_editar(request, pk):
         Acompanhamento.objects.select_related("paciente", "programa"), pk=pk, organizacao=org
     )
     proximo = request.GET.get("next") or request.POST.get("next") or ""
+    pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
 
     if request.method == "POST":
         form = AcompanhamentoForm(request.POST, instance=acompanhamento)
@@ -207,7 +208,6 @@ def acompanhamento_editar(request, pk):
             )
             acompanhamento.save()
 
-            pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
             if pagamento:
                 pagamento.valor = acompanhamento.valor_contratado - acompanhamento.desconto
                 pagamento.save(update_fields=["valor", "atualizado_em"])
@@ -221,12 +221,11 @@ def acompanhamento_editar(request, pk):
         # Se o valor do pagamento foi corrigido direto no Financeiro (sem
         # passar por essa tela), reconcilia aqui antes de mostrar o
         # formulário — senão reabriria mostrando o valor antigo de novo.
-        pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
         if pagamento and pagamento.valor != acompanhamento.valor_contratado - acompanhamento.desconto:
             acompanhamento.valor_contratado = pagamento.valor + acompanhamento.desconto
         form = AcompanhamentoForm(instance=acompanhamento)
 
-    contexto = {"form": form, "acompanhamento": acompanhamento, "next": proximo}
+    contexto = {"form": form, "acompanhamento": acompanhamento, "next": proximo, "pagamento": pagamento}
     return render(request, "programas/acompanhamento_form.html", contexto)
 
 
