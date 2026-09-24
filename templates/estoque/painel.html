@@ -212,7 +212,7 @@
         </form>
 
         <div class="grid">
-            <div class="card stat"><div class="num">{{ vendas_do_mes|length }}</div><div class="rotulo">Vendas em {{ mes_nome }}/{{ ano|stringformat:'d' }}</div></div>
+            <div class="card stat"><div class="num">{{ vendas_do_mes|length }}</div><div class="rotulo">Compras em {{ mes_nome }}/{{ ano|stringformat:'d' }}</div></div>
             <div class="card stat"><div class="num">{{ total_unidades_mes }}</div><div class="rotulo">Unidades vendidas</div></div>
             <div class="card stat"><div class="num">R$ {{ total_vendido_mes|floatformat:2 }}</div><div class="rotulo">Total vendido no mês</div></div>
         </div>
@@ -224,24 +224,44 @@
         <div class="card">
             {% if vendas_do_mes %}
                 <table>
-                    <thead><tr><th>Data</th><th>Produto</th><th>Paciente</th><th>Qtd.</th><th>Forma</th><th>Valor</th><th></th></tr></thead>
+                    <thead><tr><th>Data</th><th>Comprador</th><th>Produtos</th><th>Forma</th><th>Valor</th><th>Pagamento</th><th></th></tr></thead>
                     <tbody>
                     {% for v in vendas_do_mes %}
+                        {% with pagamento=v.pagamentos.first %}
                         <tr>
                             <td>{{ v.data|date:"d/m/Y" }}</td>
-                            <td>{{ v.produto.nome }}</td>
-                            <td>{{ v.paciente.nome|default:v.nome_comprador_avulso|default:"—" }}</td>
-                            <td>{{ v.quantidade }}</td>
+                            <td>{{ v.nome_comprador }}</td>
+                            <td>
+                                {% for item in v.itens.all %}
+                                    {{ item.quantidade }}x {{ item.produto.nome }}{% if not forloop.last %}<br>{% endif %}
+                                {% endfor %}
+                            </td>
                             <td>{{ v.get_forma_pagamento_display }}</td>
                             <td>R$ {{ v.valor_total|floatformat:2 }}</td>
                             <td>
+                                {% if pagamento %}
+                                    <a href="{% url 'financeiro:editar_pagamento' pagamento.pk %}?next={{ request.get_full_path|urlencode }}">
+                                        {% if pagamento.status == "PAGO" %}
+                                            <span class="badge">Pago</span>
+                                        {% elif pagamento.status == "PARCIAL" %}
+                                            <span class="badge badge-parcial">Parcial — falta R$ {{ pagamento.saldo_pendente|floatformat:2 }}</span>
+                                        {% else %}
+                                            <span class="badge badge-atrasado">Pendente</span>
+                                        {% endif %}
+                                    </a>
+                                {% else %}
+                                    <span style="color:var(--text-muted); font-size:.85rem;">Pago na hora</span>
+                                {% endif %}
+                            </td>
+                            <td>
                                 <form method="post" action="{% url 'estoque:venda_excluir' v.pk %}" style="display:inline;"
-                                      onsubmit="return confirm('Excluir essa venda de {{ v.produto.nome }}? A quantidade volta pro estoque.');">
+                                      onsubmit="return confirm('Excluir essa compra de {{ v.nome_comprador }}? As quantidades voltam pro estoque{% if pagamento %} e o pagamento vinculado é removido{% endif %}.');">
                                     {% csrf_token %}
                                     <button type="submit" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0; text-decoration:underline; font-size:.85rem;">Excluir</button>
                                 </form>
                             </td>
                         </tr>
+                        {% endwith %}
                     {% endfor %}
                     </tbody>
                 </table>

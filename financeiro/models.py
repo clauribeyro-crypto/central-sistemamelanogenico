@@ -61,6 +61,14 @@ class Pagamento(ModeloDaOrganizacao):
         null=True,
         help_text="Programa de acompanhamento ao qual este pagamento pertence, se houver.",
     )
+    venda = models.ForeignKey(
+        "estoque.Venda",
+        on_delete=models.SET_NULL,
+        related_name="pagamentos",
+        blank=True,
+        null=True,
+        help_text="Compra de produto à qual este pagamento pertence, se houver.",
+    )
 
     valor = models.DecimalField("valor total", max_digits=10, decimal_places=2)
     forma_pagamento = models.CharField(

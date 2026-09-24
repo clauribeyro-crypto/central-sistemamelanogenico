@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 from django.db import models
 from django.utils import timezone
@@ -135,19 +136,21 @@ class Recompra(ModeloDaOrganizacao):
             )
 
 
-class VendaProduto(ModeloDaOrganizacao):
+class Venda(ModeloDaOrganizacao):
     """
-    Venda de um produto de prateleira (sabonete, hidratante...) — diferente
-    de Recompra (que é só um lembrete de quando a paciente vai precisar
-    comprar de novo). Registrar aqui é o que desconta do estoque; sem isso o
-    estoque_atual do Produto nunca refletia o que realmente saiu vendido.
+    Uma compra de produtos — reúne vários produtos numa venda só (ver
+    ItemVenda), em vez de uma venda por produto. Quando é de uma paciente
+    cadastrada, gera um Pagamento no Financeiro (mesmo mecanismo que
+    tratamento e consulta já usam), pra dar pra registrar pagamento
+    parcelado — uma parte agora, o resto depois. Comprador avulso (não é
+    paciente) não gera Pagamento: é tratado como pago na hora, sem
+    parcelamento (não tem como cobrar parcela de quem não tem cadastro).
     """
 
     class FormaPagamento(models.TextChoices):
         PIX = "PIX", "Pix/dinheiro"
         CARTAO = "CARTAO", "Cartão"
 
-    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="vendas")
     paciente = models.ForeignKey(
         Paciente, on_delete=models.SET_NULL, blank=True, null=True, related_name="compras_produtos",
     )
@@ -155,17 +158,50 @@ class VendaProduto(ModeloDaOrganizacao):
         "nome (quem não é paciente cadastrada)", max_length=150, blank=True,
         help_text="Pra quem só quer comprar o produto, sem ser paciente — não cria cadastro nenhum.",
     )
-    quantidade = models.PositiveIntegerField(default=1)
-    forma_pagamento = models.CharField(max_length=10, choices=FormaPagamento.choices, default=FormaPagamento.PIX)
-    valor_total = models.DecimalField(max_digits=10, decimal_places=2)
+    forma_pagamento = models.CharField(
+        max_length=10, choices=FormaPagamento.choices, default=FormaPagamento.PIX,
+        help_text="Usada pra calcular o preço de cada item (tabela Pix ou cartão) no momento da venda.",
+    )
     data = models.DateField(default=timezone.localdate)
     observacoes = models.CharField(max_length=255, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "venda de produto"
-        verbose_name_plural = "vendas de produtos"
+        verbose_name = "venda"
+        verbose_name_plural = "vendas"
         ordering = ["-data", "-criado_em"]
 
     def __str__(self):
-        return f"{self.quantidade}x {self.produto} — R$ {self.valor_total} ({self.data:%d/%m/%Y})"
+        return f"Compra de {self.nome_comprador} em {self.data:%d/%m/%Y}"
+
+    @property
+    def nome_comprador(self):
+        return self.paciente.nome if self.paciente_id else (self.nome_comprador_avulso or "—")
+
+    @property
+    def valor_total(self):
+        return sum((item.valor_total for item in self.itens.all()), Decimal("0.00"))
+
+    @property
+    def quantidade_total(self):
+        return sum((item.quantidade for item in self.itens.all()), 0)
+
+
+class ItemVenda(ModeloDaOrganizacao):
+    """Um produto — com quantidade e preço travado no momento da venda — dentro de uma Venda."""
+
+    venda = models.ForeignKey(Venda, on_delete=models.CASCADE, related_name="itens")
+    produto = models.ForeignKey(Produto, on_delete=models.PROTECT, related_name="itens_vendidos")
+    quantidade = models.PositiveIntegerField(default=1)
+    valor_unitario = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        verbose_name = "item da venda"
+        verbose_name_plural = "itens da venda"
+
+    def __str__(self):
+        return f"{self.quantidade}x {self.produto}"
+
+    @property
+    def valor_total(self):
+        return self.valor_unitario * self.quantidade
