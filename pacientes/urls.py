@@ -7,6 +7,7 @@ app_name = "pacientes"
 urlpatterns = [
     path("", views.lista, name="lista"),
     path("nova/", views.criar, name="criar"),
+    path("nova/rapido/", views.criar_rapido_json, name="criar_rapido_json"),
     path("<int:pk>/", views.ficha, name="ficha"),
     path("<int:pk>/excluir/", views.excluir, name="excluir"),
     path("<int:pk>/mesclar/", views.mesclar_selecionar, name="mesclar_selecionar"),

@@ -3,45 +3,203 @@
 {% block content %}
     <p><a href="{% url 'estoque:painel' %}?aba=vendas">← Voltar</a></p>
     <div class="card">
-        <h1>Nova venda de produto</h1>
+        <h1>Nova venda</h1>
         <p style="font-size:.85rem; color:var(--text-muted);">
-            A quantidade é descontada do estoque do produto assim que a venda é salva. Pra lançar uma venda de um
-            mês passado (ex.: setembro), é só trocar a data abaixo pela data certa da venda.
+            Dá pra colocar vários produtos na mesma compra. A quantidade de cada um é descontada do estoque assim
+            que a compra é salva. Pra lançar uma compra de um mês passado (ex.: setembro), é só trocar a data pela
+            data certa da compra.
         </p>
         <form method="post" class="acao" id="form-venda">
             {% csrf_token %}
-            {% for field in form %}
-                <div>
-                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-                    {{ field }}
-                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+
+            <div>
+                <label for="{{ form.paciente.id_for_label }}">{{ form.paciente.label }}</label>
+                <div style="display:flex; gap:.5rem; align-items:center;">
+                    {{ form.paciente }}
+                    <button type="button" class="btn btn-secondary btn-sm" id="btn-nova-paciente" style="white-space:nowrap;">+ Nova paciente</button>
                 </div>
-            {% endfor %}
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">
+                    Só aparecem aqui pacientes já cadastradas. Paciente antiga que ainda não tem cadastro? Clique em
+                    "+ Nova paciente" — não precisa preencher a ficha inteira agora, só o essencial.
+                </p>
+                {% for error in form.paciente.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+            </div>
+
+            <div>
+                <label for="{{ form.nome_comprador_avulso.id_for_label }}">{{ form.nome_comprador_avulso.label }}</label>
+                {{ form.nome_comprador_avulso }}
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">
+                    Pra quem comprou sem ser paciente da clínica — só anota o nome, não cria cadastro nenhum.
+                    Preencha isso <strong>ou</strong> selecione a paciente acima, não precisa os dois. Compra de
+                    quem não é paciente é sempre tratada como paga na hora, sem controle de parcela.
+                </p>
+                {% for error in form.nome_comprador_avulso.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+            </div>
+
+            <div>
+                <label for="{{ form.forma_pagamento.id_for_label }}">{{ form.forma_pagamento.label }}</label>
+                {{ form.forma_pagamento }}
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">Usada pra calcular o preço de cada produto abaixo.</p>
+            </div>
+
+            <h2 style="margin-bottom:.5rem;">Produtos</h2>
+            {{ formset.management_form }}
+            {% if formset.non_form_errors %}
+                <p style="color:#8f2e45;font-size:.8rem;">{{ formset.non_form_errors }}</p>
+            {% endif %}
+            <table id="tabela-itens">
+                <thead><tr><th>Produto</th><th>Qtd.</th><th>Valor estimado</th></tr></thead>
+                <tbody>
+                {% for subform in formset %}
+                    <tr class="linha-item">
+                        <td>
+                            {{ subform.produto }}
+                            {% for error in subform.produto.errors %}<p style="color:#8f2e45;font-size:.78rem;">{{ error }}</p>{% endfor %}
+                        </td>
+                        <td style="width:90px;">
+                            {{ subform.quantidade }}
+                            {% for error in subform.quantidade.errors %}<p style="color:#8f2e45;font-size:.78rem;">{{ error }}</p>{% endfor %}
+                        </td>
+                        <td class="valor-linha" style="white-space:nowrap;">—</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="font-weight:600;">
+                        <td colspan="2">Total estimado</td>
+                        <td id="valor-total-estimado">R$ 0,00</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <p style="font-size:.78rem; color:var(--text-muted); margin-top:-.5rem;">
+                O valor certo é calculado ao salvar — isso aqui é só uma prévia.
+            </p>
+
+            <div>
+                <label for="{{ form.data.id_for_label }}">{{ form.data.label }}</label>
+                {{ form.data }}
+            </div>
+            <div>
+                <label for="{{ form.observacoes.id_for_label }}">{{ form.observacoes.label }}</label>
+                {{ form.observacoes }}
+            </div>
+            <div>
+                <label for="{{ form.valor_recebido_agora.id_for_label }}">{{ form.valor_recebido_agora.label }}</label>
+                {{ form.valor_recebido_agora }}
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">{{ form.valor_recebido_agora.help_text }}</p>
+                {% for error in form.valor_recebido_agora.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+            </div>
+
             <button class="btn" type="submit">Registrar venda</button>
         </form>
+    </div>
+
+    <div class="modal-fundo" id="modal-nova-paciente" hidden>
+        <div class="modal-caixa">
+            <h2>Nova paciente</h2>
+            <form id="form-nova-paciente" class="acao">
+                {% csrf_token %}
+                <div>
+                    <label for="np-nome">Nome</label>
+                    <input type="text" id="np-nome" name="nome" required>
+                </div>
+                <div>
+                    <label for="np-telefone">Telefone</label>
+                    <input type="text" id="np-telefone" name="telefone" placeholder="(11) 91234-5678">
+                </div>
+                <div>
+                    <label for="np-cidade">Cidade</label>
+                    <input type="text" id="np-cidade" name="cidade" placeholder="Opcional">
+                </div>
+                <p id="nova-paciente-erro" style="color:#8f2e45; font-size:.85rem;"></p>
+                <div style="display:flex; gap:.5rem;">
+                    <button class="btn" type="submit">Cadastrar paciente</button>
+                    <button class="btn btn-secondary" type="button" id="nova-paciente-cancelar">Cancelar</button>
+                </div>
+            </form>
+        </div>
     </div>
 
     {{ precos_produtos|json_script:"precos-produtos" }}
     <script>
         (function () {
             var precos = JSON.parse(document.getElementById("precos-produtos").textContent);
-            var campoProduto = document.getElementById("{{ form.produto.id_for_label }}");
             var campoForma = document.getElementById("{{ form.forma_pagamento.id_for_label }}");
-            var campoQuantidade = document.getElementById("{{ form.quantidade.id_for_label }}");
-            var campoValor = document.getElementById("{{ form.valor_total.id_for_label }}");
-            if (!campoProduto || !campoForma || !campoQuantidade || !campoValor) return;
 
-            function atualizarValor() {
-                var precosProduto = precos[campoProduto.value];
-                if (!precosProduto) return;
-                var precoUnitario = campoForma.value === "CARTAO" ? precosProduto.cartao : precosProduto.pix;
-                var quantidade = parseInt(campoQuantidade.value, 10) || 0;
-                campoValor.value = (parseFloat(precoUnitario) * quantidade).toFixed(2);
+            function atualizarValores() {
+                var total = 0;
+                document.querySelectorAll(".linha-item").forEach(function (linha) {
+                    var selectProduto = linha.querySelector('select[name$="-produto"]');
+                    var inputQuantidade = linha.querySelector('input[name$="-quantidade"]');
+                    var celulaValor = linha.querySelector(".valor-linha");
+                    var precosProduto = precos[selectProduto.value];
+                    if (!precosProduto || !selectProduto.value) {
+                        celulaValor.textContent = "—";
+                        return;
+                    }
+                    var precoUnitario = campoForma.value === "CARTAO" ? precosProduto.cartao : precosProduto.pix;
+                    var quantidade = parseInt(inputQuantidade.value, 10) || 0;
+                    var valorLinha = parseFloat(precoUnitario) * quantidade;
+                    celulaValor.textContent = "R$ " + valorLinha.toFixed(2).replace(".", ",");
+                    total += valorLinha;
+                });
+                document.getElementById("valor-total-estimado").textContent = "R$ " + total.toFixed(2).replace(".", ",");
             }
 
-            campoProduto.addEventListener("change", atualizarValor);
-            campoForma.addEventListener("change", atualizarValor);
-            campoQuantidade.addEventListener("input", atualizarValor);
+            document.querySelectorAll('select[name$="-produto"], input[name$="-quantidade"]').forEach(function (campo) {
+                campo.addEventListener("change", atualizarValores);
+                campo.addEventListener("input", atualizarValores);
+            });
+            campoForma.addEventListener("change", atualizarValores);
+            atualizarValores();
+
+            // ---- Nova paciente (cadastro rápido sem sair da tela) ----
+            var csrf = document.querySelector('#form-venda [name=csrfmiddlewaretoken]').value;
+            var modal = document.getElementById("modal-nova-paciente");
+            var formNovaPaciente = document.getElementById("form-nova-paciente");
+            var erroNovaPaciente = document.getElementById("nova-paciente-erro");
+            var campoPaciente = document.getElementById("{{ form.paciente.id_for_label }}");
+
+            document.getElementById("btn-nova-paciente").addEventListener("click", function () {
+                formNovaPaciente.reset();
+                erroNovaPaciente.textContent = "";
+                modal.hidden = false;
+            });
+            document.getElementById("nova-paciente-cancelar").addEventListener("click", function () {
+                modal.hidden = true;
+            });
+            modal.addEventListener("click", function (ev) {
+                if (ev.target === modal) modal.hidden = true;
+            });
+
+            formNovaPaciente.addEventListener("submit", function (ev) {
+                ev.preventDefault();
+                erroNovaPaciente.textContent = "";
+                fetch("{% url 'pacientes:criar_rapido_json' %}", {
+                    method: "POST",
+                    headers: { "X-CSRFToken": csrf },
+                    body: new FormData(formNovaPaciente),
+                }).then(function (r) {
+                    return r.json().then(function (json) { return { status: r.status, json: json }; });
+                }).then(function (resultado) {
+                    if (resultado.status !== 200 || !resultado.json.ok) {
+                        var errors = resultado.json.errors;
+                        var primeiraChave = errors ? Object.keys(errors)[0] : null;
+                        erroNovaPaciente.textContent = primeiraChave
+                            ? errors[primeiraChave][0].message
+                            : "Não deu pra cadastrar — confira o nome.";
+                        return;
+                    }
+                    var opcao = document.createElement("option");
+                    opcao.value = resultado.json.id;
+                    opcao.textContent = resultado.json.nome;
+                    opcao.selected = true;
+                    campoPaciente.appendChild(opcao);
+                    modal.hidden = true;
+                }).catch(function () {
+                    erroNovaPaciente.textContent = "Erro de conexão. Tente novamente.";
+                });
+            });
         })();
     </script>
 {% endblock %}
