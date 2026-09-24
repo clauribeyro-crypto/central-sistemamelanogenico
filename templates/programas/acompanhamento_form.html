@@ -23,4 +23,25 @@
             <button class="btn" type="submit">Salvar alterações</button>
         </form>
     </div>
+    <div class="card">
+        <h2>Pagamento</h2>
+        {% if pagamento %}
+            <p>
+                <a href="{% url 'financeiro:editar_pagamento' pagamento.pk %}?next={{ request.get_full_path|urlencode }}">
+                    {% if pagamento.status == "PAGO" %}
+                        <span class="badge">Pago</span>
+                    {% elif pagamento.status == "PARCIAL" %}
+                        <span class="badge badge-parcial">Parcial — falta R$ {{ pagamento.saldo_pendente|floatformat:2 }}</span>
+                    {% else %}
+                        <span class="badge badge-atrasado">Pendente — registrar recebimento</span>
+                    {% endif %}
+                </a>
+            </p>
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                Clique pra registrar a entrada, ver o saldo pendente e ir completando o pagamento aos poucos.
+            </p>
+        {% else %}
+            <p>Nenhum pagamento lançado para este tratamento ainda.</p>
+        {% endif %}
+    </div>
 {% endblock %}
