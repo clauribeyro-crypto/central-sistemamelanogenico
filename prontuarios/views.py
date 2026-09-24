@@ -277,6 +277,17 @@ def checkin_excluir(request, pk):
     return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=evolucao")
 
 
+@login_required
+def checkin_historico_imprimir(request, paciente_pk):
+    """Histórico completo de check-ins, um embaixo do outro — pra imprimir ou salvar como PDF pelo navegador."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    registros = paciente.registros_evolucao.select_related("criado_por").order_by("-criado_em")
+    return render(request, "prontuarios/checkin_historico_imprimir.html", {
+        "paciente": paciente, "registros": registros,
+    })
+
+
 def checkin_publico(request, token):
     """
     Tela pública (sem login) pra paciente registrar o check-in diário — o
