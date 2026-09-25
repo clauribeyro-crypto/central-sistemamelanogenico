@@ -83,8 +83,10 @@
                 <thead>
                     <tr>
                         <th>Pessoa</th>
+                        <th>Chamados hoje (CRM)</th>
+                        <th>Movimentações hoje (CRM)</th>
                         <th>Seguidores novos</th>
-                        <th>Pessoas chamadas</th>
+                        <th>Pessoas chamadas (Instagram)</th>
                         <th>Responderam</th>
                         <th>Telefones conseguidos</th>
                     </tr>
@@ -93,6 +95,8 @@
                     {% for item in equipe_social_selling %}
                         <tr>
                             <td>{{ item.usuario }}</td>
+                            <td>{{ item.chamados_hoje }}</td>
+                            <td>{{ item.movimentacoes_hoje }}</td>
                             <td>{{ item.hoje.seguidores_novos|default:0 }} <span style="color:var(--text-muted); font-size:.8rem;">(mês: {{ item.mes.seguidores_novos|default:0 }})</span></td>
                             <td>{{ item.hoje.pessoas_chamadas|default:0 }} <span style="color:var(--text-muted); font-size:.8rem;">(mês: {{ item.mes.pessoas_chamadas|default:0 }})</span></td>
                             <td>{{ item.hoje.pessoas_responderam|default:0 }} <span style="color:var(--text-muted); font-size:.8rem;">(mês: {{ item.mes.pessoas_responderam|default:0 }})</span></td>
@@ -101,6 +105,10 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <p style="font-size:.78rem; color:var(--text-muted); margin-top:.5rem; margin-bottom:0;">
+                "Chamados" e "Movimentações" são automáticos, direto do histórico do CRM — não precisa digitar nada.
+                As outras colunas continuam sendo preenchidas manualmente por cada pessoa.
+            </p>
         </div>
     {% endif %}
 
