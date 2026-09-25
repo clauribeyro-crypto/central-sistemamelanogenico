@@ -141,6 +141,12 @@ class Acompanhamento(ModeloDaOrganizacao):
             Modulacao.iniciar(acompanhamento=acompanhamento, numero=numero)
 
         # Gera automaticamente a receita prevista (pendente) do plano fechado.
+        # forma_pagamento (o texto livre do Acompanhamento, até 100 caracteres,
+        # ex.: "Entrada + 2 prestações") NÃO é copiado pro Pagamento.forma_pagamento:
+        # esse campo só aceita um código curto (PIX/CREDITO/...) — texto livre
+        # mais longo estourava o limite da coluna no Postgres (erro 500). O
+        # campo já é preenchido automaticamente pelo recebimento mais recente
+        # assim que o primeiro for registrado (ver Pagamento.recalcular_status).
         from financeiro.models import Pagamento
 
         Pagamento.objects.create(
@@ -148,7 +154,6 @@ class Acompanhamento(ModeloDaOrganizacao):
             paciente=paciente,
             acompanhamento=acompanhamento,
             valor=acompanhamento.valor_contratado - acompanhamento.desconto,
-            forma_pagamento=forma_pagamento,
             status=Pagamento.Status.PENDENTE,
             data_vencimento=data_inicio,
         )
