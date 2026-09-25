@@ -196,11 +196,41 @@ def home(request):
                 organizacao=org, data__year=hoje.year, data__month=hoje.month,
             ).values("usuario_id").annotate(**{campo: Sum(campo) for campo in campos_social})
         }
+        # Contadores automáticos, direto do histórico do lead — não dependem
+        # de ninguém digitar nada: "chamados" conta lead distinta com
+        # WhatsApp enviado ou ligação registrada pelo CRM hoje; "movimentações"
+        # conta lead distinta que mudou de etapa/status hoje por ação da pessoa.
+        chamados_hoje = {
+            row["responsavel_id"]: row["total"]
+            for row in (
+                HistoricoLead.objects.filter(
+                    lead__organizacao=org, responsavel__isnull=False,
+                    tipo__in=[HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO],
+                    data_hora__gte=inicio_hoje, data_hora__lt=fim_hoje,
+                )
+                .values("responsavel_id")
+                .annotate(total=Count("lead_id", distinct=True))
+            )
+        }
+        movimentacoes_hoje = {
+            row["responsavel_id"]: row["total"]
+            for row in (
+                HistoricoLead.objects.filter(
+                    lead__organizacao=org, responsavel__isnull=False,
+                    tipo=HistoricoLead.Tipo.STATUS,
+                    data_hora__gte=inicio_hoje, data_hora__lt=fim_hoje,
+                )
+                .values("responsavel_id")
+                .annotate(total=Count("lead_id", distinct=True))
+            )
+        }
         equipe_social = [
             {
                 "usuario": sdr,
                 "hoje": registros_hoje.get(sdr.pk),
                 "mes": totais_mes.get(sdr.pk),
+                "chamados_hoje": chamados_hoje.get(sdr.pk, 0),
+                "movimentacoes_hoje": movimentacoes_hoje.get(sdr.pk, 0),
             }
             for sdr in Usuario.objects.filter(organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True)
         ]
