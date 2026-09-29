@@ -86,6 +86,7 @@
                 <div style="display:flex; gap:.5rem;">
                     <a class="btn btn-secondary" href="{% url 'financeiro:banco_criar' %}">+ Banco</a>
                     <a class="btn btn-secondary" href="{% url 'financeiro:categoria_criar' %}">+ Categoria</a>
+                    <a class="btn btn-secondary" href="{% url 'financeiro:extrato_importar' %}">Importar extrato</a>
                     <a class="btn" href="{% url 'financeiro:lancamento_criar' %}?ano={{ ano|stringformat:'d' }}&mes={{ mes }}">+ Lançamento</a>
                 </div>
             </div>

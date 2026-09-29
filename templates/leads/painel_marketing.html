@@ -111,4 +111,57 @@
             <button class="btn" type="submit" style="margin-top:1rem;">Salvar</button>
         </form>
     </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">De onde vêm as leads</h2>
+        <p style="font-size:.85rem; color:var(--text-muted);">
+            Das leads que entraram em {{ mes_nome }}/{{ ano|stringformat:'d' }} por cada origem, quantas já
+            têm consulta agendada — pra saber qual canal está trazendo gente que realmente agenda.
+        </p>
+        <table>
+            <thead>
+                <tr><th>Origem</th><th>Leads</th><th>Agendaram</th><th>Taxa de conversão</th></tr>
+            </thead>
+            <tbody>
+                {% for linha in origem_resumo %}
+                    <tr>
+                        <td>{{ linha.origem.nome }}</td>
+                        <td>{{ linha.leads }}</td>
+                        <td>{{ linha.agendaram }}</td>
+                        <td>{% if linha.taxa != None %}{{ linha.taxa|floatformat:0 }}%{% else %}—{% endif %}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4">Nenhuma origem cadastrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Quem está agendando, por origem</h2>
+        <p style="font-size:.85rem; color:var(--text-muted);">
+            Agendamentos feitos em {{ mes_nome }}/{{ ano|stringformat:'d' }}, por quem agendou — direto do
+            histórico do CRM (CRM de leads, board ou Agenda), sem precisar preencher nada à parte.
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Pessoa</th>
+                    {% for origem in origens %}<th>{{ origem.nome }}</th>{% endfor %}
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pessoa in matriz_quem_agendou %}
+                    <tr>
+                        <td>{{ pessoa.nome }}</td>
+                        {% for valor in pessoa.valores %}<td>{{ valor }}</td>{% endfor %}
+                        <td style="font-weight:600;">{{ pessoa.total }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{{ origens|length|add:2 }}">Nenhum agendamento no período.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 {% endblock %}

@@ -18,6 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
+from contas.models import Usuario
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
 from financeiro.models import Pagamento
 from financeiro.views import MESES
@@ -95,6 +96,25 @@ def kanban(request):
         status__in=[Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO]
     ).select_related("origem", "responsavel")
 
+    # Filtro por origem ("funil") e por período de entrada — pra quem cuida
+    # de tráfego conseguir ver só as leads de uma campanha/canal específico
+    # num intervalo de datas, sem precisar vasculhar o board inteiro.
+    origem_selecionada = request.GET.get("origem") or ""
+    data_inicio_filtro = request.GET.get("data_inicio") or ""
+    data_fim_filtro = request.GET.get("data_fim") or ""
+    if origem_selecionada:
+        ativos = ativos.filter(origem_id=origem_selecionada)
+    if data_inicio_filtro:
+        try:
+            ativos = ativos.filter(entrou_em__date__gte=datetime.date.fromisoformat(data_inicio_filtro))
+        except ValueError:
+            data_inicio_filtro = ""
+    if data_fim_filtro:
+        try:
+            ativos = ativos.filter(entrou_em__date__lte=datetime.date.fromisoformat(data_fim_filtro))
+        except ValueError:
+            data_fim_filtro = ""
+
     etapas_kanban = [e for e in Lead.Etapa.choices if e[0] != Lead.Etapa.CONCLUIDA]
     colunas = [(codigo, rotulo, []) for codigo, rotulo in etapas_kanban]
     colunas_por_codigo = {codigo: lista for codigo, _, lista in colunas}
@@ -133,7 +153,12 @@ def kanban(request):
 
     return render(
         request, "leads/kanban.html",
-        {"colunas": colunas, "contadores": contadores, "origens": origens, "leads_busca": leads_busca},
+        {
+            "colunas": colunas, "contadores": contadores, "origens": origens, "leads_busca": leads_busca,
+            "origem_selecionada": origem_selecionada,
+            "data_inicio_filtro": data_inicio_filtro,
+            "data_fim_filtro": data_fim_filtro,
+        },
     )
 
 
@@ -316,11 +341,63 @@ def painel_marketing(request):
         "valor": sum((l["valor"] for l in linhas), Decimal("0.00")),
     }
 
+    # "De onde vêm as leads": pra cada origem, quantas entraram no período e
+    # quantas dessas mesmas leads já estão com consulta agendada — a taxa de
+    # conversão que a gestora de tráfego precisa pra saber qual canal traz
+    # gente que realmente agenda, não só quem preenche formulário.
+    agendaram_por_origem = {
+        row["origem_id"]: row["total"]
+        for row in Lead.objects.filter(
+            organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
+            status=Lead.Status.AGENDADA,
+        ).values("origem_id").annotate(total=Count("id"))
+    }
+    origem_resumo = []
+    for origem, total_leads in zip(origens, totais["leads_por_origem"]):
+        agendaram = agendaram_por_origem.get(origem.pk, 0)
+        origem_resumo.append({
+            "origem": origem,
+            "leads": total_leads,
+            "agendaram": agendaram,
+            "taxa": (agendaram / total_leads * 100) if total_leads else None,
+        })
+
+    # "Quem está agendando, por origem": todo agendamento passa por
+    # Lead.marcar_agendada (CRM, arrastar no board ou direto na Agenda), que
+    # sempre registra um HistoricoLead com quem fez — dá pra cruzar com a
+    # origem do lead sem depender de ninguém preencher planilha à parte.
+    contagem_agendamentos = {}
+    responsaveis_ids = set()
+    for row in (
+        HistoricoLead.objects.filter(
+            lead__organizacao=org, tipo=HistoricoLead.Tipo.AGENDAMENTO,
+            data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+        )
+        .values("responsavel_id", "lead__origem_id")
+        .annotate(total=Count("id"))
+    ):
+        contagem_agendamentos[(row["responsavel_id"], row["lead__origem_id"])] = row["total"]
+        responsaveis_ids.add(row["responsavel_id"])
+
+    nomes_responsaveis = {
+        u.pk: str(u) for u in Usuario.objects.filter(pk__in=[rid for rid in responsaveis_ids if rid])
+    }
+    matriz_quem_agendou = []
+    for responsavel_id in sorted(responsaveis_ids, key=lambda rid: nomes_responsaveis.get(rid, "")):
+        valores = [contagem_agendamentos.get((responsavel_id, o.pk), 0) for o in origens]
+        matriz_quem_agendou.append({
+            "nome": nomes_responsaveis.get(responsavel_id, "Sem responsável definido"),
+            "valores": valores,
+            "total": sum(valores),
+        })
+
     contexto = {
         "formset": formset,
         "linhas": linhas,
         "totais": totais,
         "origens": origens,
+        "origem_resumo": origem_resumo,
+        "matriz_quem_agendou": matriz_quem_agendou,
         "ano": ano,
         "mes": mes,
         "mes_nome": dict(MESES)[mes],
