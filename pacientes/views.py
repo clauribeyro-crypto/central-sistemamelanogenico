@@ -659,9 +659,10 @@ def crm_fechamento(request):
         organizacao=org, status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True,
         data_hora__gte=inicio_dt, data_hora__lte=fim_dt,
     ).count()
-    fechados_no_mes = Acompanhamento.objects.filter(
+    fechados_qs = Acompanhamento.objects.filter(
         organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
-    ).count()
+    ).select_related("paciente", "programa").order_by("-data_inicio")
+    fechados_no_mes = fechados_qs.count()
     perdidos_qs = HistoricoFechamento.objects.filter(
         paciente__organizacao=org, tipo=HistoricoFechamento.Tipo.PERDA,
         data_hora__gte=inicio_dt, data_hora__lte=fim_dt,
@@ -684,5 +685,6 @@ def crm_fechamento(request):
         "perdidos_no_mes": perdidos_no_mes,
         "taxa_conversao": taxa_conversao,
         "lista_perdidos": perdidos_qs[:50],
+        "lista_fechados": fechados_qs[:50],
     }
     return render(request, "pacientes/crm_fechamento.html", contexto)

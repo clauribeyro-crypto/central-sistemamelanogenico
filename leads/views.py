@@ -96,6 +96,25 @@ def kanban(request):
         status__in=[Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO]
     ).select_related("origem", "responsavel")
 
+    # Filtro por origem ("funil") e por período de entrada — pra quem cuida
+    # de tráfego conseguir ver só as leads de uma campanha/canal específico
+    # num intervalo de datas, sem precisar vasculhar o board inteiro.
+    origem_selecionada = request.GET.get("origem") or ""
+    data_inicio_filtro = request.GET.get("data_inicio") or ""
+    data_fim_filtro = request.GET.get("data_fim") or ""
+    if origem_selecionada:
+        ativos = ativos.filter(origem_id=origem_selecionada)
+    if data_inicio_filtro:
+        try:
+            ativos = ativos.filter(entrou_em__date__gte=datetime.date.fromisoformat(data_inicio_filtro))
+        except ValueError:
+            data_inicio_filtro = ""
+    if data_fim_filtro:
+        try:
+            ativos = ativos.filter(entrou_em__date__lte=datetime.date.fromisoformat(data_fim_filtro))
+        except ValueError:
+            data_fim_filtro = ""
+
     etapas_kanban = [e for e in Lead.Etapa.choices if e[0] != Lead.Etapa.CONCLUIDA]
     colunas = [(codigo, rotulo, []) for codigo, rotulo in etapas_kanban]
     colunas_por_codigo = {codigo: lista for codigo, _, lista in colunas}
@@ -134,7 +153,12 @@ def kanban(request):
 
     return render(
         request, "leads/kanban.html",
-        {"colunas": colunas, "contadores": contadores, "origens": origens, "leads_busca": leads_busca},
+        {
+            "colunas": colunas, "contadores": contadores, "origens": origens, "leads_busca": leads_busca,
+            "origem_selecionada": origem_selecionada,
+            "data_inicio_filtro": data_inicio_filtro,
+            "data_fim_filtro": data_fim_filtro,
+        },
     )
 
 

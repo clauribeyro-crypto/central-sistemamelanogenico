@@ -4,7 +4,13 @@
     <h1>🤝 CRM de fechamento</h1>
     <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
         Acompanhamento de quem já fez a consulta de diagnóstico — quantas pessoas a gente está
-        conseguindo fechar e quantas está perdendo, mês a mês.
+        conseguindo fechar e quantas está perdendo, mês a mês. "Fechamento" aqui é o início de um
+        <strong>protocolo/programa</strong> (não da consulta de diagnóstico em si — essa é o ponto de
+        partida da fila abaixo). A lista de quem fechou no mês está logo abaixo.
+        {% if user.papel != "COMERCIAL" %}
+            Pra ver consultas cobradas separadamente dos protocolos fechados, veja o
+            <a href="{% url 'financeiro:relatorio_fechamentos' %}?ano={{ ano }}&mes={{ mes }}">relatório de fechamentos no Financeiro →</a>
+        {% endif %}
     </p>
 
     <form class="filtro no-print" method="get">
@@ -79,6 +85,29 @@
             </table>
         {% else %}
             <p>Ninguém esperando follow-up agora. 🎉</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2>Fechados em {{ mes_nome|lower }} ({{ fechados_no_mes }})</h2>
+        {% if lista_fechados %}
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Paciente</th><th>Programa</th><th>Valor contratado</th></tr>
+                </thead>
+                <tbody>
+                    {% for tratamento in lista_fechados %}
+                        <tr>
+                            <td>{{ tratamento.data_inicio|date:"d/m/Y" }}</td>
+                            <td><a href="{% url 'pacientes:ficha' tratamento.paciente.pk %}">{{ tratamento.paciente.nome }}</a></td>
+                            <td>{{ tratamento.programa.nome }}</td>
+                            <td>R$ {{ tratamento.valor_contratado|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhum protocolo fechado nesse mês.</p>
         {% endif %}
     </div>
 

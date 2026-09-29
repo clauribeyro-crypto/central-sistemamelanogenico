@@ -19,6 +19,30 @@
         <a href="{% url 'leads:kanban' %}?filtro=perdidos">Perdidos ({{ contadores.perdidos }})</a>
     </div>
 
+    <form method="get" class="filtro no-print">
+        <div>
+            <label for="origem">Origem (funil)</label>
+            <select id="origem" name="origem">
+                <option value="">Todas</option>
+                {% for origem in origens %}
+                    <option value="{{ origem.pk }}" {% if origem_selecionada == origem.pk|stringformat:"s" %}selected{% endif %}>{{ origem.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="data_inicio">Entrou de</label>
+            <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio_filtro }}">
+        </div>
+        <div>
+            <label for="data_fim">Até</label>
+            <input type="date" id="data_fim" name="data_fim" value="{{ data_fim_filtro }}">
+        </div>
+        <button type="submit">Filtrar</button>
+        {% if origem_selecionada or data_inicio_filtro or data_fim_filtro %}
+            <a class="btn btn-secondary" href="{% url 'leads:kanban' %}">Limpar filtro</a>
+        {% endif %}
+    </form>
+
     <div style="margin-bottom:1rem;">
         <input type="search" id="busca-leads" class="busca-leads" placeholder="Buscar por nome ou telefone…" style="max-width:340px;" autocomplete="off">
     </div>
