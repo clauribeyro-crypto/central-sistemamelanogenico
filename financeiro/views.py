@@ -15,7 +15,10 @@ from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuar
 from programas.models import Acompanhamento
 
 from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, RecebimentoForm
+from .importador_extrato import parse_extrato, sugerir_categoria
 from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, Recebimento
+
+SESSION_KEY_EXTRATO_PENDENTE = "extrato_importar_pendente"
 
 MESES = [
     (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"),
@@ -527,6 +530,131 @@ def lancamento_excluir(request, pk):
     lancamento.delete()
     messages.success(request, "Lançamento excluído.")
     return redirect(f"{reverse('financeiro:painel')}?aba=lancamentos&ano={ano}&mes={mes}")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+def extrato_importar(request):
+    """
+    Passo 1 da importação de extrato: sobe um arquivo OFX ou CSV do banco,
+    escolhe a qual Banco cadastrado ele pertence, e guarda as transações lidas
+    na sessão pra revisar (escolher categoria linha a linha) no passo 2 —
+    nada é gravado como Lançamento ainda aqui.
+    """
+    org = organizacao_do_usuario(request)
+    bancos = Banco.objects.filter(organizacao=org, ativo=True)
+
+    if request.method == "POST":
+        banco_id = request.POST.get("banco")
+        arquivo = request.FILES.get("arquivo")
+        if not arquivo:
+            messages.error(request, "Selecione o arquivo OFX ou CSV exportado do seu banco.")
+        elif not banco_id:
+            messages.error(request, "Selecione a qual banco esse extrato pertence.")
+        else:
+            banco = get_object_or_404(Banco, pk=banco_id, organizacao=org)
+            try:
+                transacoes = parse_extrato(arquivo.name, arquivo.read())
+            except ValueError as erro:
+                messages.error(request, f"Não consegui ler o arquivo: {erro}")
+                transacoes = None
+            if transacoes is not None:
+                if not transacoes:
+                    messages.error(request, "Não encontrei nenhuma transação nesse arquivo.")
+                else:
+                    request.session[SESSION_KEY_EXTRATO_PENDENTE] = {
+                        "banco_id": banco.pk,
+                        "transacoes": [
+                            {"data": t["data"].isoformat(), "valor": str(t["valor"]), "descricao": t["descricao"]}
+                            for t in transacoes
+                        ],
+                    }
+                    return redirect("financeiro:extrato_importar_revisar")
+
+    return render(request, "financeiro/extrato_importar.html", {"bancos": bancos})
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+def extrato_importar_revisar(request):
+    """
+    Passo 2: mostra cada transação lida do extrato com uma sugestão de
+    categoria (baseada nas categorias já cadastradas), marca como possível
+    duplicata quem já bate com um Lançamento existente (mesmo banco+data+
+    valor), e só cria os Lançamentos de fato quando o formulário é confirmado.
+    """
+    org = organizacao_do_usuario(request)
+    pendente = request.session.get(SESSION_KEY_EXTRATO_PENDENTE)
+    if not pendente:
+        messages.error(request, "Nenhum extrato pendente de revisão — envie o arquivo de novo.")
+        return redirect("financeiro:extrato_importar")
+
+    banco = get_object_or_404(Banco, pk=pendente["banco_id"], organizacao=org)
+    categorias_despesa = list(
+        CategoriaFinanceira.objects.filter(organizacao=org, ativo=True)
+        .exclude(grupo__in=CategoriaFinanceira.GRUPOS_RECEITA)
+    )
+    categorias_receita = list(
+        CategoriaFinanceira.objects.filter(
+            organizacao=org, ativo=True, grupo__in=CategoriaFinanceira.GRUPOS_RECEITA
+        )
+    )
+    lancamentos_existentes = set(
+        Lancamento.objects.filter(organizacao=org, banco=banco).values_list("data", "valor")
+    )
+
+    linhas = []
+    for indice, t in enumerate(pendente["transacoes"]):
+        data = datetime.date.fromisoformat(t["data"])
+        valor = Decimal(t["valor"])
+        categorias = categorias_receita if valor >= 0 else categorias_despesa
+        linhas.append({
+            "indice": indice,
+            "data": data,
+            "valor": valor,
+            "descricao": t["descricao"],
+            "categorias": categorias,
+            "duplicada": (data, abs(valor)) in lancamentos_existentes,
+            "sugestao": sugerir_categoria(t["descricao"], categorias),
+        })
+
+    if request.method == "POST":
+        algum_erro = False
+        novos_lancamentos = []
+        for linha in linhas:
+            linha["marcada"] = f"linha_{linha['indice']}" in request.POST
+            linha["categoria_selecionada_id"] = request.POST.get(f"categoria_{linha['indice']}", "")
+            if not linha["marcada"]:
+                continue
+            if not linha["categoria_selecionada_id"]:
+                messages.error(request, f'Escolha a categoria da linha "{linha["descricao"]}" (ou desmarque ela).')
+                algum_erro = True
+                continue
+            categoria = get_object_or_404(
+                CategoriaFinanceira, pk=linha["categoria_selecionada_id"], organizacao=org
+            )
+            novos_lancamentos.append(Lancamento(
+                organizacao=org, data=linha["data"], descricao=linha["descricao"][:255],
+                categoria=categoria, banco=banco, valor=abs(linha["valor"]),
+                status=Lancamento.Status.REALIZADO,
+            ))
+
+        if algum_erro:
+            return render(request, "financeiro/extrato_importar_revisar.html", {"banco": banco, "linhas": linhas})
+
+        Lancamento.objects.bulk_create(novos_lancamentos)
+        del request.session[SESSION_KEY_EXTRATO_PENDENTE]
+        if novos_lancamentos:
+            messages.success(request, f"{len(novos_lancamentos)} lançamento(s) importado(s) do extrato.")
+        else:
+            messages.info(request, "Nenhuma linha foi selecionada — nada foi importado.")
+        return redirect(f"{reverse('financeiro:painel')}?aba=lancamentos")
+
+    for linha in linhas:
+        linha["marcada"] = not linha["duplicada"]
+        linha["categoria_selecionada_id"] = linha["sugestao"].pk if linha["sugestao"] else ""
+
+    return render(request, "financeiro/extrato_importar_revisar.html", {"banco": banco, "linhas": linhas})
 
 
 @login_required

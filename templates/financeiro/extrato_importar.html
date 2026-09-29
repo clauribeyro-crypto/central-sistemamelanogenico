@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Importar extrato · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'financeiro:painel' %}?aba=lancamentos">← Voltar</a></p>
+    <div class="card">
+        <h1>Importar extrato bancário</h1>
+        <p style="color:var(--text-muted);">
+            Suba o extrato exportado do seu banco (arquivo <strong>.ofx</strong> ou <strong>.csv</strong>) e o
+            sistema lê as transações pra você — na próxima tela dá pra conferir e escolher a categoria de
+            cada uma antes de confirmar. Nada é lançado automaticamente sem você revisar.
+        </p>
+        {% if not bancos %}
+            <p style="color:#8f2e45;">
+                Você ainda não tem nenhum banco cadastrado. <a href="{% url 'financeiro:banco_criar' %}">Cadastre um banco primeiro</a>.
+            </p>
+        {% else %}
+            <form method="post" enctype="multipart/form-data" class="acao">
+                {% csrf_token %}
+                <div>
+                    <label for="banco">A qual banco esse extrato pertence?</label>
+                    <select name="banco" id="banco" required>
+                        <option value="">---------</option>
+                        {% for banco in bancos %}
+                            <option value="{{ banco.pk }}">{{ banco.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="arquivo">Arquivo do extrato (.ofx ou .csv)</label>
+                    <input type="file" name="arquivo" id="arquivo" accept=".ofx,.csv" required>
+                    <p style="font-size:.78rem; color:var(--text-muted);">
+                        A maioria dos bancos exporta OFX direto no app/site — é o formato mais confiável.
+                        Se só tiver CSV, o arquivo precisa ter colunas de data e valor (os nomes mais comuns
+                        são reconhecidos automaticamente).
+                    </p>
+                </div>
+                <button class="btn" type="submit">Ler extrato</button>
+            </form>
+        {% endif %}
+    </div>
+{% endblock %}

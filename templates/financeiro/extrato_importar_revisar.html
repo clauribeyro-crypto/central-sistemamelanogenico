@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Revisar extrato importado · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'financeiro:extrato_importar' %}">← Voltar</a></p>
+    <div class="card">
+        <h1>Revisar transações — {{ banco.nome }}</h1>
+        <p style="color:var(--text-muted);">
+            Confira as transações lidas do extrato. Desmarque o que não quer importar, escolha a categoria
+            de cada linha (já vem sugerida quando dá pra reconhecer) e confirme. Linhas marcadas como
+            <span class="badge badge-atrasado">possível duplicata</span> já batem com um lançamento existente
+            desse banco na mesma data e valor — vêm desmarcadas por padrão pra não duplicar.
+        </p>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            <table>
+                <thead>
+                    <tr>
+                        <th></th><th>Data</th><th>Descrição</th><th>Valor</th><th>Categoria</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas %}
+                        <tr>
+                            <td><input type="checkbox" name="linha_{{ linha.indice }}" {% if linha.marcada %}checked{% endif %}></td>
+                            <td>{{ linha.data|date:"d/m/Y" }}</td>
+                            <td>{{ linha.descricao }}</td>
+                            <td style="{% if linha.valor < 0 %}color:#8f2e45;{% else %}color:#1f7a4d;{% endif %}">
+                                R$ {{ linha.valor|floatformat:2 }}
+                            </td>
+                            <td>
+                                <select name="categoria_{{ linha.indice }}">
+                                    <option value="">---------</option>
+                                    {% for categoria in linha.categorias %}
+                                        <option value="{{ categoria.pk }}" {% if linha.categoria_selecionada_id|stringformat:"s" == categoria.pk|stringformat:"s" %}selected{% endif %}>
+                                            {{ categoria.nome }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>{% if linha.duplicada %}<span class="badge badge-atrasado">possível duplicata</span>{% endif %}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <button class="btn" type="submit">Confirmar importação</button>
+        </form>
+    </div>
+{% endblock %}
