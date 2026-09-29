@@ -18,6 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
+from contas.models import Usuario
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
 from financeiro.models import Pagamento
 from financeiro.views import MESES
@@ -316,11 +317,63 @@ def painel_marketing(request):
         "valor": sum((l["valor"] for l in linhas), Decimal("0.00")),
     }
 
+    # "De onde vêm as leads": pra cada origem, quantas entraram no período e
+    # quantas dessas mesmas leads já estão com consulta agendada — a taxa de
+    # conversão que a gestora de tráfego precisa pra saber qual canal traz
+    # gente que realmente agenda, não só quem preenche formulário.
+    agendaram_por_origem = {
+        row["origem_id"]: row["total"]
+        for row in Lead.objects.filter(
+            organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
+            status=Lead.Status.AGENDADA,
+        ).values("origem_id").annotate(total=Count("id"))
+    }
+    origem_resumo = []
+    for origem, total_leads in zip(origens, totais["leads_por_origem"]):
+        agendaram = agendaram_por_origem.get(origem.pk, 0)
+        origem_resumo.append({
+            "origem": origem,
+            "leads": total_leads,
+            "agendaram": agendaram,
+            "taxa": (agendaram / total_leads * 100) if total_leads else None,
+        })
+
+    # "Quem está agendando, por origem": todo agendamento passa por
+    # Lead.marcar_agendada (CRM, arrastar no board ou direto na Agenda), que
+    # sempre registra um HistoricoLead com quem fez — dá pra cruzar com a
+    # origem do lead sem depender de ninguém preencher planilha à parte.
+    contagem_agendamentos = {}
+    responsaveis_ids = set()
+    for row in (
+        HistoricoLead.objects.filter(
+            lead__organizacao=org, tipo=HistoricoLead.Tipo.AGENDAMENTO,
+            data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+        )
+        .values("responsavel_id", "lead__origem_id")
+        .annotate(total=Count("id"))
+    ):
+        contagem_agendamentos[(row["responsavel_id"], row["lead__origem_id"])] = row["total"]
+        responsaveis_ids.add(row["responsavel_id"])
+
+    nomes_responsaveis = {
+        u.pk: str(u) for u in Usuario.objects.filter(pk__in=[rid for rid in responsaveis_ids if rid])
+    }
+    matriz_quem_agendou = []
+    for responsavel_id in sorted(responsaveis_ids, key=lambda rid: nomes_responsaveis.get(rid, "")):
+        valores = [contagem_agendamentos.get((responsavel_id, o.pk), 0) for o in origens]
+        matriz_quem_agendou.append({
+            "nome": nomes_responsaveis.get(responsavel_id, "Sem responsável definido"),
+            "valores": valores,
+            "total": sum(valores),
+        })
+
     contexto = {
         "formset": formset,
         "linhas": linhas,
         "totais": totais,
         "origens": origens,
+        "origem_resumo": origem_resumo,
+        "matriz_quem_agendou": matriz_quem_agendou,
         "ano": ano,
         "mes": mes,
         "mes_nome": dict(MESES)[mes],
