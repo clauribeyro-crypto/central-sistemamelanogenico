@@ -73,6 +73,39 @@ def _leads_do_usuario(request):
 def kanban(request):
     leads_qs, org = _leads_do_usuario(request)
     filtro = request.GET.get("filtro")
+    origens = Origem.objects.filter(organizacao=org, ativo=True)
+
+    # Filtro por origem ("funil") e por período de entrada — pra quem cuida
+    # de tráfego conseguir ver só as leads de uma campanha/canal específico
+    # num intervalo de datas (ex.: quantas leads do Quiz agendaram no mês),
+    # sem precisar vasculhar o board inteiro. Vale tanto pro board principal
+    # quanto pras abas (Agendados, Perdidos etc.) — filtra a mesma origem e
+    # período nos dois, senão dava pra ver as leads mas não quantas delas
+    # realmente agendaram.
+    origem_selecionada = request.GET.get("origem") or ""
+    data_inicio_filtro = request.GET.get("data_inicio") or ""
+    data_fim_filtro = request.GET.get("data_fim") or ""
+    data_inicio = None
+    data_fim = None
+    if data_inicio_filtro:
+        try:
+            data_inicio = datetime.date.fromisoformat(data_inicio_filtro)
+        except ValueError:
+            data_inicio_filtro = ""
+    if data_fim_filtro:
+        try:
+            data_fim = datetime.date.fromisoformat(data_fim_filtro)
+        except ValueError:
+            data_fim_filtro = ""
+
+    def _aplicar_filtros(queryset):
+        if origem_selecionada:
+            queryset = queryset.filter(origem_id=origem_selecionada)
+        if data_inicio:
+            queryset = queryset.filter(entrou_em__date__gte=data_inicio)
+        if data_fim:
+            queryset = queryset.filter(entrou_em__date__lte=data_fim)
+        return queryset
 
     status_por_filtro = {
         "pausados": Lead.Status.PAUSADO,
@@ -81,39 +114,26 @@ def kanban(request):
         "perdidos": Lead.Status.PERDIDA,
     }
     if filtro in status_por_filtro:
-        leads = leads_qs.filter(status=status_por_filtro[filtro]).select_related(
-            "origem", "responsavel"
-        )
+        leads = _aplicar_filtros(
+            leads_qs.filter(status=status_por_filtro[filtro])
+        ).select_related("origem", "responsavel")
         return render(
             request, "leads/lista_filtrada.html",
-            {"leads": leads, "filtro": filtro, "titulo": dict(
-                [("pausados", "Pausados"), ("agendados", "Agendados"),
-                 ("sem_resposta", "Sem resposta"), ("perdidos", "Perdidos")]
-            )[filtro]},
+            {
+                "leads": leads, "filtro": filtro, "titulo": dict(
+                    [("pausados", "Pausados"), ("agendados", "Agendados"),
+                     ("sem_resposta", "Sem resposta"), ("perdidos", "Perdidos")]
+                )[filtro],
+                "origens": origens,
+                "origem_selecionada": origem_selecionada,
+                "data_inicio_filtro": data_inicio_filtro,
+                "data_fim_filtro": data_fim_filtro,
+            },
         )
 
-    ativos = leads_qs.filter(
-        status__in=[Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO]
+    ativos = _aplicar_filtros(
+        leads_qs.filter(status__in=[Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO])
     ).select_related("origem", "responsavel")
-
-    # Filtro por origem ("funil") e por período de entrada — pra quem cuida
-    # de tráfego conseguir ver só as leads de uma campanha/canal específico
-    # num intervalo de datas, sem precisar vasculhar o board inteiro.
-    origem_selecionada = request.GET.get("origem") or ""
-    data_inicio_filtro = request.GET.get("data_inicio") or ""
-    data_fim_filtro = request.GET.get("data_fim") or ""
-    if origem_selecionada:
-        ativos = ativos.filter(origem_id=origem_selecionada)
-    if data_inicio_filtro:
-        try:
-            ativos = ativos.filter(entrou_em__date__gte=datetime.date.fromisoformat(data_inicio_filtro))
-        except ValueError:
-            data_inicio_filtro = ""
-    if data_fim_filtro:
-        try:
-            ativos = ativos.filter(entrou_em__date__lte=datetime.date.fromisoformat(data_fim_filtro))
-        except ValueError:
-            data_fim_filtro = ""
 
     etapas_kanban = [e for e in Lead.Etapa.choices if e[0] != Lead.Etapa.CONCLUIDA]
     colunas = [(codigo, rotulo, []) for codigo, rotulo in etapas_kanban]
@@ -122,11 +142,9 @@ def kanban(request):
         colunas_por_codigo[lead.etapa].append(lead)
 
     contadores = {
-        chave: leads_qs.filter(status=status).count()
+        chave: _aplicar_filtros(leads_qs.filter(status=status)).count()
         for chave, status in status_por_filtro.items()
     }
-
-    origens = Origem.objects.filter(organizacao=org, ativo=True)
 
     # Dataset pra busca cruzando abas: todo lead da organização, com a aba
     # e a etapa já resolvidas em texto — a busca em si roda no navegador.

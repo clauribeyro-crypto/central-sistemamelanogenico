@@ -11,13 +11,15 @@
         </div>
     </div>
 
-    <div class="filtros-status">
-        <a class="ativo" href="{% url 'leads:kanban' %}">Cadência ativa</a>
-        <a href="{% url 'leads:kanban' %}?filtro=pausados">Pausados ({{ contadores.pausados }})</a>
-        <a href="{% url 'leads:kanban' %}?filtro=agendados" id="aba-agendados">Agendados ({{ contadores.agendados }})</a>
-        <a href="{% url 'leads:kanban' %}?filtro=sem_resposta">Sem resposta ({{ contadores.sem_resposta }})</a>
-        <a href="{% url 'leads:kanban' %}?filtro=perdidos">Perdidos ({{ contadores.perdidos }})</a>
-    </div>
+    {% with filtro_qs="&origem="|add:origem_selecionada|add:"&data_inicio="|add:data_inicio_filtro|add:"&data_fim="|add:data_fim_filtro %}
+        <div class="filtros-status">
+            <a class="ativo" href="{% url 'leads:kanban' %}">Cadência ativa</a>
+            <a href="{% url 'leads:kanban' %}?filtro=pausados{{ filtro_qs }}">Pausados ({{ contadores.pausados }})</a>
+            <a href="{% url 'leads:kanban' %}?filtro=agendados{{ filtro_qs }}" id="aba-agendados">Agendados ({{ contadores.agendados }})</a>
+            <a href="{% url 'leads:kanban' %}?filtro=sem_resposta{{ filtro_qs }}">Sem resposta ({{ contadores.sem_resposta }})</a>
+            <a href="{% url 'leads:kanban' %}?filtro=perdidos{{ filtro_qs }}">Perdidos ({{ contadores.perdidos }})</a>
+        </div>
+    {% endwith %}
 
     <form method="get" class="filtro no-print">
         <div>
