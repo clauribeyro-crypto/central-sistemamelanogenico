@@ -135,6 +135,14 @@ SECOES_ANAMNESE = [
         "satisfacao": "satisfacao_energia",
     },
     {
+        "titulo": "Língua",
+        "campos": [
+            "cor_lingua", "saburra_lingual", "cor_saburra", "textura_lingua", "feridas_lingua",
+            "umidade_boca", "sensibilidade_lingua", "mau_halito_caseos", "raspagem_lingua",
+        ],
+        "satisfacao": None,
+    },
+    {
         "titulo": "Sono",
         "campos": [
             "qualidade_sono", "horas_dormidas", "horario_dormir", "horario_acordar", "insonia",
@@ -308,7 +316,18 @@ class Anamnese(ModeloDaOrganizacao):
     pele_ressecada = _campo("pele ressecada")
     satisfacao_energia = _campo_satisfacao("seu nível de energia")
 
-    # 7. Sono
+    # 7. Língua
+    cor_lingua = _campo("cor predominante da língua")
+    saburra_lingual = _campo("saburra lingual (presença/intensidade)")
+    cor_saburra = _campo("cor da saburra")
+    textura_lingua = _campo("textura da língua")
+    feridas_lingua = _campo("feridas, aftas ou nódulos na língua/boca com mais de 15-20 dias")
+    umidade_boca = _campo("umidade da boca")
+    sensibilidade_lingua = _campo("dor, queimação ou sensibilidade na língua/boca")
+    mau_halito_caseos = _campo("mau hálito ou cáseos amigdalianos")
+    raspagem_lingua = _campo("raspa a língua em jejum")
+
+    # 8. Sono
     qualidade_sono = _campo("qualidade do sono")
     horas_dormidas = _campo("horas dormidas", max_length=50)
     horario_dormir = _campo("horário de dormir", max_length=50)
@@ -319,7 +338,7 @@ class Anamnese(ModeloDaOrganizacao):
     acorda_cansada = _campo("acorda cansada")
     satisfacao_sono = _campo_satisfacao("a qualidade do seu sono")
 
-    # 8. Saúde mental
+    # 9. Saúde mental
     ansiedade = _campo("ansiedade")
     estresse = _campo("estresse")
     irritabilidade = _campo("irritabilidade")
@@ -333,7 +352,7 @@ class Anamnese(ModeloDaOrganizacao):
     uso_medicamentos_controlados = _campo("uso de medicamentos controlados")
     satisfacao_emocional = _campo_satisfacao("seu equilíbrio emocional")
 
-    # 9. Hormônios e metabolismo
+    # 10. Hormônios e metabolismo
     tpm = _campo("TPM")
     fluxo_menstrual = _campo("fluxo menstrual (intensidade/coágulos)")
     baixa_libido_hormonal = _campo("baixa libido")
@@ -350,7 +369,7 @@ class Anamnese(ModeloDaOrganizacao):
     sop = _campo("SOP (síndrome dos ovários policísticos)")
     satisfacao_hormonal = _campo_satisfacao("seu equilíbrio hormonal")
 
-    # 10. Pele (condições específicas)
+    # 11. Pele (condições específicas)
     acne = _campo("acne (região)")
     melasma = _campo("melasma")
     rosacea = _campo("rosácea")
@@ -364,7 +383,7 @@ class Anamnese(ModeloDaOrganizacao):
     acrocordons = _campo("acrocórdons")
     cabelo_branco_precoce = _campo("cabelo branco precoce")
 
-    # 11. Alimentação
+    # 12. Alimentação
     horario_cafe_da_manha = _campo("horário do café da manhã", max_length=50)
     cafe_da_manha = _campo("o que consome no café da manhã", max_length=255)
     horario_almoco = _campo("horário do almoço", max_length=50)
@@ -382,7 +401,7 @@ class Anamnese(ModeloDaOrganizacao):
     preferencia_carne = _campo("preferência de carne (branca/vermelha)", max_length=100)
     ingestao_agua = _campo("ingestão de água (copos/dia)", max_length=100)
 
-    # 12. Atividade física e hábitos
+    # 13. Atividade física e hábitos
     tipo_exercicio = _campo("tipo de exercício")
     frequencia_exercicio = _campo("frequência de exercício", max_length=100)
     tabagismo = _campo("tabagismo (quantidade/dia)")
@@ -391,7 +410,7 @@ class Anamnese(ModeloDaOrganizacao):
     shampoo = _campo("shampoo", max_length=100)
     condicionador = _campo("condicionador", max_length=100)
 
-    # 13. Histórico médico
+    # 14. Histórico médico
     tipo_parto = _campo("tipo de parto", max_length=100)
     idade_menarca = _campo("idade da menarca", max_length=50)
     cirurgias_previas = _campo_texto("cirurgias prévias")
@@ -421,11 +440,11 @@ class Anamnese(ModeloDaOrganizacao):
     adenomiose = _campo("adenomiose", max_length=100)
     outras_doencas = _campo_texto("outras doenças")
 
-    # 14. Campo aberto
+    # 15. Campo aberto
     outros_sintomas_doencas = _campo_texto("você tem outros sintomas e/ou doenças?")
     orgaos_mais_atencao = _campo_texto("quais órgãos você sente que precisam de mais atenção?")
 
-    # 15. Foto
+    # 16. Foto
     foto_rosto = models.ImageField(
         "foto do rosto", upload_to="anamnese_fotos/%Y/%m/", blank=True, null=True
     )
