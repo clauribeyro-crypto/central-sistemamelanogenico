@@ -11,6 +11,10 @@
                     {% if paciente.idade %}{{ paciente.idade }} anos{% endif %}
                     {% if paciente.idade and paciente.cidade %} · {% endif %}
                     {{ paciente.cidade }}
+                    {% if paciente.telefone %}
+                        {% if paciente.idade or paciente.cidade %} · {% endif %}
+                        📞 <a href="tel:{{ paciente.telefone }}">{{ paciente.telefone }}</a>
+                    {% endif %}
                 </p>
                 {% if acompanhamento %}
                     <span class="badge">Programa: {{ acompanhamento.programa.nome }}</span>

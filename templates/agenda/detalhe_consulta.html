@@ -11,6 +11,9 @@
                     <span style="display:inline-block; width:.8rem; height:.8rem; border-radius:50%; background:{{ consulta.tipo_consulta.cor }}; margin-right:.3rem; vertical-align:middle;"></span>
                     {{ consulta.tipo_consulta }} · {{ consulta.profissional }}<br>
                     {{ consulta.data_hora|date:"d/m/Y" }} às {{ consulta.data_hora|time:"H:i" }} · {{ consulta.duracao_minutos }} min
+                    {% if consulta.paciente.telefone %}
+                        <br>📞 <a href="tel:{{ consulta.paciente.telefone }}">{{ consulta.paciente.telefone }}</a>
+                    {% endif %}
                 </p>
             </div>
             <span class="badge">{{ consulta.get_status_display }}</span>
