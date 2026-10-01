@@ -297,6 +297,29 @@ def vincular_consulta_prevista(request, pk):
 
 
 @login_required
+@require_POST
+def desvincular_consulta_prevista(request, pk):
+    """
+    Desfaz o vínculo de uma Consulta N marcada como realizada por engano —
+    seja por um vínculo manual errado, seja pelo vínculo automático que
+    existia antes (removido, mas o estrago em acompanhamentos antigos
+    continua até alguém corrigir). Volta pro estado "pendente de agendamento".
+    """
+    org = organizacao_do_usuario(request)
+    consulta_prevista = get_object_or_404(
+        ConsultaPrevista.objects.select_related("acompanhamento__paciente"),
+        pk=pk, acompanhamento__organizacao=org,
+    )
+    paciente = consulta_prevista.acompanhamento.paciente
+
+    consulta_prevista.consulta = None
+    consulta_prevista.status = ConsultaPrevista.Status.PENDENTE_AGENDAMENTO
+    consulta_prevista.save(update_fields=["consulta", "status"])
+    messages.success(request, f"Consulta {consulta_prevista.numero} voltou a ficar pendente de agendamento.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=consultas")
+
+
+@login_required
 def fase_detalhe(request, pk):
     """
     Plano e avaliação de uma fase da modulação. Definir o plano ou registrar

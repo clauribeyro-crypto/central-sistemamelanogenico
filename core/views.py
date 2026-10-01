@@ -1,3 +1,4 @@
+import calendar
 import datetime
 from decimal import Decimal
 
@@ -243,8 +244,29 @@ def home(request):
 @login_required
 def indicadores(request):
     org = organizacao_do_usuario(request)
+    hoje = timezone.localdate()
+
+    todos_periodos = request.GET.get("todos_periodos") == "1"
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
 
     leads_qs = Lead.objects.filter(organizacao=org)
+    consultas_qs = Consulta.objects.filter(organizacao=org)
+    if not todos_periodos:
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        data_inicio = datetime.date(ano, mes, 1)
+        data_fim = datetime.date(ano, mes, ultimo_dia)
+        leads_qs = leads_qs.filter(entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim)
+        consultas_qs = consultas_qs.filter(data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim)
+
     por_status = leads_qs.values("status").annotate(total=Count("id")).order_by("-total")
     por_origem = leads_qs.values("origem__nome").annotate(total=Count("id")).order_by("-total")
     por_motivo_perda = (
@@ -254,10 +276,7 @@ def indicadores(request):
         .order_by("-total")
     )
     consultas_por_status = (
-        Consulta.objects.filter(organizacao=org)
-        .values("status")
-        .annotate(total=Count("id"))
-        .order_by("-total")
+        consultas_qs.values("status").annotate(total=Count("id")).order_by("-total")
     )
 
     status_labels = dict(Lead.Status.choices)
@@ -274,6 +293,12 @@ def indicadores(request):
             {"label": dict(Consulta.Status.choices).get(r["status"], r["status"]), "total": r["total"]}
             for r in consultas_por_status
         ],
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+        "todos_periodos": todos_periodos,
     }
     return render(request, "core/indicadores.html", contexto)
 

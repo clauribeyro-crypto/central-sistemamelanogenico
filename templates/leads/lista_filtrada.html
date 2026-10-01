@@ -1,15 +1,42 @@
 {% extends "base.html" %}
 {% block title %}{{ titulo }} · CRM · Sistema da Clínica{% endblock %}
 {% block content %}
-    <h1>{{ titulo }}</h1>
+    <h1>{{ titulo }} ({{ leads|length }})</h1>
 
-    <div class="filtros-status">
-        <a href="{% url 'leads:kanban' %}">Cadência ativa</a>
-        <a {% if filtro == "pausados" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=pausados">Pausados</a>
-        <a {% if filtro == "agendados" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=agendados">Agendados</a>
-        <a {% if filtro == "sem_resposta" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=sem_resposta">Sem resposta</a>
-        <a {% if filtro == "perdidos" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=perdidos">Perdidos</a>
-    </div>
+    {% with filtro_qs="&origem="|add:origem_selecionada|add:"&data_inicio="|add:data_inicio_filtro|add:"&data_fim="|add:data_fim_filtro %}
+        <div class="filtros-status">
+            <a href="{% url 'leads:kanban' %}?{{ filtro_qs|slice:"1:" }}">Cadência ativa</a>
+            <a {% if filtro == "pausados" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=pausados{{ filtro_qs }}">Pausados</a>
+            <a {% if filtro == "agendados" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=agendados{{ filtro_qs }}">Agendados</a>
+            <a {% if filtro == "sem_resposta" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=sem_resposta{{ filtro_qs }}">Sem resposta</a>
+            <a {% if filtro == "perdidos" %}class="ativo"{% endif %} href="{% url 'leads:kanban' %}?filtro=perdidos{{ filtro_qs }}">Perdidos</a>
+        </div>
+    {% endwith %}
+
+    <form method="get" class="filtro no-print">
+        <input type="hidden" name="filtro" value="{{ filtro }}">
+        <div>
+            <label for="origem">Origem (funil)</label>
+            <select id="origem" name="origem">
+                <option value="">Todas</option>
+                {% for origem in origens %}
+                    <option value="{{ origem.pk }}" {% if origem_selecionada == origem.pk|stringformat:"s" %}selected{% endif %}>{{ origem.nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="data_inicio">Entrou de</label>
+            <input type="date" id="data_inicio" name="data_inicio" value="{{ data_inicio_filtro }}">
+        </div>
+        <div>
+            <label for="data_fim">Até</label>
+            <input type="date" id="data_fim" name="data_fim" value="{{ data_fim_filtro }}">
+        </div>
+        <button type="submit">Filtrar</button>
+        {% if origem_selecionada or data_inicio_filtro or data_fim_filtro %}
+            <a class="btn btn-secondary" href="{% url 'leads:kanban' %}?filtro={{ filtro }}">Limpar filtro</a>
+        {% endif %}
+    </form>
 
     <div class="card">
         {% if leads %}

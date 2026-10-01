@@ -11,6 +11,10 @@
                     {% if paciente.idade %}{{ paciente.idade }} anos{% endif %}
                     {% if paciente.idade and paciente.cidade %} · {% endif %}
                     {{ paciente.cidade }}
+                    {% if paciente.telefone %}
+                        {% if paciente.idade or paciente.cidade %} · {% endif %}
+                        📞 <a href="tel:{{ paciente.telefone }}">{{ paciente.telefone }}</a>
+                    {% endif %}
                 </p>
                 {% if acompanhamento %}
                     <span class="badge">Programa: {{ acompanhamento.programa.nome }}</span>
@@ -35,6 +39,9 @@
                 <div style="text-align:right; font-size:.85rem; color:var(--text-muted);">
                     <div>Início: {{ acompanhamento.data_inicio|date:"d/m/Y" }}</div>
                     <div>Término previsto: {{ acompanhamento.data_termino_prevista|date:"d/m/Y" }}</div>
+                    {% if usuario_e_administrador %}
+                        <div><a href="{% url 'programas:acompanhamento_editar' acompanhamento.pk %}?next={{ request.get_full_path|urlencode }}">Editar data/valor ›</a></div>
+                    {% endif %}
                 </div>
             {% endif %}
         </div>
@@ -508,6 +515,11 @@
                                     <td>
                                         {% if cp.consulta %}
                                             <a href="{% url 'agenda:detalhe_consulta' cp.consulta.pk %}">Ver ›</a>
+                                            <form method="post" action="{% url 'programas:desvincular_consulta_prevista' cp.pk %}" style="display:inline; margin-left:.4rem;"
+                                                  onsubmit="return confirm('Desfazer o vínculo da Consulta {{ cp.numero }}? Ela volta a ficar pendente de agendamento.');">
+                                                {% csrf_token %}
+                                                <button type="submit" style="color:var(--text-muted); background:none; border:none; padding:0; cursor:pointer; font-size:.8rem; text-decoration:underline;">desfazer</button>
+                                            </form>
                                         {% elif consultas_para_vincular %}
                                             <form method="post" action="{% url 'programas:vincular_consulta_prevista' cp.pk %}" style="display:flex; gap:.35rem; align-items:center;">
                                                 {% csrf_token %}
