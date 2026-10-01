@@ -512,6 +512,11 @@
                                     <td>
                                         {% if cp.consulta %}
                                             <a href="{% url 'agenda:detalhe_consulta' cp.consulta.pk %}">Ver ›</a>
+                                            <form method="post" action="{% url 'programas:desvincular_consulta_prevista' cp.pk %}" style="display:inline; margin-left:.4rem;"
+                                                  onsubmit="return confirm('Desfazer o vínculo da Consulta {{ cp.numero }}? Ela volta a ficar pendente de agendamento.');">
+                                                {% csrf_token %}
+                                                <button type="submit" style="color:var(--text-muted); background:none; border:none; padding:0; cursor:pointer; font-size:.8rem; text-decoration:underline;">desfazer</button>
+                                            </form>
                                         {% elif consultas_para_vincular %}
                                             <form method="post" action="{% url 'programas:vincular_consulta_prevista' cp.pk %}" style="display:flex; gap:.35rem; align-items:center;">
                                                 {% csrf_token %}

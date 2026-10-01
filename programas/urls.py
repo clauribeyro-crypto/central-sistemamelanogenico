@@ -30,4 +30,9 @@ urlpatterns = [
         views.vincular_consulta_prevista,
         name="vincular_consulta_prevista",
     ),
+    path(
+        "consultas-previstas/<int:pk>/desvincular/",
+        views.desvincular_consulta_prevista,
+        name="desvincular_consulta_prevista",
+    ),
 ]
