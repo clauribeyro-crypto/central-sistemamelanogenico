@@ -49,7 +49,19 @@
         </div>
         <div class="card stat">
             <div class="num">{% if taxa_conversao is not None %}{{ taxa_conversao }}%{% else %}—{% endif %}</div>
-            <div class="rotulo">Taxa de conversão (fechados ÷ fechados+perdidos)</div>
+            <div class="rotulo">Taxa de fechamento das decisões (fechados ÷ fechados+perdidos)</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                Só conta quem já foi fechado ou perdido — não conta as {{ total_fila_fechamento }} pessoas ainda
+                na fila esperando resposta.
+            </div>
+        </div>
+        <div class="card stat">
+            <div class="num">{% if taxa_conversao_consultas is not None %}{{ taxa_conversao_consultas }}%{% else %}—{% endif %}</div>
+            <div class="rotulo">Conversão de consultas em vendas (fechados ÷ consultas realizadas)</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                Das {{ consultas_no_mes }} consultas de diagnóstico do mês, quantas já viraram venda — inclui
+                quem ainda está decidindo, por isso costuma ser menor que a taxa de fechamento ao lado.
+            </div>
         </div>
     </div>
 

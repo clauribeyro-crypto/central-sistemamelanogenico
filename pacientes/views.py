@@ -681,6 +681,11 @@ def crm_fechamento(request):
 
     total_decisoes = fechados_no_mes + perdidos_no_mes
     taxa_conversao = round(fechados_no_mes / total_decisoes * 100) if total_decisoes else None
+    # Métrica diferente da de cima: aqui a base é TODA consulta de diagnóstico
+    # realizada no mês (inclui quem ainda está na fila, esperando decisão),
+    # não só quem já foi fechado ou perdido — dá o "quantas consultas viraram
+    # venda" que a Cláudia espera bater com o controle manual dela.
+    taxa_conversao_consultas = round(fechados_no_mes / consultas_no_mes * 100) if consultas_no_mes else None
 
     contexto = {
         "ano": ano,
@@ -694,6 +699,7 @@ def crm_fechamento(request):
         "fechados_no_mes": fechados_no_mes,
         "perdidos_no_mes": perdidos_no_mes,
         "taxa_conversao": taxa_conversao,
+        "taxa_conversao_consultas": taxa_conversao_consultas,
         "lista_perdidos": perdidos_qs[:50],
         "lista_fechados": fechados_qs[:50],
         "lista_consultas_mes": lista_consultas_mes,
