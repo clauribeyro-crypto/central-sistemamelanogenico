@@ -77,7 +77,7 @@ def semana(request):
         Consulta.objects.filter(
             organizacao=org, data_hora__date__gte=dias[0], data_hora__date__lte=dias[-1]
         )
-        .exclude(status=Consulta.Status.CANCELADA)
+        .exclude(status__in=[Consulta.Status.CANCELADA, Consulta.Status.REAGENDADA])
         .select_related("paciente", "profissional", "tipo_consulta")
     )
     bloqueios_qs = HorarioBloqueado.objects.filter(
@@ -295,6 +295,15 @@ def detalhe_consulta(request, pk):
         pk=pk, organizacao=org,
     )
     pagamento = Pagamento.objects.filter(consulta=consulta, organizacao=org).order_by("-criado_em").first()
+    # Consulta remarcada não gera lançamento próprio (ver sincronizar_receita_
+    # prevista) — o pagamento fica na consulta original, então mostra ele aqui
+    # também (só leitura: as ações de pagamento continuam na consulta original).
+    pagamento_da_original = None
+    if not pagamento and consulta.reagendada_de_id:
+        raiz = consulta.reagendada_de
+        while raiz.reagendada_de_id:
+            raiz = raiz.reagendada_de
+        pagamento_da_original = Pagamento.objects.filter(consulta=raiz, organizacao=org).order_by("-criado_em").first()
     pagamento_form = None
     recebimento_form = None
     consulta_form = None
@@ -364,6 +373,16 @@ def detalhe_consulta(request, pk):
             messages.success(request, "Consulta marcada como realizada.")
             return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
+        elif acao == "marcar_nao_compareceu":
+            # Diferente de "realizada": a paciente não veio (mesmo tendo
+            # pago algo, tipo um sinal) — não conta como consulta feita nos
+            # indicadores nem no checklist do programa, mas o valor já
+            # recebido continua registrado (não mexe no pagamento).
+            consulta.status = Consulta.Status.NAO_COMPARECEU
+            consulta.save()
+            messages.success(request, "Consulta marcada como não compareceu.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
         elif acao == "cancelar_consulta":
             consulta.status = Consulta.Status.CANCELADA
             consulta.save()  # dispara a sincronização automática do Financeiro
@@ -397,6 +416,7 @@ def detalhe_consulta(request, pk):
     contexto = {
         "consulta": consulta,
         "pagamento": pagamento,
+        "pagamento_da_original": pagamento_da_original,
         "pagamento_form": pagamento_form,
         "recebimento_form": recebimento_form,
         "consulta_form": consulta_form,
@@ -404,6 +424,48 @@ def detalhe_consulta(request, pk):
         "next": "",
     }
     return render(request, "agenda/detalhe_consulta.html", contexto)
+
+
+@login_required
+def remarcar_consulta(request, pk):
+    """
+    Remarca uma consulta pra outro dia/horário sem duplicar a cobrança: cria
+    uma consulta nova vinculada à original (reagendada_de), que por sinal da
+    sincronizar_receita_prevista não gera um segundo lançamento no
+    Financeiro — o pagamento continua sendo o da consulta original. A
+    consulta original vira "Reagendada" e some da grade da Agenda, pra não
+    dar a impressão de dois agendamentos ativos pra mesma paciente.
+    """
+    org = organizacao_do_usuario(request)
+    original = get_object_or_404(Consulta.objects.select_related("paciente"), pk=pk, organizacao=org)
+
+    if original.status not in (Consulta.Status.AGENDADA, Consulta.Status.CONFIRMADA):
+        messages.error(request, "Só dá pra remarcar uma consulta que ainda está agendada.")
+        return redirect("agenda:detalhe_consulta", pk=original.pk)
+
+    nova = Consulta(
+        organizacao=org, paciente=original.paciente, profissional=original.profissional,
+        tipo_consulta=original.tipo_consulta, lead=original.lead, reagendada_de=original,
+        data_hora=original.data_hora, duracao_minutos=original.duracao_minutos,
+        valor=original.valor, motivo=original.motivo,
+    )
+    form = ConsultaEditarForm(request.POST or None, instance=nova, organizacao=org, prefix="consulta")
+
+    if request.method == "POST" and form.is_valid():
+        nova = form.save(commit=False)
+        nova.organizacao = org
+        nova.paciente = original.paciente
+        nova.lead = original.lead
+        nova.reagendada_de = original
+        nova.save()
+
+        original.status = Consulta.Status.REAGENDADA
+        original.save(update_fields=["status", "atualizado_em"])
+
+        messages.success(request, f"Consulta remarcada para {timezone.localtime(nova.data_hora):%d/%m/%Y %H:%M}.")
+        return redirect("agenda:detalhe_consulta", pk=nova.pk)
+
+    return render(request, "agenda/remarcar_consulta.html", {"original": original, "form": form})
 
 
 @login_required

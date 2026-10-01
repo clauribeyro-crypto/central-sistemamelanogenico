@@ -21,18 +21,38 @@
         {% if consulta.observacoes %}
             <p><strong>Observações:</strong> {{ consulta.observacoes }}</p>
         {% endif %}
+        {% if consulta.reagendada_de %}
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                Remarcada a partir da consulta de
+                <a href="{% url 'agenda:detalhe_consulta' consulta.reagendada_de.pk %}">{{ consulta.reagendada_de.data_hora|date:"d/m/Y H:i" }}</a>.
+            </p>
+        {% endif %}
+        {% with proxima=consulta.reagendamentos.first %}
+            {% if proxima %}
+                <p style="font-size:.85rem; color:var(--text-muted);">
+                    Remarcada para
+                    <a href="{% url 'agenda:detalhe_consulta' proxima.pk %}">{{ proxima.data_hora|date:"d/m/Y H:i" }}</a>.
+                </p>
+            {% endif %}
+        {% endwith %}
 
         <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-top:1rem;">
             <a class="btn btn-secondary" href="{% url 'pacientes:ficha' consulta.paciente.pk %}">Ver ficha da paciente</a>
             {% if not consulta.paciente.acompanhamento_atual %}
                 <a class="btn" href="{% url 'pacientes:iniciar_protocolo' consulta.paciente.pk %}">Iniciar protocolo de acompanhamento</a>
             {% endif %}
-            {% if consulta.status != "CANCELADA" and consulta.status != "REALIZADA" %}
+            {% if consulta.status == "AGENDADA" or consulta.status == "CONFIRMADA" %}
                 <form method="post">
                     {% csrf_token %}
                     <input type="hidden" name="acao" value="marcar_realizada">
                     <button class="btn" type="submit">Marcar como realizada</button>
                 </form>
+                <form method="post" onsubmit="return confirm('Marcar que {{ consulta.paciente|escapejs }} não compareceu? Não conta como consulta realizada, mas o pagamento já feito continua registrado.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="marcar_nao_compareceu">
+                    <button class="btn btn-secondary" type="submit">Não compareceu</button>
+                </form>
+                <a class="btn btn-secondary" href="{% url 'agenda:remarcar_consulta' consulta.pk %}">Remarcar ›</a>
                 <form method="post" onsubmit="return confirm('Cancelar esta consulta? O lançamento financeiro pendente vinculado (se houver) também será cancelado.');">
                     {% csrf_token %}
                     <input type="hidden" name="acao" value="cancelar_consulta">
@@ -86,6 +106,15 @@
                 <input type="hidden" name="acao" value="excluir_pagamento">
                 <button class="btn btn-secondary" type="submit" style="color:#8f2e45;">Excluir lançamento</button>
             </form>
+        </div>
+    {% elif pagamento_da_original %}
+        <div class="card">
+            <h2 style="margin-top:0;">Financeiro</h2>
+            <p style="color:var(--text-muted);">
+                Essa consulta veio de uma remarcação — o pagamento (R$ {{ pagamento_da_original.valor|floatformat:2 }},
+                {{ pagamento_da_original.get_status_display }}) continua na
+                <a href="{% url 'agenda:detalhe_consulta' pagamento_da_original.consulta_id %}">consulta original</a>, pra não duplicar a cobrança.
+            </p>
         </div>
     {% else %}
         <div class="card">
