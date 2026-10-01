@@ -39,6 +39,9 @@
                 <div style="text-align:right; font-size:.85rem; color:var(--text-muted);">
                     <div>Início: {{ acompanhamento.data_inicio|date:"d/m/Y" }}</div>
                     <div>Término previsto: {{ acompanhamento.data_termino_prevista|date:"d/m/Y" }}</div>
+                    {% if usuario_e_administrador %}
+                        <div><a href="{% url 'programas:acompanhamento_editar' acompanhamento.pk %}?next={{ request.get_full_path|urlencode }}">Editar data/valor ›</a></div>
+                    {% endif %}
                 </div>
             {% endif %}
         </div>
