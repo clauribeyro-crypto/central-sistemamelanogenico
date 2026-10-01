@@ -1,5 +1,6 @@
 import calendar
 import datetime
+from collections import Counter
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -659,10 +660,15 @@ def crm_fechamento(request):
             fila.append({"paciente": paciente, "consulta": ultima_consulta})
     fila.sort(key=lambda item: item["consulta"].data_hora, reverse=True)
 
-    consultas_no_mes = Consulta.objects.filter(
+    consultas_mes_qs = Consulta.objects.filter(
         organizacao=org, status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True,
         data_hora__gte=inicio_dt, data_hora__lte=fim_dt,
-    ).count()
+    ).select_related("paciente", "profissional", "tipo_consulta").order_by("-data_hora")
+    consultas_no_mes = consultas_mes_qs.count()
+    lista_consultas_mes = list(consultas_mes_qs[:100])
+    contagem_por_paciente = Counter(c.paciente_id for c in lista_consultas_mes)
+    for c in lista_consultas_mes:
+        c.possivel_duplicada = contagem_por_paciente[c.paciente_id] > 1
     fechados_qs = Acompanhamento.objects.filter(
         organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
     ).select_related("paciente", "programa").order_by("-data_inicio")
@@ -690,5 +696,6 @@ def crm_fechamento(request):
         "taxa_conversao": taxa_conversao,
         "lista_perdidos": perdidos_qs[:50],
         "lista_fechados": fechados_qs[:50],
+        "lista_consultas_mes": lista_consultas_mes,
     }
     return render(request, "pacientes/crm_fechamento.html", contexto)

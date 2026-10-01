@@ -310,6 +310,7 @@ def painel_marketing(request):
         row["data_hora__date"]: row["total"]
         for row in Consulta.objects.filter(
             organizacao=org, status=Consulta.Status.REALIZADA,
+            tipo_consulta__conta_para_fechamento=True,
             data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
         ).values("data_hora__date").annotate(total=Count("id"))
     }

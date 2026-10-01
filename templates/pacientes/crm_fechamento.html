@@ -89,6 +89,37 @@
     </div>
 
     <div class="card">
+        <h2>Consultas de diagnóstico realizadas em {{ mes_nome|lower }} ({{ consultas_no_mes }})</h2>
+        <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+            Só consultas do tipo que conta para fechamento (não entram aqui consulta inicial, retorno de
+            acompanhamento, etc.). Pacientes em <span style="color:#8f2e45;">vermelho</span> aparecem mais de uma
+            vez no mês — confira se não é um agendamento duplicado.
+        </p>
+        {% if lista_consultas_mes %}
+            <table>
+                <thead>
+                    <tr><th>Data</th><th>Paciente</th><th>Profissional</th><th>Tipo</th></tr>
+                </thead>
+                <tbody>
+                    {% for consulta in lista_consultas_mes %}
+                        <tr{% if consulta.possivel_duplicada %} style="color:#8f2e45;"{% endif %}>
+                            <td>{{ consulta.data_hora|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <a href="{% url 'pacientes:ficha' consulta.paciente.pk %}">{{ consulta.paciente.nome }}</a>
+                                {% if consulta.possivel_duplicada %}<br><small>⚠ possível duplicidade</small>{% endif %}
+                            </td>
+                            <td>{{ consulta.profissional }}</td>
+                            <td><a href="{% url 'agenda:detalhe_consulta' consulta.pk %}">{{ consulta.tipo_consulta }}</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhuma consulta de diagnóstico realizada nesse mês.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
         <h2>Fechados em {{ mes_nome|lower }} ({{ fechados_no_mes }})</h2>
         {% if lista_fechados %}
             <table>
