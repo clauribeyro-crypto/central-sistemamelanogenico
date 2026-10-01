@@ -563,7 +563,11 @@ def iniciar_protocolo(request, pk):
             messages.success(request, "Protocolo de acompanhamento iniciado.")
             return redirect("pacientes:ficha", pk=paciente.pk)
     else:
-        form = IniciarProtocoloForm(organizacao=org)
+        # Sem isso o campo de data começa em branco — fácil de digitar/
+        # selecionar o dia errado sem perceber, e aí o fechamento de hoje
+        # silenciosamente não entra na contagem do mês certo no CRM de
+        # fechamento nem no relatório do Financeiro.
+        form = IniciarProtocoloForm(organizacao=org, initial={"data_inicio": timezone.localdate()})
 
     return render(request, "pacientes/iniciar_protocolo.html", {"paciente": paciente, "form": form})
 
