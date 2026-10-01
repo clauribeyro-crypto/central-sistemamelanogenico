@@ -179,6 +179,11 @@ def totais_fechamentos_mes(org, ano, mes):
         c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
     total_consultas = sum((c.valor for c in consultas), Decimal("0.00"))
     total_recebido_consultas = sum((c.total_recebido for c in consultas), Decimal("0.00"))
+    # "Cobradas" (acima) é tudo que tem valor lançado, incluindo agendada,
+    # reagendada etc. — pra saber quantas de fato aconteceram, conta só as
+    # REALIZADA dentro dessa mesma lista (é o número que bate com o controle
+    # manual da Cláudia, que só contabiliza consulta que rolou de verdade).
+    qtd_consultas_realizadas = sum(1 for c in consultas if c.status == Consulta.Status.REALIZADA)
 
     return {
         "tratamentos": tratamentos,
@@ -187,6 +192,7 @@ def totais_fechamentos_mes(org, ano, mes):
         "total_recebido_tratamentos": total_recebido_tratamentos,
         "consultas": consultas,
         "qtd_consultas": len(consultas),
+        "qtd_consultas_realizadas": qtd_consultas_realizadas,
         "total_consultas": total_consultas,
         "total_recebido_consultas": total_recebido_consultas,
         "total_geral": total_tratamentos + total_consultas,
