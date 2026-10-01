@@ -3,10 +3,43 @@
 {% block content %}
     <h1>Indicadores</h1>
 
+    <form class="filtro" method="get">
+        <div id="campos-periodo" {% if todos_periodos %}style="display:none;"{% endif %}>
+            <label for="mes">Mês</label>
+            <select id="mes" name="mes">
+                {% for numero, nome in meses %}
+                    <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div id="campos-periodo-ano" {% if todos_periodos %}style="display:none;"{% endif %}>
+            <label for="ano">Ano</label>
+            <select id="ano" name="ano">
+                {% for a in anos %}
+                    <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="todos_periodos" style="display:flex; align-items:center; gap:.35rem; white-space:nowrap;">
+                <input type="checkbox" id="todos_periodos" name="todos_periodos" value="1"
+                       {% if todos_periodos %}checked{% endif %}
+                       onchange="document.getElementById('campos-periodo').style.display = this.checked ? 'none' : ''; document.getElementById('campos-periodo-ano').style.display = this.checked ? 'none' : '';">
+                Ver de todos os períodos
+            </label>
+        </div>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <p style="color:var(--text-muted); font-size:.9rem;">
+        {% if todos_periodos %}Mostrando todos os períodos — desde o início do sistema.
+        {% else %}Mostrando {{ mes_nome|lower }}/{{ ano|stringformat:'d' }} — leads pela data em que entraram, consultas pela data em que aconteceram.{% endif %}
+    </p>
+
     <div class="grid">
         <div class="card stat">
             <div class="num">{{ total_leads }}</div>
-            <div class="rotulo">Total de leads</div>
+            <div class="rotulo">{% if todos_periodos %}Total de leads{% else %}Leads no período{% endif %}</div>
         </div>
     </div>
 
@@ -77,8 +110,7 @@
     </div>
 
     <p style="color:var(--text-muted); font-size:.85rem;">
-        Conversões (lead → resposta → consulta → venda) e "qual origem converte mais"
-        ficam para quando o módulo de Programas estiver pronto — hoje ainda não temos
-        o conceito de venda fechada no sistema.
+        Pra ver quantas leads de cada origem agendaram (taxa de conversão por canal), veja
+        <a href="{% url 'leads:painel_marketing' %}">Marketing → "De onde vêm as leads"</a>.
     </p>
 {% endblock %}
