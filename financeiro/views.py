@@ -140,6 +140,26 @@ def relatorio(request):
     return render(request, "financeiro/relatorio.html", contexto)
 
 
+def recebido_no_periodo(org, ano, mes):
+    """
+    Dinheiro que realmente caiu no caixa no mês — soma os recebimentos pela
+    data em que cada um foi recebido, não pela data da consulta/tratamento a
+    que o lançamento pertence. É diferente de "total_recebido_geral" (ver
+    totais_fechamentos_mes): aquele soma, para as consultas/tratamentos *do
+    mês*, tudo que já foi recebido deles *a qualquer momento* — então um
+    sinal pago em setembro pra reservar uma consulta de outubro entra no
+    caixa de outubro (mês da consulta) em vez de no de setembro (mês em que
+    o dinheiro realmente chegou). Esta função corrige isso pra quem precisa
+    do valor real que entrou no caixa no período, tipo o card de meta do mês.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    return Recebimento.objects.filter(
+        pagamento__organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+    ).aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
+
+
 def totais_fechamentos_mes(org, ano, mes):
     """
     Tratamentos/programas fechados (contratos assinados no período) e
@@ -147,6 +167,13 @@ def totais_fechamentos_mes(org, ano, mes):
     diferentes. Reaproveitado pelo relatório de fechamentos e pelo card
     de meta mensal da home, pra não calcular esse número de dois jeitos
     diferentes em dois lugares.
+
+    Os valores "recebido" daqui (total_recebido_tratamentos/consultas/geral)
+    somam, pra cada tratamento/consulta *deste mês*, tudo que já foi
+    recebido dele a qualquer momento — bom pra saber "quanto já foi
+    cobrado desse mês", mas não equivale a "quanto caiu no caixa neste
+    mês" quando tem pagamento parcelado atravessando meses (ver
+    recebido_no_periodo, que soma pela data de cada recebimento).
     """
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)

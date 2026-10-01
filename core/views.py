@@ -13,7 +13,7 @@ from contas.models import Organizacao, Usuario
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Venda
 from financeiro.models import Pagamento
-from financeiro.views import MESES, totais_fechamentos_mes
+from financeiro.views import MESES, recebido_no_periodo, totais_fechamentos_mes
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
@@ -130,8 +130,11 @@ def home(request):
     if org.modulo_financeiro_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         totais_mes_atual = totais_fechamentos_mes(org, hoje.year, hoje.month)
         # A meta é sobre dinheiro em caixa, não sobre valor fechado/contratado —
-        # tratamento ou consulta com saldo a receber não entra até ser pago.
-        faturado = totais_mes_atual["total_recebido_geral"]
+        # tratamento ou consulta com saldo a receber não entra até ser pago. Por
+        # isso usa recebido_no_periodo (soma pela data de cada recebimento) em
+        # vez do total_recebido_geral de totais_fechamentos_mes, que contaria
+        # errado um sinal pago num mês pra reservar consulta de outro mês.
+        faturado = recebido_no_periodo(org, hoje.year, hoje.month)
         qtd_fechamentos_pagos = sum(1 for t in totais_mes_atual["tratamentos"] if t.total_recebido > 0)
         qtd_consultas_pagas = sum(1 for c in totais_mes_atual["consultas"] if c.total_recebido > 0)
         faltam_faturamento = max(org.meta_faturamento_mensal - faturado, Decimal("0.00"))
@@ -329,7 +332,7 @@ def painel_mentoradas(request):
     clinicas = []
     for org in Organizacao.objects.filter(ativo=True).order_by("nome"):
         totais = totais_fechamentos_mes(org, ano, mes)
-        faturado = totais["total_recebido_geral"]
+        faturado = recebido_no_periodo(org, ano, mes)
         meta = org.meta_faturamento_mensal
         clinicas.append({
             "org": org,
