@@ -160,6 +160,36 @@ def recebido_no_periodo(org, ano, mes):
     ).aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
 
 
+def detalhe_recebido_no_periodo(org, ano, mes):
+    """
+    Lista cada recebimento que compõe recebido_no_periodo, com a origem
+    (consulta/tratamento/produto/avulso) — pra dar pra conferir exatamente
+    de onde vem o valor quando o número do caixa não bater com o esperado.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    recebimentos = list(
+        Recebimento.objects.filter(
+            pagamento__organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+        ).select_related(
+            "pagamento__paciente", "pagamento__consulta__tipo_consulta",
+            "pagamento__acompanhamento__programa", "pagamento__venda",
+        ).order_by("-data", "-criado_em")
+    )
+    for recebimento in recebimentos:
+        pagamento = recebimento.pagamento
+        if pagamento.consulta_id:
+            recebimento.origem = f"Consulta ({pagamento.consulta.tipo_consulta})"
+        elif pagamento.acompanhamento_id:
+            recebimento.origem = f"Tratamento ({pagamento.acompanhamento.programa.nome})"
+        elif pagamento.venda_id:
+            recebimento.origem = "Produto"
+        else:
+            recebimento.origem = "Avulso"
+    return recebimentos
+
+
 def totais_fechamentos_mes(org, ano, mes):
     """
     Tratamentos/programas fechados (contratos assinados no período) e

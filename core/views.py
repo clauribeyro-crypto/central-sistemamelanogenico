@@ -13,7 +13,7 @@ from contas.models import Organizacao, Usuario
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Venda
 from financeiro.models import Pagamento
-from financeiro.views import MESES, recebido_no_periodo, totais_fechamentos_mes
+from financeiro.views import MESES, detalhe_recebido_no_periodo, recebido_no_periodo, totais_fechamentos_mes
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
@@ -154,6 +154,7 @@ def home(request):
             "meta_fechamentos": org.meta_fechamentos_mensal,
             "qtd_fechamentos": qtd_fechamentos_pagos,
             "faltam_fechamentos": faltam_fechamentos,
+            "detalhe_recebimentos": detalhe_recebido_no_periodo(org, hoje.year, hoje.month),
         }
 
     if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
