@@ -615,6 +615,44 @@ def reabrir_fechamento(request, pk):
 
 @login_required
 @modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def salvar_oferta_consulta(request, pk):
+    """Anotação rápida de quem atendeu: o que foi ofertado na consulta de diagnóstico — ajuda a planejar uma ação de retomada pra quem ainda não decidiu."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    paciente.oferta_consulta_diagnostico = request.POST.get("oferta_consulta_diagnostico", "").strip()
+    paciente.save(update_fields=["oferta_consulta_diagnostico", "atualizado_em"])
+    messages.success(request, f"Anotação de {paciente.nome} salva.")
+    proximo = request.POST.get("proximo")
+    if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        return redirect(proximo)
+    return redirect("pacientes:crm_fechamento")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def salvar_limite_fila_fechamento(request):
+    """Admin ajusta a partir de quantas pessoas na fila de fechamento o CRM de fechamento mostra um aviso."""
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem alterar esse ajuste.")
+        return redirect("pacientes:crm_fechamento")
+    try:
+        limite = int(request.POST.get("limite_fila_fechamento", "0"))
+    except ValueError:
+        limite = 0
+    if limite > 0:
+        org.limite_fila_fechamento = limite
+        org.save(update_fields=["limite_fila_fechamento"])
+        messages.success(request, "Aviso da fila de fechamento atualizado.")
+    else:
+        messages.error(request, "Valor inválido.")
+    return redirect("pacientes:crm_fechamento")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
 def crm_fechamento(request):
     """
     CRM separado do de leads: acompanha só quem já passou pela consulta de
@@ -681,6 +719,11 @@ def crm_fechamento(request):
 
     total_decisoes = fechados_no_mes + perdidos_no_mes
     taxa_conversao = round(fechados_no_mes / total_decisoes * 100) if total_decisoes else None
+    # Métrica diferente da de cima: aqui a base é TODA consulta de diagnóstico
+    # realizada no mês (inclui quem ainda está na fila, esperando decisão),
+    # não só quem já foi fechado ou perdido — dá o "quantas consultas viraram
+    # venda" que a Cláudia espera bater com o controle manual dela.
+    taxa_conversao_consultas = round(fechados_no_mes / consultas_no_mes * 100) if consultas_no_mes else None
 
     contexto = {
         "ano": ano,
@@ -690,10 +733,14 @@ def crm_fechamento(request):
         "anos": range(hoje.year - 3, hoje.year + 2),
         "fila_fechamento": fila,
         "total_fila_fechamento": len(fila),
+        "limite_fila_fechamento": org.limite_fila_fechamento,
+        "fila_atingiu_limite": len(fila) >= org.limite_fila_fechamento,
+        "usuario_e_administrador": usuario_e_administrador(request),
         "consultas_no_mes": consultas_no_mes,
         "fechados_no_mes": fechados_no_mes,
         "perdidos_no_mes": perdidos_no_mes,
         "taxa_conversao": taxa_conversao,
+        "taxa_conversao_consultas": taxa_conversao_consultas,
         "lista_perdidos": perdidos_qs[:50],
         "lista_fechados": fechados_qs[:50],
         "lista_consultas_mes": lista_consultas_mes,

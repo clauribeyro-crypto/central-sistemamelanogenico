@@ -46,6 +46,10 @@ class Paciente(ModeloDaOrganizacao):
         help_text="Preenchido quando alguém marca que, após a consulta, a paciente decidiu não continuar — tira ela da fila de fechamento sem precisar excluir nada.",
     )
     fechamento_descartado_motivo = models.CharField(max_length=255, blank=True)
+    oferta_consulta_diagnostico = models.CharField(
+        "o que foi ofertado na consulta de diagnóstico", max_length=255, blank=True,
+        help_text="Anotação rápida do profissional sobre o plano/programa apresentado na consulta — ajuda a planejar uma ação de retomada pra quem ainda não decidiu.",
+    )
 
     class Meta:
         verbose_name = "paciente"

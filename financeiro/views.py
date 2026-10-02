@@ -140,6 +140,56 @@ def relatorio(request):
     return render(request, "financeiro/relatorio.html", contexto)
 
 
+def recebido_no_periodo(org, ano, mes):
+    """
+    Dinheiro que realmente caiu no caixa no mês — soma os recebimentos pela
+    data em que cada um foi recebido, não pela data da consulta/tratamento a
+    que o lançamento pertence. É diferente de "total_recebido_geral" (ver
+    totais_fechamentos_mes): aquele soma, para as consultas/tratamentos *do
+    mês*, tudo que já foi recebido deles *a qualquer momento* — então um
+    sinal pago em setembro pra reservar uma consulta de outubro entra no
+    caixa de outubro (mês da consulta) em vez de no de setembro (mês em que
+    o dinheiro realmente chegou). Esta função corrige isso pra quem precisa
+    do valor real que entrou no caixa no período, tipo o card de meta do mês.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    return Recebimento.objects.filter(
+        pagamento__organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+    ).aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
+
+
+def detalhe_recebido_no_periodo(org, ano, mes):
+    """
+    Lista cada recebimento que compõe recebido_no_periodo, com a origem
+    (consulta/tratamento/produto/avulso) — pra dar pra conferir exatamente
+    de onde vem o valor quando o número do caixa não bater com o esperado.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    recebimentos = list(
+        Recebimento.objects.filter(
+            pagamento__organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+        ).select_related(
+            "pagamento__paciente", "pagamento__consulta__tipo_consulta",
+            "pagamento__acompanhamento__programa", "pagamento__venda",
+        ).order_by("-data", "-criado_em")
+    )
+    for recebimento in recebimentos:
+        pagamento = recebimento.pagamento
+        if pagamento.consulta_id:
+            recebimento.origem = f"Consulta ({pagamento.consulta.tipo_consulta})"
+        elif pagamento.acompanhamento_id:
+            recebimento.origem = f"Tratamento ({pagamento.acompanhamento.programa.nome})"
+        elif pagamento.venda_id:
+            recebimento.origem = "Produto"
+        else:
+            recebimento.origem = "Avulso"
+    return recebimentos
+
+
 def totais_fechamentos_mes(org, ano, mes):
     """
     Tratamentos/programas fechados (contratos assinados no período) e
@@ -147,6 +197,13 @@ def totais_fechamentos_mes(org, ano, mes):
     diferentes. Reaproveitado pelo relatório de fechamentos e pelo card
     de meta mensal da home, pra não calcular esse número de dois jeitos
     diferentes em dois lugares.
+
+    Os valores "recebido" daqui (total_recebido_tratamentos/consultas/geral)
+    somam, pra cada tratamento/consulta *deste mês*, tudo que já foi
+    recebido dele a qualquer momento — bom pra saber "quanto já foi
+    cobrado desse mês", mas não equivale a "quanto caiu no caixa neste
+    mês" quando tem pagamento parcelado atravessando meses (ver
+    recebido_no_periodo, que soma pela data de cada recebimento).
     """
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)
@@ -179,6 +236,11 @@ def totais_fechamentos_mes(org, ano, mes):
         c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
     total_consultas = sum((c.valor for c in consultas), Decimal("0.00"))
     total_recebido_consultas = sum((c.total_recebido for c in consultas), Decimal("0.00"))
+    # "Cobradas" (acima) é tudo que tem valor lançado, incluindo agendada,
+    # reagendada etc. — pra saber quantas de fato aconteceram, conta só as
+    # REALIZADA dentro dessa mesma lista (é o número que bate com o controle
+    # manual da Cláudia, que só contabiliza consulta que rolou de verdade).
+    qtd_consultas_realizadas = sum(1 for c in consultas if c.status == Consulta.Status.REALIZADA)
 
     return {
         "tratamentos": tratamentos,
@@ -187,6 +249,7 @@ def totais_fechamentos_mes(org, ano, mes):
         "total_recebido_tratamentos": total_recebido_tratamentos,
         "consultas": consultas,
         "qtd_consultas": len(consultas),
+        "qtd_consultas_realizadas": qtd_consultas_realizadas,
         "total_consultas": total_consultas,
         "total_recebido_consultas": total_recebido_consultas,
         "total_geral": total_tratamentos + total_consultas,
@@ -259,6 +322,18 @@ def editar_pagamento(request, pk):
                 recebimento.save()
                 messages.success(request, "Recebimento registrado.")
                 return redirect(url_desta_pagina)
+
+        elif acao == "editar_recebimento":
+            recebimento = get_object_or_404(
+                Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
+            )
+            form_recebimento_editar = RecebimentoForm(request.POST, instance=recebimento)
+            if form_recebimento_editar.is_valid():
+                form_recebimento_editar.save()
+                messages.success(request, "Recebimento atualizado.")
+            else:
+                messages.error(request, "Não deu pra salvar o recebimento — confira os valores.")
+            return redirect(url_desta_pagina)
 
         elif acao == "excluir_recebimento":
             recebimento = get_object_or_404(

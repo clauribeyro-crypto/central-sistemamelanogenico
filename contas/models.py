@@ -65,6 +65,11 @@ class Organizacao(models.Model):
         verbose_name="meta de fechamentos por mês",
         help_text="Quantidade mínima de tratamentos/programas fechados no mês pra bater a meta de faturamento.",
     )
+    limite_fila_fechamento = models.PositiveIntegerField(
+        default=40,
+        verbose_name="alerta da fila de fechamento",
+        help_text="Quando a fila de fechamento (quem já fez consulta de diagnóstico e ainda não decidiu) atingir esse tanto de gente, mostra um aviso no CRM de fechamento.",
+    )
 
     criado_em = models.DateTimeField(auto_now_add=True)
 

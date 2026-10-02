@@ -13,6 +13,14 @@
         {% endif %}
     </p>
 
+    {% if fila_atingiu_limite %}
+        <div class="card" style="border:2px solid #f59e0b; background:#f59e0b11;">
+            🔔 <strong>A fila de fechamento já tem {{ total_fila_fechamento }} pessoas</strong> esperando resposta
+            (aviso configurado pra {{ limite_fila_fechamento }}) — já fizeram consulta de diagnóstico e ainda não
+            decidiram. Pode ser hora de uma ação de retomada com esse grupo.
+        </div>
+    {% endif %}
+
     <form class="filtro no-print" method="get">
         <div>
             <label for="mes">Mês</label>
@@ -49,7 +57,19 @@
         </div>
         <div class="card stat">
             <div class="num">{% if taxa_conversao is not None %}{{ taxa_conversao }}%{% else %}—{% endif %}</div>
-            <div class="rotulo">Taxa de conversão (fechados ÷ fechados+perdidos)</div>
+            <div class="rotulo">Taxa de fechamento das decisões (fechados ÷ fechados+perdidos)</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                Só conta quem já foi fechado ou perdido — não conta as {{ total_fila_fechamento }} pessoas ainda
+                na fila esperando resposta.
+            </div>
+        </div>
+        <div class="card stat">
+            <div class="num">{% if taxa_conversao_consultas is not None %}{{ taxa_conversao_consultas }}%{% else %}—{% endif %}</div>
+            <div class="rotulo">Conversão de consultas em vendas (fechados ÷ consultas realizadas)</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                Das {{ consultas_no_mes }} consultas de diagnóstico do mês, quantas já viraram venda — inclui
+                quem ainda está decidindo, por isso costuma ser menor que a taxa de fechamento ao lado.
+            </div>
         </div>
     </div>
 
@@ -58,10 +78,24 @@
         <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
             Já fizeram a consulta de diagnóstico e ainda não iniciaram um programa nem foram marcadas como perdidas.
         </p>
+        {% if usuario_e_administrador %}
+            <details class="no-print" style="margin:-.25rem 0 .75rem;">
+                <summary style="cursor:pointer; font-size:.8rem; color:var(--text-muted);">Ajustar aviso da fila (hoje: {{ limite_fila_fechamento }})</summary>
+                <form method="post" action="{% url 'pacientes:salvar_limite_fila_fechamento' %}"
+                      style="display:flex; gap:.5rem; align-items:flex-end; margin-top:.5rem;">
+                    {% csrf_token %}
+                    <div>
+                        <label style="display:block; font-size:.8rem; color:var(--text-muted);">Avisar quando a fila chegar a</label>
+                        <input type="number" step="1" min="1" name="limite_fila_fechamento" value="{{ limite_fila_fechamento }}">
+                    </div>
+                    <button type="submit" class="btn">Salvar</button>
+                </form>
+            </details>
+        {% endif %}
         {% if fila_fechamento %}
             <table>
                 <thead>
-                    <tr><th>Paciente</th><th>Última consulta</th><th>Profissional</th><th>Ações</th></tr>
+                    <tr><th>Paciente</th><th>Última consulta</th><th>Profissional</th><th>O que foi ofertado</th><th>Ações</th></tr>
                 </thead>
                 <tbody>
                     {% for item in fila_fechamento %}
@@ -69,6 +103,16 @@
                             <td><a href="{% url 'pacientes:ficha' item.paciente.pk %}">{{ item.paciente.nome }}</a></td>
                             <td>{{ item.consulta.data_hora|date:"d/m/Y" }}</td>
                             <td>{{ item.consulta.profissional }}</td>
+                            <td>
+                                <form method="post" action="{% url 'pacientes:salvar_oferta_consulta' item.paciente.pk %}"
+                                      style="display:flex; gap:.3rem;">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="proximo" value="{{ request.get_full_path }}">
+                                    <input type="text" name="oferta_consulta_diagnostico" value="{{ item.paciente.oferta_consulta_diagnostico }}"
+                                           placeholder="Ex.: Programa de 3 meses" style="font-size:.8rem; padding:.3rem; flex:1; min-width:140px;">
+                                    <button class="btn btn-secondary" style="padding:.3rem .5rem; font-size:.75rem;" type="submit">Salvar</button>
+                                </form>
+                            </td>
                             <td style="white-space:nowrap;">
                                 <a class="btn" style="padding:.3rem .6rem; font-size:.8rem;" href="{% url 'pacientes:iniciar_protocolo' item.paciente.pk %}">Iniciar protocolo</a>
                                 <form method="post" action="{% url 'pacientes:descartar_fechamento' item.paciente.pk %}" style="display:inline;"
