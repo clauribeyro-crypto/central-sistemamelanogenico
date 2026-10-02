@@ -323,6 +323,18 @@ def editar_pagamento(request, pk):
                 messages.success(request, "Recebimento registrado.")
                 return redirect(url_desta_pagina)
 
+        elif acao == "editar_recebimento":
+            recebimento = get_object_or_404(
+                Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
+            )
+            form_recebimento_editar = RecebimentoForm(request.POST, instance=recebimento)
+            if form_recebimento_editar.is_valid():
+                form_recebimento_editar.save()
+                messages.success(request, "Recebimento atualizado.")
+            else:
+                messages.error(request, "Não deu pra salvar o recebimento — confira os valores.")
+            return redirect(url_desta_pagina)
+
         elif acao == "excluir_recebimento":
             recebimento = get_object_or_404(
                 Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org

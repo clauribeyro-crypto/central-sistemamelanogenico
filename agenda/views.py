@@ -335,6 +335,18 @@ def detalhe_consulta(request, pk):
                 messages.success(request, "Recebimento registrado.")
                 return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
+        elif acao == "editar_recebimento" and pagamento:
+            recebimento = get_object_or_404(
+                Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
+            )
+            form_recebimento_editar = RecebimentoForm(request.POST, instance=recebimento)
+            if form_recebimento_editar.is_valid():
+                form_recebimento_editar.save()
+                messages.success(request, "Recebimento atualizado.")
+            else:
+                messages.error(request, "Não deu pra salvar o recebimento — confira os valores.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
         elif acao == "excluir_recebimento" and pagamento:
             recebimento = get_object_or_404(
                 Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
