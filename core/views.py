@@ -387,19 +387,21 @@ def vendas_kit_mentoradas(request):
             venda = form.save(commit=False)
             venda.organizacao = org
             venda.save()
-            if venda.produto_id:
-                produto = venda.produto
+            form.save_m2m()
+            produtos_negativos = []
+            for produto in venda.produtos.all():
                 produto.estoque_atual = produto.estoque_atual - venda.quantidade
                 produto.save(update_fields=["estoque_atual"])
                 if produto.estoque_atual < 0:
-                    messages.warning(
-                        request,
-                        f'Venda registrada, mas o estoque de "{produto.nome}" ficou negativo — o '
-                        "estoque atual estava contando a menos do que o que realmente tinha. Ajuste "
-                        "com uma entrada de estoque.",
-                    )
-                else:
-                    messages.success(request, "Venda registrada.")
+                    produtos_negativos.append(produto.nome)
+            if produtos_negativos:
+                messages.warning(
+                    request,
+                    "Venda registrada, mas o estoque de "
+                    + ", ".join(f'"{nome}"' for nome in produtos_negativos)
+                    + " ficou negativo — o estoque atual estava contando a menos do que o que "
+                    "realmente tinha. Ajuste com uma entrada de estoque.",
+                )
             else:
                 messages.success(request, "Venda registrada.")
             return redirect("core:vendas_kit_mentoradas")
@@ -407,7 +409,7 @@ def vendas_kit_mentoradas(request):
         form = VendaKitMentoraForm(organizacao=org, initial={"data_venda": timezone.localdate()})
 
     vendas = list(
-        VendaKitMentora.objects.filter(organizacao=org).select_related("mentorada", "produto")
+        VendaKitMentora.objects.filter(organizacao=org).select_related("mentorada").prefetch_related("produtos")
     )
 
     hoje = timezone.localdate()
@@ -473,10 +475,11 @@ def vendas_kit_mentora_excluir(request, pk):
         return redirect("core:home")
     org = organizacao_do_usuario(request)
     venda = get_object_or_404(VendaKitMentora, pk=pk, organizacao=org)
-    if venda.produto_id:
-        produto = venda.produto
-        produto.estoque_atual = produto.estoque_atual + venda.quantidade
-        produto.save(update_fields=["estoque_atual"])
+    produtos = list(venda.produtos.all())
+    if produtos:
+        for produto in produtos:
+            produto.estoque_atual = produto.estoque_atual + venda.quantidade
+            produto.save(update_fields=["estoque_atual"])
         venda.delete()
         messages.success(request, "Venda excluída — a quantidade voltou pro seu estoque.")
     else:

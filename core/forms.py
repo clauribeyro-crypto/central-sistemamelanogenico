@@ -18,11 +18,16 @@ class VendaKitMentoraForm(forms.ModelForm):
         label="Previsão de próxima compra", required=False,
         widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
     )
+    produtos = forms.ModelMultipleChoiceField(
+        label="Produto(s)", queryset=Produto.objects.none(), required=False,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Marque um só pra venda avulsa, ou mais de um quando for um kit (ex.: produto da noite + produto do dia).",
+    )
 
     class Meta:
         model = VendaKitMentora
         fields = [
-            "mentorada", "produto", "kit_nome", "quantidade", "valor_unitario", "data_venda",
+            "mentorada", "produtos", "kit_nome", "quantidade", "valor_unitario", "data_venda",
             "valor_pago", "data_pagamento_restante", "previsao_proxima_compra", "observacoes",
         ]
         widgets = {
@@ -36,14 +41,13 @@ class VendaKitMentoraForm(forms.ModelForm):
         self.fields["mentorada"].queryset = Organizacao.objects.filter(ativo=True).exclude(
             pk=organizacao.pk if organizacao else None
         ).order_by("nome")
-        self.fields["produto"].queryset = Produto.objects.filter(
+        self.fields["produtos"].queryset = Produto.objects.filter(
             organizacao=organizacao, ativo=True
         ).order_by("nome") if organizacao else Produto.objects.none()
-        self.fields["produto"].empty_label = "— nenhum (usar nome livre abaixo) —"
         self.fields["valor_pago"].required = False
 
     def clean(self):
         cleaned = super().clean()
-        if not cleaned.get("produto") and not cleaned.get("kit_nome"):
-            raise forms.ValidationError("Escolha um produto do estoque ou dê um nome livre pro kit.")
+        if not cleaned.get("produtos") and not cleaned.get("kit_nome"):
+            raise forms.ValidationError("Marque pelo menos um produto do estoque ou dê um nome livre pro kit.")
         return cleaned
