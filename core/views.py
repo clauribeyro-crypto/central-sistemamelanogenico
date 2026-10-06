@@ -5,8 +5,9 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.models import Organizacao, Usuario
@@ -20,6 +21,9 @@ from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
 from programas.models import Acompanhamento
+
+from .forms import VendaKitMentoraForm
+from .models import VendaKitMentora
 
 BADGE_POR_ETAPA = {
     Lead.Etapa.NOVO: "1º contato",
@@ -362,6 +366,94 @@ def painel_mentoradas(request):
         "clinicas": clinicas,
     }
     return render(request, "core/painel_mentoradas.html", contexto)
+
+
+@login_required
+def vendas_kit_mentoradas(request):
+    """
+    Controle de venda de kit/produto da Cláudia pras organizações
+    mentoradas — negócio à parte da clínica em si (cada mentorada compra
+    pra revender às próprias pacientes). Só a administradora geral vê isso.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode ver essa página.")
+        return redirect("core:home")
+
+    if request.method == "POST":
+        form = VendaKitMentoraForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Venda registrada.")
+            return redirect("core:vendas_kit_mentoradas")
+    else:
+        form = VendaKitMentoraForm(initial={"data_venda": timezone.localdate()})
+
+    vendas = list(VendaKitMentora.objects.select_related("mentorada").all())
+
+    hoje = timezone.localdate()
+    for venda in vendas:
+        venda.previsao_vencida = bool(
+            venda.previsao_proxima_compra and venda.previsao_proxima_compra <= hoje
+        )
+
+    resumo_por_mentorada = {}
+    for venda in vendas:
+        resumo = resumo_por_mentorada.setdefault(venda.mentorada_id, {
+            "mentorada": venda.mentorada,
+            "total_comprado": Decimal("0.00"),
+            "total_pago": Decimal("0.00"),
+            "total_pendente": Decimal("0.00"),
+            "ultima_compra": None,
+        })
+        resumo["total_comprado"] += venda.valor_total
+        resumo["total_pago"] += venda.valor_pago
+        resumo["total_pendente"] += venda.saldo_pendente
+        if resumo["ultima_compra"] is None or venda.data_venda > resumo["ultima_compra"]:
+            resumo["ultima_compra"] = venda.data_venda
+    for resumo in resumo_por_mentorada.values():
+        resumo["dias_desde_ultima_compra"] = (
+            (hoje - resumo["ultima_compra"]).days if resumo["ultima_compra"] else None
+        )
+    resumos = sorted(resumo_por_mentorada.values(), key=lambda r: r["mentorada"].nome)
+
+    contexto = {
+        "form": form,
+        "vendas": vendas,
+        "resumos": resumos,
+        "hoje": hoje,
+    }
+    return render(request, "core/vendas_kit_mentoradas.html", contexto)
+
+
+@login_required
+@require_POST
+def vendas_kit_mentora_editar(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode alterar isso.")
+        return redirect("core:home")
+    venda = get_object_or_404(VendaKitMentora, pk=pk)
+    try:
+        venda.valor_pago = Decimal(request.POST.get("valor_pago", "0") or "0")
+    except Exception:
+        messages.error(request, "Valor pago inválido.")
+        return redirect("core:vendas_kit_mentoradas")
+    venda.data_pagamento_restante = request.POST.get("data_pagamento_restante") or None
+    venda.previsao_proxima_compra = request.POST.get("previsao_proxima_compra") or None
+    venda.save(update_fields=["valor_pago", "data_pagamento_restante", "previsao_proxima_compra"])
+    messages.success(request, "Venda atualizada.")
+    return redirect("core:vendas_kit_mentoradas")
+
+
+@login_required
+@require_POST
+def vendas_kit_mentora_excluir(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode excluir isso.")
+        return redirect("core:home")
+    venda = get_object_or_404(VendaKitMentora, pk=pk)
+    venda.delete()
+    messages.success(request, "Venda excluída.")
+    return redirect("core:vendas_kit_mentoradas")
 
 
 @login_required

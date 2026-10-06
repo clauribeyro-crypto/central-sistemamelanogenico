@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Vendas de kit pras mentoradas · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'core:painel_mentoradas' %}">← Painel de mentoradas</a></p>
+    <h1>📦 Vendas de kit pras mentoradas</h1>
+    <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
+        Controle do que cada mentorada compra de você pra revender às próprias pacientes — separado do
+        financeiro de cada clínica. Só você vê essa página.
+    </p>
+
+    {% if resumos %}
+        <div class="grid">
+            {% for r in resumos %}
+                <div class="card stat">
+                    <div class="num">{{ r.mentorada.nome }}</div>
+                    <div class="rotulo">
+                        Comprado: R$ {{ r.total_comprado|floatformat:2 }} · Pago: R$ {{ r.total_pago|floatformat:2 }}
+                        {% if r.total_pendente > 0 %}
+                            · <span style="color:#8a5a10;">Pendente: R$ {{ r.total_pendente|floatformat:2 }}</span>
+                        {% endif %}
+                    </div>
+                    <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                        {% if r.dias_desde_ultima_compra is not None %}
+                            Última compra: {{ r.ultima_compra|date:"d/m/Y" }}
+                            ({{ r.dias_desde_ultima_compra }} dia{{ r.dias_desde_ultima_compra|pluralize }} atrás)
+                            {% if r.dias_desde_ultima_compra > 30 %}
+                                <br><span style="color:#8a5a10;">⚠ Mais de 30 dias sem comprar — pode estar na hora de oferecer.</span>
+                            {% endif %}
+                        {% else %}
+                            Nenhuma compra ainda.
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <h2 style="margin-top:0;">Registrar venda</h2>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            {% for field in form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Registrar venda</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Todas as vendas ({{ vendas|length }})</h2>
+        {% if vendas %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th><th>Mentorada</th><th>Kit</th><th>Qtd</th><th>Valor total</th>
+                        <th>Pago</th><th>Saldo/pagamento</th><th>Próxima compra</th><th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vendas %}
+                        <tr{% if v.previsao_vencida %} style="color:#8a5a10;"{% endif %}>
+                            <td>{{ v.data_venda|date:"d/m/Y" }}</td>
+                            <td>{{ v.mentorada.nome }}</td>
+                            <td>{{ v.kit_nome }}</td>
+                            <td>{{ v.quantidade }}</td>
+                            <td>R$ {{ v.valor_total|floatformat:2 }}</td>
+                            <td colspan="3">
+                                <form method="post" action="{% url 'core:vendas_kit_mentora_editar' v.pk %}"
+                                      style="display:flex; gap:.4rem; flex-wrap:wrap; align-items:center;">
+                                    {% csrf_token %}
+                                    <span>Pago:</span>
+                                    <input type="number" step="0.01" min="0" name="valor_pago" value="{{ v.valor_pago|stringformat:'.2f' }}"
+                                           style="width:5.5rem; font-size:.82rem; padding:.2rem;">
+                                    <span>(saldo R$ {{ v.saldo_pendente|floatformat:2 }})</span>
+                                    <span>Pagto. restante:</span>
+                                    <input type="date" name="data_pagamento_restante" value="{{ v.data_pagamento_restante|date:'Y-m-d' }}"
+                                           style="font-size:.82rem; padding:.2rem;">
+                                    <span>Próxima compra:</span>
+                                    <input type="date" name="previsao_proxima_compra" value="{{ v.previsao_proxima_compra|date:'Y-m-d' }}"
+                                           style="font-size:.82rem; padding:.2rem;">
+                                    <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Salvar</button>
+                                </form>
+                            </td>
+                            <td style="white-space:nowrap;">
+                                <form method="post" action="{% url 'core:vendas_kit_mentora_excluir' v.pk %}"
+                                      onsubmit="return confirm('Excluir essa venda de {{ v.quantidade }}x {{ v.kit_nome|escapejs }} pra {{ v.mentorada.nome|escapejs }}?');">
+                                    {% csrf_token %}
+                                    <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem; color:#8f2e45;" type="submit">Excluir</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>Nenhuma venda registrada ainda.</p>
+        {% endif %}
+    </div>
+{% endblock %}
