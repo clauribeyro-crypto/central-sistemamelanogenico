@@ -128,9 +128,17 @@ def relatorio(request):
         .distinct()
     )
 
+    # Buscar por paciente ignora o período — é pra achar um lançamento
+    # específico (ex.: um recebimento lançado com a data errada, que por
+    # isso nem aparece no período certo) sem precisar adivinhar o filtro.
+    paciente_busca = request.GET.get("paciente", "").strip()
+    if paciente_busca:
+        pagamentos = Pagamento.objects.filter(organizacao=org, paciente__nome__icontains=paciente_busca)
+
     contexto = {
         "data_inicio": data_inicio,
         "data_fim": data_fim,
+        "paciente_busca": paciente_busca,
         "pagamentos": pagamentos.order_by("-data_vencimento"),
         "total_pago": total_pago,
         "total_pendente": total_pendente,
