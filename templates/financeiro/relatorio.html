@@ -37,6 +37,19 @@
         </div>
     </div>
 
+    {% if vendas_kit_mentora %}
+        <div class="card stat" style="background:#a855f711; border:1px solid #a855f733;">
+            <div class="num">R$ {{ vendas_kit_mentora.total_pago|floatformat:2 }}</div>
+            <div>
+                Recebido de vendas de kit pras mentoradas no período
+                (vendido: R$ {{ vendas_kit_mentora.total_vendido|floatformat:2 }} em
+                {{ vendas_kit_mentora.qtd }} venda{{ vendas_kit_mentora.qtd|pluralize }})
+                — receita à parte, não incluída nos totais acima.
+                <a href="{% url 'core:vendas_kit_mentoradas' %}">Ver detalhes ›</a>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="card">
         <h2>Recebido por forma de pagamento</h2>
         {% if por_forma_pagamento %}

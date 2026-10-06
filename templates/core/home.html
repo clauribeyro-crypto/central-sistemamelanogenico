@@ -35,6 +35,22 @@
                 {{ meta_mes.percentual_faturamento }}% da meta batida este mês.
             </p>
 
+            {% if request.user.is_superuser and meta_mes.vendas_kit_mentora %}
+                <div class="card stat" style="margin-top:.75rem; background:#a855f711; border:1px solid #a855f733;">
+                    <div class="num">R$ {{ meta_mes.vendas_kit_mentora.total_pago|floatformat:2 }}</div>
+                    <div class="rotulo">
+                        Recebido de vendas de kit pras mentoradas este mês
+                        (vendido: R$ {{ meta_mes.vendas_kit_mentora.total_vendido|floatformat:2 }} em
+                        {{ meta_mes.vendas_kit_mentora.qtd }} venda{{ meta_mes.vendas_kit_mentora.qtd|pluralize }})
+                        — não entra na meta de R$ {{ meta_mes.meta_faturamento|floatformat:0 }} da clínica, é
+                        receita à parte.
+                    </div>
+                </div>
+                <p style="font-size:.85rem; margin:.35rem 0 0;">
+                    <a href="{% url 'core:vendas_kit_mentoradas' %}">Ver vendas de kit pras mentoradas ›</a>
+                </p>
+            {% endif %}
+
             <details style="margin-top:.75rem;">
                 <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
                     Ver de onde vêm os R$ {{ meta_mes.faturado|floatformat:2 }} recebidos este mês

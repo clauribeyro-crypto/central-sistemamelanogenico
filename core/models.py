@@ -69,3 +69,23 @@ class VendaKitMentora(models.Model):
     def saldo_pendente(self):
         saldo = self.valor_total - self.valor_pago
         return saldo if saldo > 0 else Decimal("0.00")
+
+
+def totais_vendas_kit_mentora_no_periodo(org, data_inicio, data_fim):
+    """
+    Total vendido e efetivamente recebido de kits pras mentoradas no
+    período (pela data da venda) — é receita de outro negócio (venda no
+    atacado pras mentoradas revenderem), por isso fica separada da meta de
+    faturamento da clínica em vez de somar junto.
+    """
+    vendas = VendaKitMentora.objects.filter(
+        organizacao=org, data_venda__gte=data_inicio, data_venda__lte=data_fim,
+    )
+    total_vendido = Decimal("0.00")
+    total_pago = Decimal("0.00")
+    qtd = 0
+    for venda in vendas:
+        total_vendido += venda.valor_total
+        total_pago += venda.valor_pago
+        qtd += 1
+    return {"total_vendido": total_vendido, "total_pago": total_pago, "qtd": qtd}

@@ -23,7 +23,7 @@ from pacientes.models import Paciente
 from programas.models import Acompanhamento
 
 from .forms import VendaKitMentoraForm
-from .models import VendaKitMentora
+from .models import VendaKitMentora, totais_vendas_kit_mentora_no_periodo
 
 BADGE_POR_ETAPA = {
     Lead.Etapa.NOVO: "1º contato",
@@ -167,6 +167,11 @@ def home(request):
             "faltam_fechamentos": faltam_fechamentos,
             "detalhe_recebimentos": detalhe_recebido_no_periodo(org, hoje.year, hoje.month),
         }
+        if request.user.is_superuser:
+            ultimo_dia_mes = calendar.monthrange(hoje.year, hoje.month)[1]
+            contexto["meta_mes"]["vendas_kit_mentora"] = totais_vendas_kit_mentora_no_periodo(
+                org, hoje.replace(day=1), hoje.replace(day=ultimo_dia_mes)
+            )
 
     if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         contexto["total_fila_fechamento"] = Paciente.objects.filter(

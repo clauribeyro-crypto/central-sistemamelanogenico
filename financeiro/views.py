@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
+from core.models import totais_vendas_kit_mentora_no_periodo
 from programas.models import Acompanhamento
 
 from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, RecebimentoForm
@@ -145,6 +146,8 @@ def relatorio(request):
         "por_forma_pagamento": por_forma_pagamento,
         "por_profissional": por_profissional,
     }
+    if request.user.is_superuser:
+        contexto["vendas_kit_mentora"] = totais_vendas_kit_mentora_no_periodo(org, data_inicio, data_fim)
     return render(request, "financeiro/relatorio.html", contexto)
 
 
