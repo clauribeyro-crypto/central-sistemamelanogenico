@@ -17,7 +17,11 @@
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
-                    <div class="rotulo">Consultas já pagas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                    <div class="rotulo">Consultas agendadas e pagas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                    <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                        Conta pela data em que a consulta foi marcada no sistema, não pela data da consulta em
+                        si — uma consulta marcada em setembro pra acontecer em outubro conta pra setembro.
+                    </div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_fechamentos }} / {{ meta_mes.meta_fechamentos }}</div>
@@ -54,6 +58,32 @@
                     </table>
                 {% else %}
                     <p style="font-size:.85rem; color:var(--text-muted);">Nenhum recebimento registrado neste mês ainda.</p>
+                {% endif %}
+            </details>
+
+            <details style="margin-top:.5rem;">
+                <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                    Ver quais são as {{ meta_mes.qtd_consultas }} consultas agendadas e pagas este mês
+                </summary>
+                {% if meta_mes.detalhe_consultas_agendadas %}
+                    <table style="margin-top:.5rem;">
+                        <thead>
+                            <tr><th>Agendada em</th><th>Data da consulta</th><th>Paciente</th><th>Tipo</th><th>Valor</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for c in meta_mes.detalhe_consultas_agendadas %}
+                                <tr>
+                                    <td>{{ c.criado_em|date:"d/m/Y" }}</td>
+                                    <td>{{ c.data_hora|date:"d/m/Y" }}</td>
+                                    <td><a href="{% url 'agenda:detalhe_consulta' c.pk %}">{{ c.paciente }}</a></td>
+                                    <td>{{ c.tipo_consulta }}</td>
+                                    <td>R$ {{ c.valor|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="font-size:.85rem; color:var(--text-muted);">Nenhuma consulta agendada e paga neste mês ainda.</p>
                 {% endif %}
             </details>
 

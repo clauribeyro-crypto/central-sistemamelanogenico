@@ -13,7 +13,9 @@ from contas.models import Organizacao, Usuario
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Venda
 from financeiro.models import Pagamento
-from financeiro.views import MESES, detalhe_recebido_no_periodo, recebido_no_periodo, totais_fechamentos_mes
+from financeiro.views import (
+    MESES, consultas_agendadas_no_mes, detalhe_recebido_no_periodo, recebido_no_periodo, totais_fechamentos_mes,
+)
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
@@ -136,7 +138,11 @@ def home(request):
         # errado um sinal pago num mês pra reservar consulta de outro mês.
         faturado = recebido_no_periodo(org, hoje.year, hoje.month)
         qtd_fechamentos_pagos = sum(1 for t in totais_mes_atual["tratamentos"] if t.total_recebido > 0)
-        qtd_consultas_pagas = sum(1 for c in totais_mes_atual["consultas"] if c.total_recebido > 0)
+        # "Consultas já pagas" é a meta de agendamento da SDR — conta pela
+        # data em que a consulta foi marcada no sistema, não pela data da
+        # consulta em si (ver consultas_agendadas_no_mes).
+        consultas_agendadas = [c for c in consultas_agendadas_no_mes(org, hoje.year, hoje.month) if c.total_recebido > 0]
+        qtd_consultas_pagas = len(consultas_agendadas)
         faltam_faturamento = max(org.meta_faturamento_mensal - faturado, Decimal("0.00"))
         faltam_consultas = max(org.meta_consultas_mensal - qtd_consultas_pagas, 0)
         faltam_fechamentos = max(org.meta_fechamentos_mensal - qtd_fechamentos_pagos, 0)
@@ -151,6 +157,7 @@ def home(request):
             "meta_consultas": org.meta_consultas_mensal,
             "qtd_consultas": qtd_consultas_pagas,
             "faltam_consultas": faltam_consultas,
+            "detalhe_consultas_agendadas": consultas_agendadas,
             "meta_fechamentos": org.meta_fechamentos_mensal,
             "qtd_fechamentos": qtd_fechamentos_pagos,
             "faltam_fechamentos": faltam_fechamentos,

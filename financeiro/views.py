@@ -198,6 +198,30 @@ def detalhe_recebido_no_periodo(org, ano, mes):
     return recebimentos
 
 
+def consultas_agendadas_no_mes(org, ano, mes):
+    """
+    Consultas cobradas *criadas* (agendadas no sistema) no mês — diferente
+    das "consultas cobradas no mês" de totais_fechamentos_mes, que conta
+    pela data da consulta em si. Uma consulta marcada em setembro pra
+    acontecer em outubro, com sinal pago em setembro, deve contar pra meta
+    de agendamento de setembro (é quando a SDR fez o trabalho), não pra de
+    outubro — é essa a meta de "consultas por mês" da organização.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    consultas = list(
+        Consulta.objects.filter(
+            organizacao=org, criado_em__date__gte=data_inicio, criado_em__date__lte=data_fim, valor__gt=0,
+        ).exclude(status=Consulta.Status.CANCELADA)
+        .select_related("paciente", "tipo_consulta").order_by("criado_em")
+    )
+    for c in consultas:
+        pagamento = c.pagamentos.first()
+        c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
+    return consultas
+
+
 def totais_fechamentos_mes(org, ano, mes):
     """
     Tratamentos/programas fechados (contratos assinados no período) e
