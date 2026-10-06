@@ -544,6 +544,7 @@ def iniciar_protocolo(request, pk):
     if request.method == "POST":
         form = IniciarProtocoloForm(request.POST, organizacao=org)
         if form.is_valid():
+            ja_paga = form.cleaned_data["ja_paga_em_outro_lancamento"]
             acompanhamento = Acompanhamento.iniciar(
                 paciente=paciente,
                 programa=form.cleaned_data["programa"],
@@ -552,16 +553,25 @@ def iniciar_protocolo(request, pk):
                 desconto=form.cleaned_data["desconto"] or 0,
                 forma_pagamento=form.cleaned_data["forma_pagamento"],
                 observacoes=form.cleaned_data["observacoes"],
+                gerar_cobranca=not ja_paga,
             )
             valor_recebido = form.cleaned_data.get("valor_recebido_agora")
-            if valor_recebido:
+            if valor_recebido and not ja_paga:
                 pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
                 Recebimento.objects.create(
                     organizacao=org, pagamento=pagamento, valor=valor_recebido,
                     forma_pagamento=form.cleaned_data["forma_recebimento"],
                     data=form.cleaned_data["data_inicio"],
                 )
-            messages.success(request, "Protocolo de acompanhamento iniciado.")
+            if ja_paga:
+                messages.success(
+                    request,
+                    "Protocolo iniciado, sem gerar cobrança nova. Pra ligar o pagamento que já existe a "
+                    "esse tratamento, vá no lançamento dela no Financeiro e escolha esse programa em "
+                    "\"Tratamento/programa vinculado\".",
+                )
+            else:
+                messages.success(request, "Protocolo de acompanhamento iniciado.")
             return redirect("pacientes:ficha", pk=paciente.pk)
     else:
         # Sem isso o campo de data começa em branco — fácil de digitar/
