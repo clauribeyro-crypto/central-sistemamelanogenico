@@ -51,6 +51,34 @@
                 </p>
             {% endif %}
 
+            {% if request.user.is_superuser and meta_mes.mentoria %}
+                <div class="card stat" style="margin-top:.75rem; background:#0ea5e911; border:1px solid #0ea5e933;">
+                    <div class="num">R$ {{ meta_mes.mentoria.total_recebido|floatformat:2 }}</div>
+                    <div class="rotulo">
+                        Recebido de mentoria este mês
+                        ({{ meta_mes.mentoria.qtd }} parcela{{ meta_mes.mentoria.qtd|pluralize }} paga{{ meta_mes.mentoria.qtd|pluralize }})
+                        — não entra na meta de R$ {{ meta_mes.meta_faturamento|floatformat:0 }} da clínica, é
+                        receita à parte.
+                    </div>
+                </div>
+                {% if meta_mes.parcelas_mentoria_previstas %}
+                    <div style="margin-top:.5rem; font-size:.85rem;">
+                        <strong>Próximas parcelas previstas:</strong>
+                        <ul style="margin:.25rem 0 0; padding-left:1.1rem;">
+                            {% for p in meta_mes.parcelas_mentoria_previstas %}
+                                <li{% if p.atrasada %} style="color:#8a5a10;"{% endif %}>
+                                    {{ p.contrato.mentorada.nome }} — R$ {{ p.valor|floatformat:2 }}
+                                    {% if p.data_prevista %}(prevista pra {{ p.data_prevista|date:"d/m/Y" }}{% if p.atrasada %}, atrasada{% endif %}){% else %}(sem data prevista){% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+                <p style="font-size:.85rem; margin:.35rem 0 0;">
+                    <a href="{% url 'core:pagamentos_mentoria' %}">Ver pagamentos de mentoria ›</a>
+                </p>
+            {% endif %}
+
             <details style="margin-top:.75rem;">
                 <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
                     Ver de onde vêm os R$ {{ meta_mes.faturado|floatformat:2 }} recebidos este mês

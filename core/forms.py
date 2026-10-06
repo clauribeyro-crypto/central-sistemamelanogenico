@@ -3,7 +3,7 @@ from django import forms
 from contas.models import Organizacao
 from estoque.models import Produto
 
-from .models import VendaKitMentora
+from .models import ContratoMentoria, ParcelaMentoria, VendaKitMentora
 
 
 class VendaKitMentoraForm(forms.ModelForm):
@@ -51,3 +51,43 @@ class VendaKitMentoraForm(forms.ModelForm):
         if not cleaned.get("produtos") and not cleaned.get("kit_nome"):
             raise forms.ValidationError("Marque pelo menos um produto do estoque ou dê um nome livre pro kit.")
         return cleaned
+
+
+class ContratoMentoriaForm(forms.ModelForm):
+    data_inicio = forms.DateField(
+        label="Início da mentoria", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+    )
+
+    class Meta:
+        model = ContratoMentoria
+        fields = ["mentorada", "valor_total", "data_inicio", "observacoes"]
+        widgets = {"observacoes": forms.TextInput(attrs={"placeholder": "Opcional"})}
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        mentoradas_com_contrato = ContratoMentoria.objects.values_list("mentorada_id", flat=True)
+        self.fields["mentorada"].queryset = Organizacao.objects.filter(ativo=True).exclude(
+            pk=organizacao.pk if organizacao else None
+        ).exclude(pk__in=mentoradas_com_contrato).order_by("nome")
+
+
+class ParcelaMentoriaForm(forms.ModelForm):
+    data_prevista = forms.DateField(
+        label="Data prevista", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        help_text="Quando você espera receber. Deixe em branco se já foi pago.",
+    )
+    data_pagamento = forms.DateField(
+        label="Data do pagamento", required=False, widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+        help_text="Preencha quando o valor já tiver entrado. Deixe em branco pra lançar como previsão futura.",
+    )
+
+    class Meta:
+        model = ParcelaMentoria
+        fields = ["contrato", "valor", "data_prevista", "data_pagamento", "observacoes"]
+        widgets = {"observacoes": forms.TextInput(attrs={"placeholder": "Opcional"})}
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["contrato"].queryset = ContratoMentoria.objects.filter(
+            organizacao=organizacao
+        ).select_related("mentorada").order_by("mentorada__nome") if organizacao else ContratoMentoria.objects.none()

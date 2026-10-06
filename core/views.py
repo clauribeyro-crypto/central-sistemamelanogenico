@@ -22,8 +22,11 @@ from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
 from programas.models import Acompanhamento
 
-from .forms import VendaKitMentoraForm
-from .models import VendaKitMentora, totais_vendas_kit_mentora_no_periodo
+from .forms import ContratoMentoriaForm, ParcelaMentoriaForm, VendaKitMentoraForm
+from .models import (
+    ContratoMentoria, ParcelaMentoria, VendaKitMentora, totais_mentoria_no_periodo,
+    totais_vendas_kit_mentora_no_periodo,
+)
 
 BADGE_POR_ETAPA = {
     Lead.Etapa.NOVO: "1º contato",
@@ -169,8 +172,16 @@ def home(request):
         }
         if request.user.is_superuser:
             ultimo_dia_mes = calendar.monthrange(hoje.year, hoje.month)[1]
+            inicio_mes = hoje.replace(day=1)
+            fim_mes = hoje.replace(day=ultimo_dia_mes)
             contexto["meta_mes"]["vendas_kit_mentora"] = totais_vendas_kit_mentora_no_periodo(
-                org, hoje.replace(day=1), hoje.replace(day=ultimo_dia_mes)
+                org, inicio_mes, fim_mes
+            )
+            contexto["meta_mes"]["mentoria"] = totais_mentoria_no_periodo(org, inicio_mes, fim_mes)
+            contexto["meta_mes"]["parcelas_mentoria_previstas"] = list(
+                ParcelaMentoria.objects.filter(
+                    contrato__organizacao=org, data_pagamento__isnull=True,
+                ).select_related("contrato__mentorada").order_by("data_prevista")[:10]
             )
 
     if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
@@ -491,6 +502,96 @@ def vendas_kit_mentora_excluir(request, pk):
         venda.delete()
         messages.success(request, "Venda excluída.")
     return redirect("core:vendas_kit_mentoradas")
+
+
+@login_required
+def pagamentos_mentoria(request):
+    """
+    Controle do contrato de mentoria de cada organização mentorada — quanto
+    foi combinado no total, quanto já entrou e o que falta, já que cada uma
+    paga aos poucos conforme bate as próprias metas (não é parcela fixa).
+    Só a administradora geral vê isso.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode ver essa página.")
+        return redirect("core:home")
+
+    org = organizacao_do_usuario(request)
+
+    if request.method == "POST" and request.POST.get("acao") == "novo_contrato":
+        form_contrato = ContratoMentoriaForm(request.POST, organizacao=org)
+        form_parcela = ParcelaMentoriaForm(organizacao=org)
+        if form_contrato.is_valid():
+            contrato = form_contrato.save(commit=False)
+            contrato.organizacao = org
+            contrato.save()
+            messages.success(request, "Contrato de mentoria registrado.")
+            return redirect("core:pagamentos_mentoria")
+    elif request.method == "POST" and request.POST.get("acao") == "nova_parcela":
+        form_contrato = ContratoMentoriaForm(organizacao=org)
+        form_parcela = ParcelaMentoriaForm(request.POST, organizacao=org)
+        if form_parcela.is_valid():
+            form_parcela.save()
+            messages.success(request, "Parcela registrada.")
+            return redirect("core:pagamentos_mentoria")
+    else:
+        form_contrato = ContratoMentoriaForm(organizacao=org)
+        form_parcela = ParcelaMentoriaForm(organizacao=org)
+
+    contratos = list(
+        ContratoMentoria.objects.filter(organizacao=org)
+        .select_related("mentorada").prefetch_related("parcelas")
+    )
+    hoje = timezone.localdate()
+    for contrato in contratos:
+        parcelas = sorted(
+            contrato.parcelas.all(),
+            key=lambda p: p.data_pagamento or p.data_prevista or hoje,
+            reverse=True,
+        )
+        contrato.parcelas_ordenadas = parcelas
+        contrato.proximas_previstas = [p for p in parcelas if not p.paga]
+
+    contexto = {
+        "form_contrato": form_contrato,
+        "form_parcela": form_parcela,
+        "contratos": contratos,
+        "hoje": hoje,
+    }
+    return render(request, "core/pagamentos_mentoria.html", contexto)
+
+
+@login_required
+@require_POST
+def pagamentos_mentoria_parcela_editar(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode alterar isso.")
+        return redirect("core:home")
+    org = organizacao_do_usuario(request)
+    parcela = get_object_or_404(ParcelaMentoria, pk=pk, contrato__organizacao=org)
+    try:
+        parcela.valor = Decimal(request.POST.get("valor", "0") or "0")
+    except Exception:
+        messages.error(request, "Valor inválido.")
+        return redirect("core:pagamentos_mentoria")
+    parcela.data_prevista = request.POST.get("data_prevista") or None
+    parcela.data_pagamento = request.POST.get("data_pagamento") or None
+    parcela.save(update_fields=["valor", "data_prevista", "data_pagamento"])
+    messages.success(request, "Parcela atualizada.")
+    return redirect("core:pagamentos_mentoria")
+
+
+@login_required
+@require_POST
+def pagamentos_mentoria_parcela_excluir(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode excluir isso.")
+        return redirect("core:home")
+    org = organizacao_do_usuario(request)
+    parcela = get_object_or_404(ParcelaMentoria, pk=pk, contrato__organizacao=org)
+    parcela.delete()
+    messages.success(request, "Parcela excluída.")
+    return redirect("core:pagamentos_mentoria")
 
 
 @login_required

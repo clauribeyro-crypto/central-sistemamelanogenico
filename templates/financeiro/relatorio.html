@@ -50,6 +50,18 @@
         </div>
     {% endif %}
 
+    {% if mentoria %}
+        <div class="card stat" style="background:#0ea5e911; border:1px solid #0ea5e933;">
+            <div class="num">R$ {{ mentoria.total_recebido|floatformat:2 }}</div>
+            <div>
+                Recebido de mentoria no período
+                ({{ mentoria.qtd }} parcela{{ mentoria.qtd|pluralize }} paga{{ mentoria.qtd|pluralize }})
+                — receita à parte, não incluída nos totais acima.
+                <a href="{% url 'core:pagamentos_mentoria' %}">Ver detalhes ›</a>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="card">
         <h2>Recebido por forma de pagamento</h2>
         {% if por_forma_pagamento %}
