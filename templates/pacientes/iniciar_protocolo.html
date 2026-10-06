@@ -7,7 +7,7 @@
         <form method="post" class="acao">
             {% csrf_token %}
             {% for field in form %}
-                <div>
+                <div {% if field.name == "valor_recebido_agora" or field.name == "forma_recebimento" %}id="campo-{{ field.name }}"{% endif %}>
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
                     {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
@@ -17,4 +17,20 @@
             <button class="btn" type="submit">Iniciar protocolo</button>
         </form>
     </div>
+    <script>
+        (function () {
+            var checkbox = document.getElementById("{{ form.ja_paga_em_outro_lancamento.id_for_label }}");
+            var campos = [
+                document.getElementById("campo-valor_recebido_agora"),
+                document.getElementById("campo-forma_recebimento"),
+            ];
+            function atualizar() {
+                campos.forEach(function (campo) {
+                    if (campo) campo.style.display = checkbox.checked ? "none" : "";
+                });
+            }
+            checkbox.addEventListener("change", atualizar);
+            atualizar();
+        })();
+    </script>
 {% endblock %}

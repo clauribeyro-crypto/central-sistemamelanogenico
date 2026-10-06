@@ -544,6 +544,7 @@ def iniciar_protocolo(request, pk):
     if request.method == "POST":
         form = IniciarProtocoloForm(request.POST, organizacao=org)
         if form.is_valid():
+            ja_paga = form.cleaned_data["ja_paga_em_outro_lancamento"]
             acompanhamento = Acompanhamento.iniciar(
                 paciente=paciente,
                 programa=form.cleaned_data["programa"],
@@ -552,16 +553,25 @@ def iniciar_protocolo(request, pk):
                 desconto=form.cleaned_data["desconto"] or 0,
                 forma_pagamento=form.cleaned_data["forma_pagamento"],
                 observacoes=form.cleaned_data["observacoes"],
+                gerar_cobranca=not ja_paga,
             )
             valor_recebido = form.cleaned_data.get("valor_recebido_agora")
-            if valor_recebido:
+            if valor_recebido and not ja_paga:
                 pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
                 Recebimento.objects.create(
                     organizacao=org, pagamento=pagamento, valor=valor_recebido,
                     forma_pagamento=form.cleaned_data["forma_recebimento"],
                     data=form.cleaned_data["data_inicio"],
                 )
-            messages.success(request, "Protocolo de acompanhamento iniciado.")
+            if ja_paga:
+                messages.success(
+                    request,
+                    "Protocolo iniciado, sem gerar cobrança nova. Pra ligar o pagamento que já existe a "
+                    "esse tratamento, vá no lançamento dela no Financeiro e escolha esse programa em "
+                    "\"Tratamento/programa vinculado\".",
+                )
+            else:
+                messages.success(request, "Protocolo de acompanhamento iniciado.")
             return redirect("pacientes:ficha", pk=paciente.pk)
     else:
         # Sem isso o campo de data começa em branco — fácil de digitar/
@@ -611,6 +621,44 @@ def reabrir_fechamento(request, pk):
     )
     messages.success(request, "Paciente voltou pra fila de fechamento.")
     return redirect("pacientes:ficha", pk=paciente.pk)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def salvar_oferta_consulta(request, pk):
+    """Anotação rápida de quem atendeu: o que foi ofertado na consulta de diagnóstico — ajuda a planejar uma ação de retomada pra quem ainda não decidiu."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    paciente.oferta_consulta_diagnostico = request.POST.get("oferta_consulta_diagnostico", "").strip()
+    paciente.save(update_fields=["oferta_consulta_diagnostico", "atualizado_em"])
+    messages.success(request, f"Anotação de {paciente.nome} salva.")
+    proximo = request.POST.get("proximo")
+    if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        return redirect(proximo)
+    return redirect("pacientes:crm_fechamento")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def salvar_limite_fila_fechamento(request):
+    """Admin ajusta a partir de quantas pessoas na fila de fechamento o CRM de fechamento mostra um aviso."""
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem alterar esse ajuste.")
+        return redirect("pacientes:crm_fechamento")
+    try:
+        limite = int(request.POST.get("limite_fila_fechamento", "0"))
+    except ValueError:
+        limite = 0
+    if limite > 0:
+        org.limite_fila_fechamento = limite
+        org.save(update_fields=["limite_fila_fechamento"])
+        messages.success(request, "Aviso da fila de fechamento atualizado.")
+    else:
+        messages.error(request, "Valor inválido.")
+    return redirect("pacientes:crm_fechamento")
 
 
 @login_required
@@ -681,6 +729,11 @@ def crm_fechamento(request):
 
     total_decisoes = fechados_no_mes + perdidos_no_mes
     taxa_conversao = round(fechados_no_mes / total_decisoes * 100) if total_decisoes else None
+    # Métrica diferente da de cima: aqui a base é TODA consulta de diagnóstico
+    # realizada no mês (inclui quem ainda está na fila, esperando decisão),
+    # não só quem já foi fechado ou perdido — dá o "quantas consultas viraram
+    # venda" que a Cláudia espera bater com o controle manual dela.
+    taxa_conversao_consultas = round(fechados_no_mes / consultas_no_mes * 100) if consultas_no_mes else None
 
     contexto = {
         "ano": ano,
@@ -690,10 +743,14 @@ def crm_fechamento(request):
         "anos": range(hoje.year - 3, hoje.year + 2),
         "fila_fechamento": fila,
         "total_fila_fechamento": len(fila),
+        "limite_fila_fechamento": org.limite_fila_fechamento,
+        "fila_atingiu_limite": len(fila) >= org.limite_fila_fechamento,
+        "usuario_e_administrador": usuario_e_administrador(request),
         "consultas_no_mes": consultas_no_mes,
         "fechados_no_mes": fechados_no_mes,
         "perdidos_no_mes": perdidos_no_mes,
         "taxa_conversao": taxa_conversao,
+        "taxa_conversao_consultas": taxa_conversao_consultas,
         "lista_perdidos": perdidos_qs[:50],
         "lista_fechados": fechados_qs[:50],
         "lista_consultas_mes": lista_consultas_mes,

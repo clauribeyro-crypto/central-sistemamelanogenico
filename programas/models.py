@@ -96,7 +96,7 @@ class Acompanhamento(ModeloDaOrganizacao):
 
     @classmethod
     def iniciar(cls, *, paciente, programa, data_inicio, valor_contratado=None,
-                desconto=0, forma_pagamento="", observacoes=""):
+                desconto=0, forma_pagamento="", observacoes="", gerar_cobranca=True):
         """Cria o acompanhamento e já gera o checklist de consultas e kits previstos."""
         data_termino = data_inicio + datetime.timedelta(days=30 * programa.duracao_meses)
         acompanhamento = cls.objects.create(
@@ -132,16 +132,23 @@ class Acompanhamento(ModeloDaOrganizacao):
         # mais longo estourava o limite da coluna no Postgres (erro 500). O
         # campo já é preenchido automaticamente pelo recebimento mais recente
         # assim que o primeiro for registrado (ver Pagamento.recalcular_status).
-        from financeiro.models import Pagamento
+        #
+        # gerar_cobranca=False pula essa parte — pra quem já pagou antes de o
+        # protocolo existir aqui no sistema (ex.: paciente antiga, pagamento
+        # avulso já lançado) e não quer duplicar a cobrança. Nesse caso quem
+        # inicia o protocolo vincula o lançamento já existente depois, em
+        # Financeiro › Editar pagamento › "Tratamento/programa vinculado".
+        if gerar_cobranca:
+            from financeiro.models import Pagamento
 
-        Pagamento.objects.create(
-            organizacao=acompanhamento.organizacao,
-            paciente=paciente,
-            acompanhamento=acompanhamento,
-            valor=acompanhamento.valor_contratado - acompanhamento.desconto,
-            status=Pagamento.Status.PENDENTE,
-            data_vencimento=data_inicio,
-        )
+            Pagamento.objects.create(
+                organizacao=acompanhamento.organizacao,
+                paciente=paciente,
+                acompanhamento=acompanhamento,
+                valor=acompanhamento.valor_contratado - acompanhamento.desconto,
+                status=Pagamento.Status.PENDENTE,
+                data_vencimento=data_inicio,
+            )
 
         return acompanhamento
 

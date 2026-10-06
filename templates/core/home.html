@@ -17,7 +17,11 @@
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
-                    <div class="rotulo">Consultas já pagas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                    <div class="rotulo">Consultas agendadas e pagas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                    <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                        Conta pela data em que a consulta foi marcada no sistema, não pela data da consulta em
+                        si — uma consulta marcada em setembro pra acontecer em outubro conta pra setembro.
+                    </div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_fechamentos }} / {{ meta_mes.meta_fechamentos }}</div>
@@ -30,6 +34,102 @@
             <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
                 {{ meta_mes.percentual_faturamento }}% da meta batida este mês.
             </p>
+
+            {% if request.user.is_superuser and meta_mes.vendas_kit_mentora %}
+                <div class="card stat" style="margin-top:.75rem; background:#a855f711; border:1px solid #a855f733;">
+                    <div class="num">R$ {{ meta_mes.vendas_kit_mentora.total_pago|floatformat:2 }}</div>
+                    <div class="rotulo">
+                        Recebido de vendas de kit pras mentoradas este mês
+                        (vendido: R$ {{ meta_mes.vendas_kit_mentora.total_vendido|floatformat:2 }} em
+                        {{ meta_mes.vendas_kit_mentora.qtd }} venda{{ meta_mes.vendas_kit_mentora.qtd|pluralize }})
+                        — não entra na meta de R$ {{ meta_mes.meta_faturamento|floatformat:0 }} da clínica, é
+                        receita à parte.
+                    </div>
+                </div>
+                <p style="font-size:.85rem; margin:.35rem 0 0;">
+                    <a href="{% url 'core:vendas_kit_mentoradas' %}">Ver vendas de kit pras mentoradas ›</a>
+                </p>
+            {% endif %}
+
+            {% if request.user.is_superuser and meta_mes.mentoria %}
+                <div class="card stat" style="margin-top:.75rem; background:#0ea5e911; border:1px solid #0ea5e933;">
+                    <div class="num">R$ {{ meta_mes.mentoria.total_recebido|floatformat:2 }}</div>
+                    <div class="rotulo">
+                        Recebido de mentoria este mês
+                        ({{ meta_mes.mentoria.qtd }} parcela{{ meta_mes.mentoria.qtd|pluralize }} paga{{ meta_mes.mentoria.qtd|pluralize }})
+                        — não entra na meta de R$ {{ meta_mes.meta_faturamento|floatformat:0 }} da clínica, é
+                        receita à parte.
+                    </div>
+                </div>
+                {% if meta_mes.parcelas_mentoria_previstas %}
+                    <div style="margin-top:.5rem; font-size:.85rem;">
+                        <strong>Próximas parcelas previstas:</strong>
+                        <ul style="margin:.25rem 0 0; padding-left:1.1rem;">
+                            {% for p in meta_mes.parcelas_mentoria_previstas %}
+                                <li{% if p.atrasada %} style="color:#8a5a10;"{% endif %}>
+                                    {{ p.contrato.mentorada.nome }} — R$ {{ p.valor|floatformat:2 }}
+                                    {% if p.data_prevista %}(prevista pra {{ p.data_prevista|date:"d/m/Y" }}{% if p.atrasada %}, atrasada{% endif %}){% else %}(sem data prevista){% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+                <p style="font-size:.85rem; margin:.35rem 0 0;">
+                    <a href="{% url 'core:pagamentos_mentoria' %}">Ver pagamentos de mentoria ›</a>
+                </p>
+            {% endif %}
+
+            <details style="margin-top:.75rem;">
+                <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                    Ver de onde vêm os R$ {{ meta_mes.faturado|floatformat:2 }} recebidos este mês
+                </summary>
+                {% if meta_mes.detalhe_recebimentos %}
+                    <table style="margin-top:.5rem;">
+                        <thead>
+                            <tr><th>Data</th><th>Paciente</th><th>Origem</th><th>Forma</th><th>Valor</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for r in meta_mes.detalhe_recebimentos %}
+                                <tr>
+                                    <td>{{ r.data|date:"d/m/Y" }}</td>
+                                    <td><a href="{% url 'pacientes:ficha' r.pagamento.paciente_id %}">{{ r.pagamento.paciente }}</a></td>
+                                    <td>{{ r.origem }}</td>
+                                    <td>{{ r.get_forma_pagamento_display }}</td>
+                                    <td>R$ {{ r.valor|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="font-size:.85rem; color:var(--text-muted);">Nenhum recebimento registrado neste mês ainda.</p>
+                {% endif %}
+            </details>
+
+            <details style="margin-top:.5rem;">
+                <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                    Ver quais são as {{ meta_mes.qtd_consultas }} consultas agendadas e pagas este mês
+                </summary>
+                {% if meta_mes.detalhe_consultas_agendadas %}
+                    <table style="margin-top:.5rem;">
+                        <thead>
+                            <tr><th>Agendada em</th><th>Data da consulta</th><th>Paciente</th><th>Tipo</th><th>Valor</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for c in meta_mes.detalhe_consultas_agendadas %}
+                                <tr>
+                                    <td>{{ c.criado_em|date:"d/m/Y" }}</td>
+                                    <td>{{ c.data_hora|date:"d/m/Y" }}</td>
+                                    <td><a href="{% url 'agenda:detalhe_consulta' c.pk %}">{{ c.paciente }}</a></td>
+                                    <td>{{ c.tipo_consulta }}</td>
+                                    <td>R$ {{ c.valor|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="font-size:.85rem; color:var(--text-muted);">Nenhuma consulta agendada e paga neste mês ainda.</p>
+                {% endif %}
+            </details>
 
             {% if usuario_e_administrador %}
                 <details style="margin-top:.75rem;">
