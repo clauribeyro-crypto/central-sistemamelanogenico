@@ -379,16 +379,36 @@ def vendas_kit_mentoradas(request):
         messages.error(request, "Só a administradora geral pode ver essa página.")
         return redirect("core:home")
 
+    org = organizacao_do_usuario(request)
+
     if request.method == "POST":
-        form = VendaKitMentoraForm(request.POST)
+        form = VendaKitMentoraForm(request.POST, organizacao=org)
         if form.is_valid():
-            form.save()
-            messages.success(request, "Venda registrada.")
+            venda = form.save(commit=False)
+            venda.organizacao = org
+            venda.save()
+            if venda.produto_id:
+                produto = venda.produto
+                produto.estoque_atual = produto.estoque_atual - venda.quantidade
+                produto.save(update_fields=["estoque_atual"])
+                if produto.estoque_atual < 0:
+                    messages.warning(
+                        request,
+                        f'Venda registrada, mas o estoque de "{produto.nome}" ficou negativo — o '
+                        "estoque atual estava contando a menos do que o que realmente tinha. Ajuste "
+                        "com uma entrada de estoque.",
+                    )
+                else:
+                    messages.success(request, "Venda registrada.")
+            else:
+                messages.success(request, "Venda registrada.")
             return redirect("core:vendas_kit_mentoradas")
     else:
-        form = VendaKitMentoraForm(initial={"data_venda": timezone.localdate()})
+        form = VendaKitMentoraForm(organizacao=org, initial={"data_venda": timezone.localdate()})
 
-    vendas = list(VendaKitMentora.objects.select_related("mentorada").all())
+    vendas = list(
+        VendaKitMentora.objects.filter(organizacao=org).select_related("mentorada", "produto")
+    )
 
     hoje = timezone.localdate()
     for venda in vendas:
@@ -431,7 +451,8 @@ def vendas_kit_mentora_editar(request, pk):
     if not request.user.is_superuser:
         messages.error(request, "Só a administradora geral pode alterar isso.")
         return redirect("core:home")
-    venda = get_object_or_404(VendaKitMentora, pk=pk)
+    org = organizacao_do_usuario(request)
+    venda = get_object_or_404(VendaKitMentora, pk=pk, organizacao=org)
     try:
         venda.valor_pago = Decimal(request.POST.get("valor_pago", "0") or "0")
     except Exception:
@@ -450,9 +471,17 @@ def vendas_kit_mentora_excluir(request, pk):
     if not request.user.is_superuser:
         messages.error(request, "Só a administradora geral pode excluir isso.")
         return redirect("core:home")
-    venda = get_object_or_404(VendaKitMentora, pk=pk)
-    venda.delete()
-    messages.success(request, "Venda excluída.")
+    org = organizacao_do_usuario(request)
+    venda = get_object_or_404(VendaKitMentora, pk=pk, organizacao=org)
+    if venda.produto_id:
+        produto = venda.produto
+        produto.estoque_atual = produto.estoque_atual + venda.quantidade
+        produto.save(update_fields=["estoque_atual"])
+        venda.delete()
+        messages.success(request, "Venda excluída — a quantidade voltou pro seu estoque.")
+    else:
+        venda.delete()
+        messages.success(request, "Venda excluída.")
     return redirect("core:vendas_kit_mentoradas")
 
 

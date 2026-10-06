@@ -13,10 +13,21 @@ class VendaKitMentora(models.Model):
     organização — por isso mora aqui no core, não dentro de uma organização.
     """
 
+    organizacao = models.ForeignKey(
+        Organizacao, on_delete=models.CASCADE, related_name="vendas_kit_como_fornecedora",
+        help_text="Organização vendedora (quem está enviando o produto) — normalmente a sua própria.",
+    )
     mentorada = models.ForeignKey(
         Organizacao, on_delete=models.CASCADE, related_name="compras_kit_mentora"
     )
-    kit_nome = models.CharField("kit", max_length=150)
+    produto = models.ForeignKey(
+        "estoque.Produto", on_delete=models.PROTECT, null=True, blank=True, related_name="vendas_kit_mentora",
+        help_text="Se o kit corresponde a um produto do seu estoque, escolha aqui — isso desconta a quantidade do seu estoque automaticamente.",
+    )
+    kit_nome = models.CharField(
+        "kit", max_length=150, blank=True,
+        help_text="Nome livre, pra kits que não são um produto único do seu estoque. Deixe em branco se escolheu um produto acima.",
+    )
     quantidade = models.PositiveIntegerField(default=1)
     valor_unitario = models.DecimalField("valor por kit", max_digits=10, decimal_places=2)
     data_venda = models.DateField()
@@ -38,7 +49,11 @@ class VendaKitMentora(models.Model):
         ordering = ["-data_venda", "-criado_em"]
 
     def __str__(self):
-        return f"{self.mentorada} — {self.quantidade}x {self.kit_nome} ({self.data_venda:%d/%m/%Y})"
+        return f"{self.mentorada} — {self.quantidade}x {self.nome_exibicao} ({self.data_venda:%d/%m/%Y})"
+
+    @property
+    def nome_exibicao(self):
+        return self.kit_nome or (self.produto.nome if self.produto_id else "—")
 
     @property
     def valor_total(self):
