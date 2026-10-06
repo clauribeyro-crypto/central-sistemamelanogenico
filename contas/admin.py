@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Organizacao, Usuario
+from .models import Organizacao, TentativaLoginFalha, Usuario
 
 
 @admin.register(Organizacao)
@@ -52,6 +52,22 @@ class UsuarioAdmin(UserAdmin):
         if request.user.is_superuser:
             return qs
         return qs.filter(organizacao=request.user.organizacao)
+
+
+@admin.register(TentativaLoginFalha)
+class TentativaLoginFalhaAdmin(admin.ModelAdmin):
+    """Só leitura — serve pra conferir se alguém está tentando adivinhar senha."""
+
+    list_display = ("ip", "username", "criado_em")
+    list_filter = ("ip",)
+    search_fields = ("ip", "username")
+    readonly_fields = ("ip", "username", "criado_em")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class OrganizacaoAdminMixin:
