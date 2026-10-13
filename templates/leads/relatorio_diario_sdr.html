@@ -6,6 +6,8 @@
     <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
         Dia a dia, quanto cada pessoa fez de cada tipo de contato — direto do histórico do CRM, sem
         precisar preencher nada à parte. Uma linha só aparece quando teve alguma atividade naquele dia.
+        Cada coluna conta <strong>leads diferentes</strong>, não mensagens — se ela mandar duas mensagens
+        pro mesmo lead no mesmo dia e na mesma etapa, conta só 1.
     </p>
 
     <form class="filtro no-print" method="get">
@@ -45,6 +47,7 @@
                 <tr>
                     <th>Data</th>
                     <th>Pessoa</th>
+                    <th>Total de leads contatados</th>
                     {% for chave, rotulo, tipos, etapa in colunas %}
                         <th>{{ rotulo }}</th>
                     {% endfor %}
@@ -56,18 +59,20 @@
                     <tr>
                         <td>{{ linha.data|date:"d/m/Y" }}</td>
                         <td>{{ linha.pessoa }}</td>
+                        <td style="font-weight:600;">{{ linha.total_contatados }}</td>
                         {% for valor in linha.valores %}
                             <td>{{ valor }}</td>
                         {% endfor %}
                         <td style="font-weight:600;">{{ linha.agendamentos }}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="{{ colunas|length|add:3 }}">Nenhuma atividade registrada no período.</td></tr>
+                    <tr><td colspan="{{ colunas|length|add:4 }}">Nenhuma atividade registrada no período.</td></tr>
                 {% endfor %}
             </tbody>
             <tfoot>
                 <tr style="font-weight:600;">
                     <td colspan="2">Total</td>
+                    <td>{{ total_contatados_geral }}</td>
                     {% for total in totais_colunas %}
                         <td>{{ total }}</td>
                     {% endfor %}

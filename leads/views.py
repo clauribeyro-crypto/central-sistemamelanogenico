@@ -489,6 +489,10 @@ def relatorio_diario_sdr(request):
     receberam o valor e quantos agendamentos fecharam — direto do histórico
     do CRM, usando `HistoricoLead.etapa_no_momento` (a etapa da lead no
     instante exato de cada ação) pra não depender de texto livre.
+
+    Cada contagem é de LEADS DIFERENTES, não de ações/mensagens — reenviar
+    uma mensagem pro mesmo lead no mesmo dia e na mesma etapa conta como 1,
+    não 2 (ver `Count("lead_id", distinct=True)` abaixo).
     """
     org = organizacao_do_usuario(request)
     hoje = timezone.localdate()
@@ -534,21 +538,41 @@ def relatorio_diario_sdr(request):
     if pessoa_id:
         historico_qs = historico_qs.filter(responsavel_id=pessoa_id)
 
+    # Conta LEADS DIFERENTES, não ações — se ela mandar duas mensagens pro
+    # mesmo lead no mesmo dia e na mesma etapa (ex.: reenviar porque não
+    # entregou), isso continua sendo "1 lead contatado", não 2. Do mesmo
+    # jeito, se o mesmo lead for contatado em mais de uma etapa no mesmo dia
+    # (ex.: ela manda o 1º contato de manhã e, já tendo arrastado o card, o
+    # 2º contato à tarde), cada etapa conta como 1 — são ações diferentes de
+    # verdade —, mas o "Total de leads contatados" (mais abaixo) não soma
+    # esse lead duas vezes.
     contagens = {}
     for chave, _rotulo, tipos, etapa in COLUNAS:
         for row in (
             historico_qs.filter(tipo__in=tipos, etapa_no_momento=etapa)
             .values("responsavel_id", "data_hora__date")
-            .annotate(total=Count("id"))
+            .annotate(total=Count("lead_id", distinct=True))
         ):
             contagens[(chave, row["responsavel_id"], row["data_hora__date"])] = row["total"]
+
+    # Total de leads diferentes contatados no dia (1º a 4º contato juntos,
+    # sem repetir o mesmo lead que passou por mais de uma etapa no mesmo dia)
+    # — é o número que responde "quantas pessoas ela chamou hoje, no total".
+    total_contatados_por_dia_pessoa = {
+        (row["responsavel_id"], row["data_hora__date"]): row["total"]
+        for row in (
+            historico_qs.filter(tipo__in=(HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO))
+            .values("responsavel_id", "data_hora__date")
+            .annotate(total=Count("lead_id", distinct=True))
+        )
+    }
 
     agendamentos_por_dia_pessoa = {
         (row["responsavel_id"], row["data_hora__date"]): row["total"]
         for row in (
             historico_qs.filter(tipo=HistoricoLead.Tipo.AGENDAMENTO)
             .values("responsavel_id", "data_hora__date")
-            .annotate(total=Count("id"))
+            .annotate(total=Count("lead_id", distinct=True))
         )
     }
 
@@ -561,21 +585,25 @@ def relatorio_diario_sdr(request):
             # percorre as duas listas lado a lado, sem precisar de lookup
             # por chave variável (que o Django template não faz sozinho).
             valores = [contagens.get((chave, pessoa.pk, dia_atual), 0) for chave, *_ in COLUNAS]
+            total_contatados = total_contatados_por_dia_pessoa.get((pessoa.pk, dia_atual), 0)
             agendamentos = agendamentos_por_dia_pessoa.get((pessoa.pk, dia_atual), 0)
             if any(valores) or agendamentos:
                 linhas.append({
-                    "data": dia_atual, "pessoa": pessoa, "valores": valores, "agendamentos": agendamentos,
+                    "data": dia_atual, "pessoa": pessoa, "valores": valores,
+                    "total_contatados": total_contatados, "agendamentos": agendamentos,
                 })
         dia_atual += datetime.timedelta(days=1)
     linhas.sort(key=lambda linha: (linha["data"], str(linha["pessoa"])), reverse=True)
 
     totais_colunas = [sum(l["valores"][i] for l in linhas) for i in range(len(COLUNAS))]
+    total_contatados_geral = sum(l["total_contatados"] for l in linhas)
     total_agendamentos = sum(l["agendamentos"] for l in linhas)
 
     contexto = {
         "colunas": COLUNAS,
         "linhas": linhas,
         "totais_colunas": totais_colunas,
+        "total_contatados_geral": total_contatados_geral,
         "total_agendamentos": total_agendamentos,
         "pessoas": pessoas,
         "pessoa_id": pessoa_id,
