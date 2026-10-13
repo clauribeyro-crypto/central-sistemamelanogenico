@@ -664,10 +664,14 @@ def resultado_contato(request, pk):
         form = ResultadoContatoForm(request.POST)
         if form.is_valid():
             if form.cleaned_data["resultado"] == "RESPONDEU":
+                etapa_anterior = lead.get_etapa_display()
                 lead.status = Lead.Status.EM_ANDAMENTO
-                lead.save(update_fields=["status", "atualizado_em"])
-                lead.registrar_historico(HistoricoLead.Tipo.RESPOSTA, "Lead respondeu", request.user)
-                messages.success(request, "Marcado como 'em andamento'. Decida o próximo passo.")
+                lead.etapa = Lead.Etapa.RESPONDEU
+                lead.save(update_fields=["status", "etapa", "atualizado_em"])
+                lead.registrar_historico(
+                    HistoricoLead.Tipo.RESPOSTA, f"Lead respondeu (estava em {etapa_anterior})", request.user
+                )
+                messages.success(request, "Lead movido pra 'Respondeu'. Avance pro próximo passo quando for o caso.")
             else:
                 etapa_anterior = lead.get_etapa_display()
                 lead.avancar_etapa()
