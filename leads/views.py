@@ -410,6 +410,58 @@ def painel_marketing(request):
             "total": sum(valores),
         })
 
+    # "Atividade da equipe no período" — chamados (WhatsApp/ligação) e
+    # movimentações (mudança de status/etapa) são automáticos, direto do
+    # histórico do CRM (mesmo cálculo da home, só que pro mês inteiro em vez
+    # de só hoje); agendamentos reaproveita a contagem já feita acima.
+    chamados_periodo = {
+        row["responsavel_id"]: row["total"]
+        for row in (
+            HistoricoLead.objects.filter(
+                lead__organizacao=org, responsavel__isnull=False,
+                tipo__in=[HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO],
+                data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+            )
+            .values("responsavel_id")
+            .annotate(total=Count("lead_id", distinct=True))
+        )
+    }
+    movimentacoes_periodo = {
+        row["responsavel_id"]: row["total"]
+        for row in (
+            HistoricoLead.objects.filter(
+                lead__organizacao=org, responsavel__isnull=False,
+                tipo=HistoricoLead.Tipo.STATUS,
+                data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+            )
+            .values("responsavel_id")
+            .annotate(total=Count("lead_id", distinct=True))
+        )
+    }
+    agendamentos_por_pessoa = {
+        responsavel_id: sum(
+            contagem_agendamentos.get((responsavel_id, o.pk), 0) for o in origens
+        )
+        for responsavel_id in responsaveis_ids
+    }
+    todas_pessoas_ids = set(chamados_periodo) | set(movimentacoes_periodo) | responsaveis_ids
+    nomes_atividade = {
+        **nomes_responsaveis,
+        **{
+            u.pk: str(u)
+            for u in Usuario.objects.filter(pk__in=[pid for pid in todas_pessoas_ids if pid])
+        },
+    }
+    atividade_equipe = [
+        {
+            "nome": nomes_atividade.get(pid, "Sem responsável definido"),
+            "chamados": chamados_periodo.get(pid, 0),
+            "movimentacoes": movimentacoes_periodo.get(pid, 0),
+            "agendamentos": agendamentos_por_pessoa.get(pid, 0),
+        }
+        for pid in sorted(todas_pessoas_ids, key=lambda pid: nomes_atividade.get(pid, ""))
+    ]
+
     contexto = {
         "formset": formset,
         "linhas": linhas,
@@ -417,6 +469,7 @@ def painel_marketing(request):
         "origens": origens,
         "origem_resumo": origem_resumo,
         "matriz_quem_agendou": matriz_quem_agendou,
+        "atividade_equipe": atividade_equipe,
         "ano": ano,
         "mes": mes,
         "mes_nome": dict(MESES)[mes],
