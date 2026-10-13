@@ -139,6 +139,9 @@
 
     <div class="card">
         <h2 style="margin-top:0;">Atividade da equipe no período</h2>
+        <p style="font-size:.85rem; margin-top:-.5rem;">
+            <a href="{% url 'leads:relatorio_diario_sdr' %}?mes={{ mes }}&ano={{ ano }}">Ver dia a dia, por pessoa ›</a>
+        </p>
         <p style="font-size:.85rem; color:var(--text-muted);">
             Chamados (WhatsApp/ligação) e movimentações (mudança de status/etapa) são automáticos, direto do
             histórico do CRM — não dependem de ninguém preencher nada. Agendamentos são as consultas marcadas

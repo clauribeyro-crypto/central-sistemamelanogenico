@@ -218,7 +218,13 @@ class Lead(ModeloDaOrganizacao):
         return self.consultas.exclude(status="CANCELADA").order_by("-data_hora").first()
 
     def registrar_historico(self, tipo, descricao, responsavel=None):
-        return self.historico.create(tipo=tipo, descricao=descricao, responsavel=responsavel)
+        # Guarda em que etapa a lead estava no momento — é o que permite
+        # depois contar, por dia, quantos "1º contato"/"2º contato"/etc. uma
+        # pessoa da equipe realmente fez (ver leads.views.relatorio_diario_sdr),
+        # sem precisar adivinhar isso a partir do texto livre da descrição.
+        return self.historico.create(
+            tipo=tipo, descricao=descricao, responsavel=responsavel, etapa_no_momento=self.etapa,
+        )
 
     @classmethod
     def buscar_por_paciente(cls, organizacao, paciente):
@@ -354,6 +360,10 @@ class HistoricoLead(models.Model):
     descricao = models.CharField(max_length=500)
     responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    etapa_no_momento = models.CharField(
+        max_length=30, choices=Lead.Etapa.choices, blank=True, default="",
+        help_text="Em qual etapa a lead estava quando isso aconteceu — preenchido automaticamente.",
     )
 
     class Meta:

@@ -481,6 +481,115 @@ def painel_marketing(request):
 
 @login_required
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+def relatorio_diario_sdr(request):
+    """
+    Dia a dia (não só o total do mês) de quanto cada pessoa da equipe fez de
+    contato em cada etapa da cadência (1º a 4º contato), quantas leads
+    responderam, quantas ficaram interessadas na consulta, quantas já
+    receberam o valor e quantos agendamentos fecharam — direto do histórico
+    do CRM, usando `HistoricoLead.etapa_no_momento` (a etapa da lead no
+    instante exato de cada ação) pra não depender de texto livre.
+    """
+    org = organizacao_do_usuario(request)
+    hoje = timezone.localdate()
+
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+
+    try:
+        pessoa_id = int(request.GET.get("pessoa") or 0) or None
+    except ValueError:
+        pessoa_id = None
+
+    ultimo_dia_mes = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = min(datetime.date(ano, mes, ultimo_dia_mes), hoje)
+
+    pessoas = Usuario.objects.filter(
+        organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True
+    ).order_by("first_name", "username")
+
+    COLUNAS = [
+        ("contato_1", "1º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_1),
+        ("contato_2", "2º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_2),
+        ("contato_3", "3º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_3),
+        ("contato_4", "4º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_4),
+        ("respondeu", "Respondeu", (HistoricoLead.Tipo.RESPOSTA,), Lead.Etapa.RESPONDEU),
+        ("interessada", "Interessada na consulta", (HistoricoLead.Tipo.STATUS,), Lead.Etapa.INTERESSADA_CONSULTA),
+        ("valor_passado", "Valor passado", (HistoricoLead.Tipo.STATUS,), Lead.Etapa.VALOR_PASSADO),
+    ]
+
+    historico_qs = HistoricoLead.objects.filter(
+        lead__organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+        responsavel__isnull=False,
+    )
+    if pessoa_id:
+        historico_qs = historico_qs.filter(responsavel_id=pessoa_id)
+
+    contagens = {}
+    for chave, _rotulo, tipos, etapa in COLUNAS:
+        for row in (
+            historico_qs.filter(tipo__in=tipos, etapa_no_momento=etapa)
+            .values("responsavel_id", "data_hora__date")
+            .annotate(total=Count("id"))
+        ):
+            contagens[(chave, row["responsavel_id"], row["data_hora__date"])] = row["total"]
+
+    agendamentos_por_dia_pessoa = {
+        (row["responsavel_id"], row["data_hora__date"]): row["total"]
+        for row in (
+            historico_qs.filter(tipo=HistoricoLead.Tipo.AGENDAMENTO)
+            .values("responsavel_id", "data_hora__date")
+            .annotate(total=Count("id"))
+        )
+    }
+
+    pessoas_do_relatorio = pessoas.filter(pk=pessoa_id) if pessoa_id else pessoas
+    linhas = []
+    dia_atual = data_inicio
+    while dia_atual <= data_fim:
+        for pessoa in pessoas_do_relatorio:
+            # Lista na MESMA ordem de COLUNAS (não dict) — o template só
+            # percorre as duas listas lado a lado, sem precisar de lookup
+            # por chave variável (que o Django template não faz sozinho).
+            valores = [contagens.get((chave, pessoa.pk, dia_atual), 0) for chave, *_ in COLUNAS]
+            agendamentos = agendamentos_por_dia_pessoa.get((pessoa.pk, dia_atual), 0)
+            if any(valores) or agendamentos:
+                linhas.append({
+                    "data": dia_atual, "pessoa": pessoa, "valores": valores, "agendamentos": agendamentos,
+                })
+        dia_atual += datetime.timedelta(days=1)
+    linhas.sort(key=lambda linha: (linha["data"], str(linha["pessoa"])), reverse=True)
+
+    totais_colunas = [sum(l["valores"][i] for l in linhas) for i in range(len(COLUNAS))]
+    total_agendamentos = sum(l["agendamentos"] for l in linhas)
+
+    contexto = {
+        "colunas": COLUNAS,
+        "linhas": linhas,
+        "totais_colunas": totais_colunas,
+        "total_agendamentos": total_agendamentos,
+        "pessoas": pessoas,
+        "pessoa_id": pessoa_id,
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+    }
+    return render(request, "leads/relatorio_diario_sdr.html", contexto)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 @require_POST
 def mover_etapa(request, pk):
     """Arrastar e soltar o card entre colunas do board."""
