@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.models import Usuario
-from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, rotular_dados_formulario
 from financeiro.models import Pagamento
 from financeiro.views import MESES
 from pacientes.models import Paciente
@@ -676,17 +676,6 @@ def editar_lead(request, pk):
     return render(request, "leads/editar.html", {"lead": lead, "form": form})
 
 
-def _rotular_dados_formulario(dados_formulario):
-    """Transforma as chaves cruas do formulário (ex.: 'qual_sua_renda') em rótulos legíveis."""
-    rotulos = []
-    for chave, valor in dados_formulario.items():
-        rotulo = chave.replace("_", " ").replace("-", " ").strip()
-        if rotulo and rotulo[0].islower():
-            rotulo = rotulo[0].upper() + rotulo[1:]
-        rotulos.append((rotulo or chave, valor))
-    return rotulos
-
-
 @login_required
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def detalhe(request, pk):
@@ -696,7 +685,7 @@ def detalhe(request, pk):
 
     contexto = {
         "lead": lead,
-        "dados_formulario": _rotular_dados_formulario(lead.dados_formulario),
+        "dados_formulario": rotular_dados_formulario(lead.dados_formulario),
         "historico": historico,
         "pausa_ativa": lead.pausa_ativa,
         "pode_agir": lead.status not in (Lead.Status.AGENDADA, Lead.Status.PERDIDA),

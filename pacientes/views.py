@@ -13,7 +13,9 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
-from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
+from contas.utils import (
+    modulo_ativo_obrigatorio, organizacao_do_usuario, rotular_dados_formulario, usuario_e_administrador,
+)
 from financeiro.models import Pagamento, Recebimento
 from financeiro.views import MESES
 from leads.models import HistoricoLead
@@ -370,8 +372,16 @@ def ficha(request, pk):
     if aba not in dict(ABAS):
         aba = "geral"
 
+    # Respostas do formulário/quiz de origem (ex.: Respondi) — vêm do(s)
+    # lead(s) que deram origem a essa paciente, pra secretária não precisar
+    # abrir a planilha pra conferir o que ela respondeu.
+    dados_formulario_merge = {}
+    for lead in paciente.leads.order_by("criado_em"):
+        dados_formulario_merge.update(lead.dados_formulario)
+
     contexto = {
         "paciente": paciente,
+        "dados_formulario": rotular_dados_formulario(dados_formulario_merge),
         "acompanhamento": acompanhamento,
         "tem_algum_acompanhamento": paciente.acompanhamentos.exists(),
         "acompanhamentos_anteriores": paciente.acompanhamentos.exclude(
