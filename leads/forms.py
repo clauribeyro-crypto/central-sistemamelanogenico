@@ -81,7 +81,10 @@ class NovoLeadForm(_LeadContatoFormMixin, forms.ModelForm):
 
     class Meta:
         model = Lead
-        fields = ["nome", "whatsapp", "instagram", "telefone", "cidade", "estado", "origem"]
+        fields = [
+            "nome", "whatsapp", "instagram", "telefone", "cidade", "estado", "origem",
+            "respostas_formulario_manual",
+        ]
         widgets = {
             "nome": forms.TextInput(attrs={"placeholder": "Nome completo"}),
             "whatsapp": forms.TextInput(attrs={"placeholder": "(11) 91234-5678"}),
@@ -89,11 +92,18 @@ class NovoLeadForm(_LeadContatoFormMixin, forms.ModelForm):
             "telefone": forms.TextInput(attrs={"placeholder": "Opcional"}),
             "cidade": forms.TextInput(attrs={"placeholder": "Ex.: São Paulo"}),
             "estado": forms.TextInput(attrs={"placeholder": "UF", "maxlength": 2}),
+            "respostas_formulario_manual": forms.Textarea(attrs={
+                "rows": 4,
+                "placeholder": "Se essa lead veio de um quiz/formulário, cole aqui as respostas "
+                               "dela (opcional) — fica salvo no card, sem precisar abrir a planilha depois.",
+            }),
         }
 
     def __init__(self, *args, organizacao=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["origem"].queryset = Origem.objects.filter(organizacao=organizacao, ativo=True)
+        self.fields["respostas_formulario_manual"].label = "Respostas do formulário (opcional)"
+        self.fields["respostas_formulario_manual"].required = False
 
 
 class EditarLeadForm(_LeadContatoFormMixin, forms.ModelForm):
@@ -101,13 +111,27 @@ class EditarLeadForm(_LeadContatoFormMixin, forms.ModelForm):
 
     class Meta:
         model = Lead
-        fields = ["nome", "whatsapp", "instagram", "telefone", "cidade", "estado", "origem"]
+        fields = [
+            "nome", "whatsapp", "instagram", "telefone", "cidade", "estado", "origem",
+            "respostas_formulario_manual",
+        ]
         widgets = {
             "whatsapp": forms.TextInput(attrs={"placeholder": "(11) 91234-5678"}),
             "instagram": forms.TextInput(attrs={"placeholder": "@usuario"}),
             "telefone": forms.TextInput(attrs={"placeholder": "Opcional"}),
             "estado": forms.TextInput(attrs={"maxlength": 2}),
+            "respostas_formulario_manual": forms.Textarea(attrs={
+                "rows": 4,
+                "placeholder": "Se essa lead veio de um quiz/formulário, cole aqui as respostas "
+                               "dela (opcional) — fica salvo no card, sem precisar abrir a planilha depois.",
+            }),
         }
+
+    def __init__(self, *args, organizacao=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["origem"].queryset = Origem.objects.filter(organizacao=organizacao, ativo=True)
+        self.fields["respostas_formulario_manual"].label = "Respostas do formulário (opcional)"
+        self.fields["respostas_formulario_manual"].required = False
 
     def __init__(self, *args, organizacao=None, **kwargs):
         super().__init__(*args, **kwargs)

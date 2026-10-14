@@ -187,6 +187,15 @@ class Lead(ModeloDaOrganizacao):
         ),
     )
 
+    respostas_formulario_manual = models.TextField(
+        blank=True, default="",
+        help_text=(
+            "Pra quando o lead foi cadastrado à mão (botão \"+ Novo lead\") a partir de "
+            "uma planilha/quiz externo: cole aqui as respostas, pra não precisar abrir "
+            "a planilha de novo depois. Some junto com o quadro \"Respostas do formulário\"."
+        ),
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 

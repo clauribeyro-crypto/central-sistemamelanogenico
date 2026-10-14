@@ -376,12 +376,16 @@ def ficha(request, pk):
     # lead(s) que deram origem a essa paciente, pra secretária não precisar
     # abrir a planilha pra conferir o que ela respondeu.
     dados_formulario_merge = {}
+    respostas_formulario_manual = []
     for lead in paciente.leads.order_by("criado_em"):
         dados_formulario_merge.update(lead.dados_formulario)
+        if lead.respostas_formulario_manual:
+            respostas_formulario_manual.append(lead.respostas_formulario_manual)
 
     contexto = {
         "paciente": paciente,
         "dados_formulario": rotular_dados_formulario(dados_formulario_merge),
+        "respostas_formulario_manual": "\n\n".join(respostas_formulario_manual),
         "acompanhamento": acompanhamento,
         "tem_algum_acompanhamento": paciente.acompanhamentos.exists(),
         "acompanhamentos_anteriores": paciente.acompanhamentos.exclude(

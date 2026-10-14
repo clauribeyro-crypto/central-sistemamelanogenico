@@ -3,20 +3,34 @@
 {% block content %}
     <p><a href="{% url 'leads:kanban' %}">← Voltar ao CRM</a></p>
 
-    {% if dados_formulario %}
+    {% if dados_formulario or lead.respostas_formulario_manual %}
         <div class="card" style="border:2px solid var(--primary, #6366f1);">
             <h2 style="margin-top:0;">📋 Respostas do formulário</h2>
             <p style="font-size:.85rem; color:var(--text-muted);">
                 O que ela respondeu no formulário/quiz de origem — já vem aqui antes de chamar, sem precisar abrir a planilha.
             </p>
-            <table style="width:100%; border-collapse:collapse;">
-                {% for rotulo, valor in dados_formulario %}
-                    <tr>
-                        <td style="padding:.35rem .5rem .35rem 0; white-space:nowrap; vertical-align:top; color:var(--text-muted);">{{ rotulo }}</td>
-                        <td style="padding:.35rem 0;">{{ valor }}</td>
-                    </tr>
-                {% endfor %}
-            </table>
+            {% if dados_formulario %}
+                <table style="width:100%; border-collapse:collapse;">
+                    {% for rotulo, valor in dados_formulario %}
+                        <tr>
+                            <td style="padding:.35rem .5rem .35rem 0; white-space:nowrap; vertical-align:top; color:var(--text-muted);">{{ rotulo }}</td>
+                            <td style="padding:.35rem 0;">{{ valor }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% endif %}
+            {% if lead.respostas_formulario_manual %}
+                <p style="white-space:pre-line; margin-bottom:0;">{{ lead.respostas_formulario_manual }}</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="card">
+            <h2 style="margin-top:0;">📋 Respostas do formulário</h2>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
+                Essa lead ainda não tem respostas de quiz/formulário salvas.
+                <a href="{% url 'leads:editar_lead' lead.pk %}">Colar as respostas</a> se ela veio de um
+                quiz/planilha externa e foi cadastrada à mão.
+            </p>
         </div>
     {% endif %}
 
