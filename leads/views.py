@@ -514,8 +514,19 @@ def relatorio_diario_sdr(request):
         pessoa_id = None
 
     ultimo_dia_mes = calendar.monthrange(ano, mes)[1]
-    data_inicio = datetime.date(ano, mes, 1)
-    data_fim = min(datetime.date(ano, mes, ultimo_dia_mes), hoje)
+
+    try:
+        dia = int(request.GET.get("dia") or 0) or None
+    except ValueError:
+        dia = None
+    if dia is not None and not (1 <= dia <= ultimo_dia_mes):
+        dia = None
+
+    if dia is not None:
+        data_inicio = data_fim = datetime.date(ano, mes, dia)
+    else:
+        data_inicio = datetime.date(ano, mes, 1)
+        data_fim = min(datetime.date(ano, mes, ultimo_dia_mes), hoje)
 
     pessoas = Usuario.objects.filter(
         organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True
@@ -641,6 +652,8 @@ def relatorio_diario_sdr(request):
         "mes_nome": dict(MESES)[mes],
         "meses": MESES,
         "anos": range(hoje.year - 3, hoje.year + 2),
+        "dia": dia,
+        "dias_do_mes": range(1, ultimo_dia_mes + 1),
     }
     return render(request, "leads/relatorio_diario_sdr.html", contexto)
 
