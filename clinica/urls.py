@@ -10,9 +10,11 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path, re_path
 from django.views.static import serve as serve_static
 
+from contas.views import LoginComLimiteDeTentativasView
+
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("entrar/", auth_views.LoginView.as_view(template_name="registration/login.html"), name="login"),
+    path("entrar/", LoginComLimiteDeTentativasView.as_view(template_name="registration/login.html"), name="login"),
     path("sair/", auth_views.LogoutView.as_view(), name="logout"),
     path("leads/", include("leads.urls")),
     path("agenda/", include("agenda.urls")),

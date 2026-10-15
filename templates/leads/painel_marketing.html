@@ -138,6 +138,35 @@
     </div>
 
     <div class="card">
+        <h2 style="margin-top:0;">Atividade da equipe no período</h2>
+        <p style="font-size:.85rem; margin-top:-.5rem;">
+            <a href="{% url 'leads:relatorio_diario_sdr' %}?mes={{ mes }}&ano={{ ano }}">Ver dia a dia, por pessoa ›</a>
+        </p>
+        <p style="font-size:.85rem; color:var(--text-muted);">
+            Chamados (WhatsApp/ligação) e movimentações (mudança de status/etapa) são automáticos, direto do
+            histórico do CRM — não dependem de ninguém preencher nada. Agendamentos são as consultas marcadas
+            por cada pessoa em {{ mes_nome }}/{{ ano|stringformat:'d' }}.
+        </p>
+        <table>
+            <thead>
+                <tr><th>Pessoa</th><th>Chamados</th><th>Movimentações</th><th>Agendamentos</th></tr>
+            </thead>
+            <tbody>
+                {% for pessoa in atividade_equipe %}
+                    <tr>
+                        <td>{{ pessoa.nome }}</td>
+                        <td>{{ pessoa.chamados }}</td>
+                        <td>{{ pessoa.movimentacoes }}</td>
+                        <td style="font-weight:600;">{{ pessoa.agendamentos }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4">Nenhuma atividade registrada no período.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
         <h2 style="margin-top:0;">Quem está agendando, por origem</h2>
         <p style="font-size:.85rem; color:var(--text-muted);">
             Agendamentos feitos em {{ mes_nome }}/{{ ano|stringformat:'d' }}, por quem agendou — direto do

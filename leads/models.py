@@ -117,6 +117,9 @@ class Lead(ModeloDaOrganizacao):
         CONTATO_2 = "CONTATO_2", "2º contato"
         CONTATO_3 = "CONTATO_3", "3º contato — prova social"
         CONTATO_4 = "CONTATO_4", "4º contato — encerramento"
+        RESPONDEU = "RESPONDEU", "Respondeu"
+        INTERESSADA_CONSULTA = "INTERESSADA_CONSULTA", "Interessada na consulta"
+        VALOR_PASSADO = "VALOR_PASSADO", "Valor passado"
         CONCLUIDA = "CONCLUIDA", "Cadência concluída"
 
     nome = models.CharField("nome do paciente", max_length=150)
@@ -184,6 +187,15 @@ class Lead(ModeloDaOrganizacao):
         ),
     )
 
+    respostas_formulario_manual = models.TextField(
+        blank=True, default="",
+        help_text=(
+            "Pra quando o lead foi cadastrado à mão (botão \"+ Novo lead\") a partir de "
+            "uma planilha/quiz externo: cole aqui as respostas, pra não precisar abrir "
+            "a planilha de novo depois. Some junto com o quadro \"Respostas do formulário\"."
+        ),
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -215,7 +227,13 @@ class Lead(ModeloDaOrganizacao):
         return self.consultas.exclude(status="CANCELADA").order_by("-data_hora").first()
 
     def registrar_historico(self, tipo, descricao, responsavel=None):
-        return self.historico.create(tipo=tipo, descricao=descricao, responsavel=responsavel)
+        # Guarda em que etapa a lead estava no momento — é o que permite
+        # depois contar, por dia, quantos "1º contato"/"2º contato"/etc. uma
+        # pessoa da equipe realmente fez (ver leads.views.relatorio_diario_sdr),
+        # sem precisar adivinhar isso a partir do texto livre da descrição.
+        return self.historico.create(
+            tipo=tipo, descricao=descricao, responsavel=responsavel, etapa_no_momento=self.etapa,
+        )
 
     @classmethod
     def buscar_por_paciente(cls, organizacao, paciente):
@@ -274,8 +292,15 @@ class Lead(ModeloDaOrganizacao):
 
     # As etapas exibidas como colunas no board (kanban) — a cadência
     # automática ainda usa CONCLUIDA como estado terminal de "sem resposta",
-    # mas essa etapa não tem coluna própria no board.
-    ETAPAS_KANBAN = [Etapa.NOVO, Etapa.CONTATO_1, Etapa.CONTATO_2, Etapa.CONTATO_3, Etapa.CONTATO_4]
+    # mas essa etapa não tem coluna própria no board. As três últimas
+    # (Respondeu, Interessada na consulta, Valor passado) não entram na
+    # cadência automática de tentativas (ORDEM_ETAPAS) — só são alcançadas
+    # por ação manual (marcar como respondido, ou arrastar o card), nunca
+    # pelo avanço automático de "sem resposta".
+    ETAPAS_KANBAN = [
+        Etapa.NOVO, Etapa.CONTATO_1, Etapa.CONTATO_2, Etapa.CONTATO_3, Etapa.CONTATO_4,
+        Etapa.RESPONDEU, Etapa.INTERESSADA_CONSULTA, Etapa.VALOR_PASSADO,
+    ]
 
     def avancar_etapa(self):
         """Move a cadência para a próxima etapa e zera o contador de tentativas."""
@@ -304,15 +329,14 @@ class Lead(ModeloDaOrganizacao):
 
     def marcar_respondido(self, responsavel=None):
         """
-        Botão rápido do card no board: avança a cadência por resposta da lead,
-        sem precisar abrir a tela de detalhe. Para na última etapa da cadência
-        (4º contato) — não empurra sozinho para "cadência concluída".
+        Botão rápido do card no board: marca que a lead respondeu, movendo
+        direto pra coluna "Respondeu" — sem precisar abrir a tela de detalhe.
+        Daí pra frente, o avanço (Interessada na consulta, Valor passado) é
+        manual, arrastando o card — essas etapas não têm mais a ver com
+        "quantas tentativas de contato", e sim com o andamento da conversa.
         """
-        indice = self.ORDEM_ETAPAS.index(self.etapa)
-        indice_maximo = self.ORDEM_ETAPAS.index(self.Etapa.CONTATO_4)
         etapa_anterior = self.get_etapa_display()
-        if indice < indice_maximo:
-            self.etapa = self.ORDEM_ETAPAS[indice + 1]
+        self.etapa = self.Etapa.RESPONDEU
         self.status = self.Status.EM_ANDAMENTO
         self.tentativas_etapa_atual = 0
         self.ultimo_contato_em = timezone.now()
@@ -321,7 +345,7 @@ class Lead(ModeloDaOrganizacao):
         ])
         self.registrar_historico(
             HistoricoLead.Tipo.RESPOSTA,
-            f"Marcado como respondido — avançou de {etapa_anterior} para {self.get_etapa_display()}",
+            f"Marcado como respondido — movido de {etapa_anterior} para Respondeu",
             responsavel,
         )
 
@@ -345,6 +369,10 @@ class HistoricoLead(models.Model):
     descricao = models.CharField(max_length=500)
     responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    etapa_no_momento = models.CharField(
+        max_length=30, choices=Lead.Etapa.choices, blank=True, default="",
+        help_text="Em qual etapa a lead estava quando isso aconteceu — preenchido automaticamente.",
     )
 
     class Meta:

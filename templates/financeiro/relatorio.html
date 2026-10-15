@@ -15,6 +15,17 @@
         <button type="submit">Filtrar</button>
     </form>
 
+    <form class="filtro" method="get" style="margin-top:-.5rem;">
+        <div>
+            <label for="paciente">Ou buscar por paciente (mostra todos os lançamentos dela, de qualquer período)</label>
+            <input type="text" id="paciente" name="paciente" value="{{ paciente_busca }}" placeholder="Nome da paciente" style="min-width:260px;">
+        </div>
+        <button type="submit">Buscar</button>
+        {% if paciente_busca %}
+            <a href="{% url 'financeiro:relatorio' %}" class="btn btn-secondary" style="padding:.4rem .8rem; font-size:.85rem;">Limpar busca</a>
+        {% endif %}
+    </form>
+
     <div class="grid">
         <div class="card stat">
             <div class="num">R$ {{ total_pago|floatformat:2 }}</div>
@@ -25,6 +36,31 @@
             <div>Total pendente no período</div>
         </div>
     </div>
+
+    {% if vendas_kit_mentora %}
+        <div class="card stat" style="background:#a855f711; border:1px solid #a855f733;">
+            <div class="num">R$ {{ vendas_kit_mentora.total_pago|floatformat:2 }}</div>
+            <div>
+                Recebido de vendas de kit pras mentoradas no período
+                (vendido: R$ {{ vendas_kit_mentora.total_vendido|floatformat:2 }} em
+                {{ vendas_kit_mentora.qtd }} venda{{ vendas_kit_mentora.qtd|pluralize }})
+                — receita à parte, não incluída nos totais acima.
+                <a href="{% url 'core:vendas_kit_mentoradas' %}">Ver detalhes ›</a>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if mentoria %}
+        <div class="card stat" style="background:#0ea5e911; border:1px solid #0ea5e933;">
+            <div class="num">R$ {{ mentoria.total_recebido|floatformat:2 }}</div>
+            <div>
+                Recebido de mentoria no período
+                ({{ mentoria.qtd }} parcela{{ mentoria.qtd|pluralize }} paga{{ mentoria.qtd|pluralize }})
+                — receita à parte, não incluída nos totais acima.
+                <a href="{% url 'core:pagamentos_mentoria' %}">Ver detalhes ›</a>
+            </div>
+        </div>
+    {% endif %}
 
     <div class="card">
         <h2>Recebido por forma de pagamento</h2>
@@ -65,7 +101,13 @@
     </div>
 
     <div class="card">
-        <h2>Lançamentos no período</h2>
+        <h2>
+            {% if paciente_busca %}
+                Lançamentos de "{{ paciente_busca }}" (todos os períodos)
+            {% else %}
+                Lançamentos no período
+            {% endif %}
+        </h2>
         <table>
             <thead>
                 <tr><th>Vencimento</th><th>Paciente</th><th>Total</th><th>Recebido</th><th>Pendente</th><th>Status</th><th></th></tr>

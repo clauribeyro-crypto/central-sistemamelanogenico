@@ -5,6 +5,21 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 
 
+def rotular_dados_formulario(dados_formulario):
+    """
+    Transforma as chaves cruas do formulário/quiz externo (ex.: 'qual_sua_renda')
+    em rótulos legíveis — usado tanto na ficha do lead quanto na ficha da
+    paciente, pra mostrar as respostas do quiz sem precisar abrir a planilha.
+    """
+    rotulos = []
+    for chave, valor in dados_formulario.items():
+        rotulo = chave.replace("_", " ").replace("-", " ").strip()
+        if rotulo and rotulo[0].islower():
+            rotulo = rotulo[0].upper() + rotulo[1:]
+        rotulos.append((rotulo or chave, valor))
+    return rotulos
+
+
 def organizacao_do_usuario(request):
     """
     Retorna a organização à qual as telas do sistema (painel do dia, kanban,

@@ -19,7 +19,7 @@ from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.models import Usuario
-from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, rotular_dados_formulario
 from financeiro.models import Pagamento
 from financeiro.views import MESES
 from pacientes.models import Paciente
@@ -410,6 +410,58 @@ def painel_marketing(request):
             "total": sum(valores),
         })
 
+    # "Atividade da equipe no período" — chamados (WhatsApp/ligação) e
+    # movimentações (mudança de status/etapa) são automáticos, direto do
+    # histórico do CRM (mesmo cálculo da home, só que pro mês inteiro em vez
+    # de só hoje); agendamentos reaproveita a contagem já feita acima.
+    chamados_periodo = {
+        row["responsavel_id"]: row["total"]
+        for row in (
+            HistoricoLead.objects.filter(
+                lead__organizacao=org, responsavel__isnull=False,
+                tipo__in=[HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO],
+                data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+            )
+            .values("responsavel_id")
+            .annotate(total=Count("lead_id", distinct=True))
+        )
+    }
+    movimentacoes_periodo = {
+        row["responsavel_id"]: row["total"]
+        for row in (
+            HistoricoLead.objects.filter(
+                lead__organizacao=org, responsavel__isnull=False,
+                tipo=HistoricoLead.Tipo.STATUS,
+                data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+            )
+            .values("responsavel_id")
+            .annotate(total=Count("lead_id", distinct=True))
+        )
+    }
+    agendamentos_por_pessoa = {
+        responsavel_id: sum(
+            contagem_agendamentos.get((responsavel_id, o.pk), 0) for o in origens
+        )
+        for responsavel_id in responsaveis_ids
+    }
+    todas_pessoas_ids = set(chamados_periodo) | set(movimentacoes_periodo) | responsaveis_ids
+    nomes_atividade = {
+        **nomes_responsaveis,
+        **{
+            u.pk: str(u)
+            for u in Usuario.objects.filter(pk__in=[pid for pid in todas_pessoas_ids if pid])
+        },
+    }
+    atividade_equipe = [
+        {
+            "nome": nomes_atividade.get(pid, "Sem responsável definido"),
+            "chamados": chamados_periodo.get(pid, 0),
+            "movimentacoes": movimentacoes_periodo.get(pid, 0),
+            "agendamentos": agendamentos_por_pessoa.get(pid, 0),
+        }
+        for pid in sorted(todas_pessoas_ids, key=lambda pid: nomes_atividade.get(pid, ""))
+    ]
+
     contexto = {
         "formset": formset,
         "linhas": linhas,
@@ -417,6 +469,7 @@ def painel_marketing(request):
         "origens": origens,
         "origem_resumo": origem_resumo,
         "matriz_quem_agendou": matriz_quem_agendou,
+        "atividade_equipe": atividade_equipe,
         "ano": ano,
         "mes": mes,
         "mes_nome": dict(MESES)[mes],
@@ -424,6 +477,185 @@ def painel_marketing(request):
         "anos": range(hoje.year - 3, hoje.year + 2),
     }
     return render(request, "leads/painel_marketing.html", contexto)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+def relatorio_diario_sdr(request):
+    """
+    Dia a dia (não só o total do mês) de quanto cada pessoa da equipe fez de
+    contato em cada etapa da cadência (1º a 4º contato), quantas leads
+    responderam, quantas ficaram interessadas na consulta, quantas já
+    receberam o valor e quantos agendamentos fecharam — direto do histórico
+    do CRM, usando `HistoricoLead.etapa_no_momento` (a etapa da lead no
+    instante exato de cada ação) pra não depender de texto livre.
+
+    Cada contagem é de LEADS DIFERENTES, não de ações/mensagens — reenviar
+    uma mensagem pro mesmo lead no mesmo dia e na mesma etapa conta como 1,
+    não 2 (ver `Count("lead_id", distinct=True)` abaixo).
+    """
+    org = organizacao_do_usuario(request)
+    hoje = timezone.localdate()
+
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+    except ValueError:
+        ano = hoje.year
+    try:
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        mes = hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+
+    try:
+        pessoa_id = int(request.GET.get("pessoa") or 0) or None
+    except ValueError:
+        pessoa_id = None
+
+    ultimo_dia_mes = calendar.monthrange(ano, mes)[1]
+
+    try:
+        dia = int(request.GET.get("dia") or 0) or None
+    except ValueError:
+        dia = None
+    if dia is not None and not (1 <= dia <= ultimo_dia_mes):
+        dia = None
+
+    if dia is not None:
+        data_inicio = data_fim = datetime.date(ano, mes, dia)
+    else:
+        data_inicio = datetime.date(ano, mes, 1)
+        data_fim = min(datetime.date(ano, mes, ultimo_dia_mes), hoje)
+
+    pessoas = Usuario.objects.filter(
+        organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True
+    ).order_by("first_name", "username")
+
+    # STATUS entra em todas as colunas (além de WHATSAPP/LIGACAO no 1º-4º
+    # contato): sem isso, uma lead que a Mayara arrastou manualmente de uma
+    # coluna pra outra (em vez de clicar em "Registrar ligação"/"Enviar
+    # WhatsApp") não contava como atividade dela no 1º/2º/3º/4º contato,
+    # mesmo ela tendo mexido na lead naquele dia.
+    COLUNAS = [
+        (
+            "contato_1", "1º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_1,
+        ),
+        (
+            "contato_2", "2º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_2,
+        ),
+        (
+            "contato_3", "3º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_3,
+        ),
+        (
+            "contato_4", "4º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_4,
+        ),
+        ("respondeu", "Respondeu", (HistoricoLead.Tipo.RESPOSTA,), Lead.Etapa.RESPONDEU),
+        ("interessada", "Interessada na consulta", (HistoricoLead.Tipo.STATUS,), Lead.Etapa.INTERESSADA_CONSULTA),
+        ("valor_passado", "Valor passado", (HistoricoLead.Tipo.STATUS,), Lead.Etapa.VALOR_PASSADO),
+    ]
+
+    historico_qs = HistoricoLead.objects.filter(
+        lead__organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+        responsavel__isnull=False,
+    )
+    if pessoa_id:
+        historico_qs = historico_qs.filter(responsavel_id=pessoa_id)
+
+    # Conta LEADS DIFERENTES, não ações — se ela mandar duas mensagens pro
+    # mesmo lead no mesmo dia e na mesma etapa (ex.: reenviar porque não
+    # entregou), isso continua sendo "1 lead contatado", não 2. Do mesmo
+    # jeito, se o mesmo lead for contatado em mais de uma etapa no mesmo dia
+    # (ex.: ela manda o 1º contato de manhã e, já tendo arrastado o card, o
+    # 2º contato à tarde), cada etapa conta como 1 — são ações diferentes de
+    # verdade —, mas o "Total de leads contatados" (mais abaixo) não soma
+    # esse lead duas vezes.
+    contagens = {}
+    for chave, _rotulo, tipos, etapa in COLUNAS:
+        for row in (
+            historico_qs.filter(tipo__in=tipos, etapa_no_momento=etapa)
+            .values("responsavel_id", "data_hora__date")
+            .annotate(total=Count("lead_id", distinct=True))
+        ):
+            contagens[(chave, row["responsavel_id"], row["data_hora__date"])] = row["total"]
+
+    # Total de leads diferentes contatados no dia (1º a 4º contato juntos,
+    # sem repetir o mesmo lead que passou por mais de uma etapa no mesmo dia)
+    # — é o número que responde "quantas pessoas ela chamou hoje, no total".
+    total_contatados_por_dia_pessoa = {
+        (row["responsavel_id"], row["data_hora__date"]): row["total"]
+        for row in (
+            historico_qs.filter(tipo__in=(HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO))
+            .values("responsavel_id", "data_hora__date")
+            .annotate(total=Count("lead_id", distinct=True))
+        )
+    }
+
+    agendamentos_por_dia_pessoa = {
+        (row["responsavel_id"], row["data_hora__date"]): row["total"]
+        for row in (
+            historico_qs.filter(tipo=HistoricoLead.Tipo.AGENDAMENTO)
+            .values("responsavel_id", "data_hora__date")
+            .annotate(total=Count("lead_id", distinct=True))
+        )
+    }
+
+    pessoas_do_relatorio = pessoas.filter(pk=pessoa_id) if pessoa_id else pessoas
+    linhas = []
+    dia_atual = data_inicio
+    while dia_atual <= data_fim:
+        for pessoa in pessoas_do_relatorio:
+            # Lista na MESMA ordem de COLUNAS (não dict) — o template só
+            # percorre as duas listas lado a lado, sem precisar de lookup
+            # por chave variável (que o Django template não faz sozinho).
+            valores = [contagens.get((chave, pessoa.pk, dia_atual), 0) for chave, *_ in COLUNAS]
+            total_contatados = total_contatados_por_dia_pessoa.get((pessoa.pk, dia_atual), 0)
+            agendamentos = agendamentos_por_dia_pessoa.get((pessoa.pk, dia_atual), 0)
+            if any(valores) or agendamentos:
+                linhas.append({
+                    "data": dia_atual, "pessoa": pessoa, "valores": valores,
+                    "total_contatados": total_contatados, "agendamentos": agendamentos,
+                })
+        dia_atual += datetime.timedelta(days=1)
+    linhas.sort(key=lambda linha: (linha["data"], str(linha["pessoa"])), reverse=True)
+
+    totais_colunas = [sum(l["valores"][i] for l in linhas) for i in range(len(COLUNAS))]
+    total_contatados_geral = sum(l["total_contatados"] for l in linhas)
+    total_agendamentos = sum(l["agendamentos"] for l in linhas)
+
+    # Resumo geral do período — além do total por coluna (horizontal), a
+    # visão de conjunto que faltava: quanto deu no total somando tudo junto.
+    indice_respondeu = next(i for i, (chave, *_resto) in enumerate(COLUNAS) if chave == "respondeu")
+    total_responderam_geral = totais_colunas[indice_respondeu]
+    total_movimentacoes_geral = sum(totais_colunas)
+
+    contexto = {
+        "colunas": COLUNAS,
+        "linhas": linhas,
+        "totais_colunas": totais_colunas,
+        "total_contatados_geral": total_contatados_geral,
+        "total_agendamentos": total_agendamentos,
+        "total_responderam_geral": total_responderam_geral,
+        "total_movimentacoes_geral": total_movimentacoes_geral,
+        "pessoas": pessoas,
+        "pessoa_id": pessoa_id,
+        "ano": ano,
+        "mes": mes,
+        "mes_nome": dict(MESES)[mes],
+        "meses": MESES,
+        "anos": range(hoje.year - 3, hoje.year + 2),
+        "dia": dia,
+        "dias_do_mes": range(1, ultimo_dia_mes + 1),
+    }
+    return render(request, "leads/relatorio_diario_sdr.html", contexto)
 
 
 @login_required
@@ -486,17 +718,6 @@ def editar_lead(request, pk):
     return render(request, "leads/editar.html", {"lead": lead, "form": form})
 
 
-def _rotular_dados_formulario(dados_formulario):
-    """Transforma as chaves cruas do formulário (ex.: 'qual_sua_renda') em rótulos legíveis."""
-    rotulos = []
-    for chave, valor in dados_formulario.items():
-        rotulo = chave.replace("_", " ").replace("-", " ").strip()
-        if rotulo and rotulo[0].islower():
-            rotulo = rotulo[0].upper() + rotulo[1:]
-        rotulos.append((rotulo or chave, valor))
-    return rotulos
-
-
 @login_required
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def detalhe(request, pk):
@@ -506,7 +727,7 @@ def detalhe(request, pk):
 
     contexto = {
         "lead": lead,
-        "dados_formulario": _rotular_dados_formulario(lead.dados_formulario),
+        "dados_formulario": rotular_dados_formulario(lead.dados_formulario),
         "historico": historico,
         "pausa_ativa": lead.pausa_ativa,
         "pode_agir": lead.status not in (Lead.Status.AGENDADA, Lead.Status.PERDIDA),
@@ -611,10 +832,14 @@ def resultado_contato(request, pk):
         form = ResultadoContatoForm(request.POST)
         if form.is_valid():
             if form.cleaned_data["resultado"] == "RESPONDEU":
+                etapa_anterior = lead.get_etapa_display()
                 lead.status = Lead.Status.EM_ANDAMENTO
-                lead.save(update_fields=["status", "atualizado_em"])
-                lead.registrar_historico(HistoricoLead.Tipo.RESPOSTA, "Lead respondeu", request.user)
-                messages.success(request, "Marcado como 'em andamento'. Decida o próximo passo.")
+                lead.etapa = Lead.Etapa.RESPONDEU
+                lead.save(update_fields=["status", "etapa", "atualizado_em"])
+                lead.registrar_historico(
+                    HistoricoLead.Tipo.RESPOSTA, f"Lead respondeu (estava em {etapa_anterior})", request.user
+                )
+                messages.success(request, "Lead movido pra 'Respondeu'. Avance pro próximo passo quando for o caso.")
             else:
                 etapa_anterior = lead.get_etapa_display()
                 lead.avancar_etapa()
