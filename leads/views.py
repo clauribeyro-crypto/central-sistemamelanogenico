@@ -620,12 +620,20 @@ def relatorio_diario_sdr(request):
     total_contatados_geral = sum(l["total_contatados"] for l in linhas)
     total_agendamentos = sum(l["agendamentos"] for l in linhas)
 
+    # Resumo geral do período — além do total por coluna (horizontal), a
+    # visão de conjunto que faltava: quanto deu no total somando tudo junto.
+    indice_respondeu = next(i for i, (chave, *_resto) in enumerate(COLUNAS) if chave == "respondeu")
+    total_responderam_geral = totais_colunas[indice_respondeu]
+    total_movimentacoes_geral = sum(totais_colunas)
+
     contexto = {
         "colunas": COLUNAS,
         "linhas": linhas,
         "totais_colunas": totais_colunas,
         "total_contatados_geral": total_contatados_geral,
         "total_agendamentos": total_agendamentos,
+        "total_responderam_geral": total_responderam_geral,
+        "total_movimentacoes_geral": total_movimentacoes_geral,
         "pessoas": pessoas,
         "pessoa_id": pessoa_id,
         "ano": ano,

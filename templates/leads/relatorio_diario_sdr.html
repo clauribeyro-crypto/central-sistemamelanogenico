@@ -41,6 +41,25 @@
 
     <h2 style="margin-bottom:.5rem;">{{ mes_nome }}/{{ ano|stringformat:'d' }}</h2>
 
+    <div class="grid" style="margin-bottom:1rem;">
+        <div class="card stat">
+            <div class="num">{{ total_contatados_geral }}</div>
+            <div class="rotulo">Total de leads chamados no período</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ total_movimentacoes_geral }}</div>
+            <div class="rotulo">Total de movimentações no período (somando todas as etapas)</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ total_responderam_geral }}</div>
+            <div class="rotulo">Total de leads com quem ela conversou (responderam)</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ total_agendamentos }}</div>
+            <div class="rotulo">Total de agendamentos no período</div>
+        </div>
+    </div>
+
     <div class="card">
         <table>
             <thead>
