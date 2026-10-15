@@ -401,24 +401,27 @@
         </div>
     {% endif %}
 
-    {% if org.modulo_leads_ativo and leads_parados %}
+    {% if org.modulo_leads_ativo and leads_parados_por_etapa %}
         <div class="card">
-            <h2>💤 Leads parados</h2>
+            <h2>💤 Leads parados ({{ total_leads_parados }})</h2>
             <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
-                Sem nenhuma atualização de status há {{ dias_lead_parado }} dias ou mais, não importa a etapa em que estão.
+                Sem nenhuma atualização de status há {{ dias_lead_parado }} dias ou mais — agrupado por etapa,
+                pra ver exatamente onde cada um está parado (ex.: quem já passou o valor da consulta e não andou).
             </p>
-            <table>
-                <thead><tr><th>Lead</th><th>Etapa atual</th><th>Sem atualização há</th></tr></thead>
-                <tbody>
-                {% for item in leads_parados %}
-                    <tr>
-                        <td><a href="{% url 'leads:detalhe' item.lead.pk %}">{{ item.lead.nome }}</a></td>
-                        <td>{{ item.lead.get_etapa_display }}</td>
-                        <td>{{ item.dias }} dia{{ item.dias|pluralize }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
+            {% for grupo in leads_parados_por_etapa %}
+                <h3 style="margin-bottom:.4rem;">{{ grupo.etapa }} ({{ grupo.total }})</h3>
+                <table style="margin-bottom:1.25rem;">
+                    <thead><tr><th>Lead</th><th>Sem atualização há</th></tr></thead>
+                    <tbody>
+                    {% for item in grupo.leads %}
+                        <tr>
+                            <td><a href="{% url 'leads:detalhe' item.lead.pk %}">{{ item.lead.nome }}</a></td>
+                            <td>{{ item.dias }} dia{{ item.dias|pluralize }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            {% endfor %}
         </div>
     {% endif %}
 

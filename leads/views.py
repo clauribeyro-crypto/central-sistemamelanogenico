@@ -521,11 +521,32 @@ def relatorio_diario_sdr(request):
         organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True
     ).order_by("first_name", "username")
 
+    # STATUS entra em todas as colunas (além de WHATSAPP/LIGACAO no 1º-4º
+    # contato): sem isso, uma lead que a Mayara arrastou manualmente de uma
+    # coluna pra outra (em vez de clicar em "Registrar ligação"/"Enviar
+    # WhatsApp") não contava como atividade dela no 1º/2º/3º/4º contato,
+    # mesmo ela tendo mexido na lead naquele dia.
     COLUNAS = [
-        ("contato_1", "1º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_1),
-        ("contato_2", "2º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_2),
-        ("contato_3", "3º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_3),
-        ("contato_4", "4º contato", (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO), Lead.Etapa.CONTATO_4),
+        (
+            "contato_1", "1º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_1,
+        ),
+        (
+            "contato_2", "2º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_2,
+        ),
+        (
+            "contato_3", "3º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_3,
+        ),
+        (
+            "contato_4", "4º contato",
+            (HistoricoLead.Tipo.WHATSAPP, HistoricoLead.Tipo.LIGACAO, HistoricoLead.Tipo.STATUS),
+            Lead.Etapa.CONTATO_4,
+        ),
         ("respondeu", "Respondeu", (HistoricoLead.Tipo.RESPOSTA,), Lead.Etapa.RESPONDEU),
         ("interessada", "Interessada na consulta", (HistoricoLead.Tipo.STATUS,), Lead.Etapa.INTERESSADA_CONSULTA),
         ("valor_passado", "Valor passado", (HistoricoLead.Tipo.STATUS,), Lead.Etapa.VALOR_PASSADO),

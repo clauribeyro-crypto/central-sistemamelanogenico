@@ -94,6 +94,30 @@ def home(request):
     limite_parado = timezone.now() - datetime.timedelta(days=org.dias_lead_parado)
     leads_parados = leads_ativos.filter(atualizado_em__lte=limite_parado).order_by("atualizado_em")
 
+    # Agrupado por etapa — sem isso, dava pra ver que tem N leads parados no
+    # total, mas não dava pra responder "onde estão parados, especificamente
+    # quem já passou o valor da consulta?" sem abrir o board e contar card
+    # por card. Mostra todos (sem cortar em 12), pra não esconder quem está
+    # parado numa etapa só porque outra etapa tem mais gente parada há mais
+    # tempo.
+    rotulos_etapa = dict(Lead.Etapa.choices)
+    leads_por_etapa = {}
+    for lead in leads_parados:
+        leads_por_etapa.setdefault(lead.etapa, []).append(lead)
+    leads_parados_por_etapa = [
+        {
+            "etapa": rotulos_etapa.get(etapa_valor, etapa_valor),
+            "total": len(leads_da_etapa),
+            "leads": [
+                {"lead": lead, "dias": (hoje - timezone.localtime(lead.atualizado_em).date()).days}
+                for lead in leads_da_etapa
+            ],
+        }
+        for etapa_valor in Lead.ETAPAS_KANBAN
+        for leads_da_etapa in [leads_por_etapa.get(etapa_valor, [])]
+        if leads_da_etapa
+    ]
+
     alertas_acompanhamentos = []
     for acomp in Acompanhamento.objects.filter(
         organizacao=org, status__in=Acompanhamento.STATUS_ATIVOS
@@ -111,11 +135,8 @@ def home(request):
         "contato_4": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_4).count(),
         "retomar_hoje": leads_pausados_hoje.count(),
         "atrasados": [lead for lead in leads_ativos if lead.esta_atrasado],
-        "leads_parados": [
-            {"lead": lead, "dias": (hoje - timezone.localtime(lead.atualizado_em).date()).days}
-            for lead in leads_parados[:12]
-        ],
-        "total_leads_parados": leads_parados.count(),
+        "leads_parados_por_etapa": leads_parados_por_etapa,
+        "total_leads_parados": len(leads_parados),
         "dias_lead_parado": org.dias_lead_parado,
         "fila": fila[:12],
         "alertas_acompanhamentos": alertas_acompanhamentos[:10],
