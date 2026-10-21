@@ -218,10 +218,11 @@ def consultas_agendadas_no_mes(org, ano, mes):
         Consulta.objects.filter(
             organizacao=org, criado_em__date__gte=data_inicio, criado_em__date__lte=data_fim, valor__gt=0,
         ).exclude(status=Consulta.Status.CANCELADA)
+        .exclude(reagendamentos__isnull=False)
         .select_related("paciente", "tipo_consulta").order_by("criado_em")
     )
     for c in consultas:
-        pagamento = c.pagamentos.first()
+        pagamento = c.pagamento_vinculado()
         c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
     return consultas
 
@@ -265,10 +266,11 @@ def totais_fechamentos_mes(org, ano, mes):
         Consulta.objects.filter(
             organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim, valor__gt=0,
         ).exclude(status=Consulta.Status.CANCELADA)
+        .exclude(reagendamentos__isnull=False)
         .select_related("paciente", "tipo_consulta", "profissional").order_by("data_hora")
     )
     for c in consultas:
-        pagamento = c.pagamentos.first()
+        pagamento = c.pagamento_vinculado()
         c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
     total_consultas = sum((c.valor for c in consultas), Decimal("0.00"))
     total_recebido_consultas = sum((c.total_recebido for c in consultas), Decimal("0.00"))
