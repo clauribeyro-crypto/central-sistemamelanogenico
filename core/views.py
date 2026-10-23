@@ -44,12 +44,18 @@ def _leads_agendados_no_mes(org, ano, mes, pessoa):
     consulta vinculada — é a base tanto da comissão da SDR (só conta quem
     realmente pagou, não qualquer agendamento: se a paciente não aparece e
     não paga, não gera comissão) quanto da conferência da administradora.
+
+    Leads de origem marcada como "para mentoria" (profissional interessado
+    em fazer a mentoria, não paciente da clínica) nem entram na lista — não
+    são da mesma natureza de um agendamento de consulta e nunca geram
+    comissão de agendamento.
     """
     historico = (
         HistoricoLead.objects.filter(
             lead__organizacao=org, tipo=HistoricoLead.Tipo.AGENDAMENTO, responsavel=pessoa,
             data_hora__year=ano, data_hora__month=mes,
         )
+        .exclude(lead__origem__para_mentoria=True)
         .select_related("lead").order_by("lead_id", "data_hora")
     )
     vistos = set()

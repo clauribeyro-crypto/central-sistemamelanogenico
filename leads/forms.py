@@ -9,7 +9,7 @@ from .models import Lead, MotivoPerda, Origem, RegistroMarketingDiario, Registro
 class OrigemForm(forms.ModelForm):
     class Meta:
         model = Origem
-        fields = ["nome", "ativo"]
+        fields = ["nome", "ativo", "para_mentoria"]
 
     def __init__(self, *args, organizacao=None, **kwargs):
         super().__init__(*args, **kwargs)

@@ -12,6 +12,15 @@ class Origem(ModeloDaOrganizacao):
 
     nome = models.CharField(max_length=80)
     ativo = models.BooleanField(default=True)
+    para_mentoria = models.BooleanField(
+        "é sobre mentoria (não é paciente)",
+        default=False,
+        help_text=(
+            "Marque quando essa origem é de profissionais interessados em fazer a mentoria "
+            "(ex.: \"Interessados em mentoria\"), não de pacientes da clínica. Leads com essa "
+            "origem não contam pra comissão de agendamento da equipe comercial."
+        ),
+    )
 
     class Meta:
         verbose_name = "origem do lead"
