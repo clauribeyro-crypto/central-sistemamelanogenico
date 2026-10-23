@@ -208,6 +208,34 @@ def home(request):
                 ).select_related("contrato__mentorada").order_by("data_prevista")[:10]
             )
 
+            # Lista (por pessoa) dos leads agendados no mês, do jeito que a
+            # comissão da SDR é calculada — pra comparar lado a lado com a
+            # lista de consultas acima e achar sozinha, sem precisar logar
+            # como a pessoa, qual lead está contando num lado e não no outro.
+            detalhe_agendamentos_por_pessoa = []
+            for pessoa in Usuario.objects.filter(
+                organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True
+            ).order_by("first_name", "username"):
+                historico_pessoa = (
+                    HistoricoLead.objects.filter(
+                        lead__organizacao=org, tipo=HistoricoLead.Tipo.AGENDAMENTO, responsavel=pessoa,
+                        data_hora__year=hoje.year, data_hora__month=hoje.month,
+                    )
+                    .select_related("lead").order_by("lead_id", "data_hora")
+                )
+                vistos = set()
+                leads_da_pessoa = []
+                for h in historico_pessoa:
+                    if h.lead_id in vistos:
+                        continue
+                    vistos.add(h.lead_id)
+                    leads_da_pessoa.append(h)
+                if leads_da_pessoa:
+                    detalhe_agendamentos_por_pessoa.append({
+                        "pessoa": pessoa, "leads": leads_da_pessoa, "total": len(leads_da_pessoa),
+                    })
+            contexto["meta_mes"]["detalhe_agendamentos_por_pessoa"] = detalhe_agendamentos_por_pessoa
+
     if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         contexto["total_fila_fechamento"] = Paciente.objects.filter(
             organizacao=org,

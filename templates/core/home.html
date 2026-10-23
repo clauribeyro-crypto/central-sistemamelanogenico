@@ -155,6 +155,36 @@
                 </details>
             {% endif %}
 
+            {% if request.user.is_superuser and meta_mes.detalhe_agendamentos_por_pessoa %}
+                {% for grupo in meta_mes.detalhe_agendamentos_por_pessoa %}
+                    <details style="margin-top:.5rem;">
+                        <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                            Ver os {{ grupo.total }} leads que {{ grupo.pessoa }} agendou este mês (usado pra comissão dela)
+                        </summary>
+                        <table style="margin-top:.5rem;">
+                            <thead>
+                                <tr><th>Agendado em</th><th>Lead</th><th>Paciente vinculada</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for h in grupo.leads %}
+                                    <tr>
+                                        <td>{{ h.data_hora|date:"d/m/Y H:i" }}</td>
+                                        <td><a href="{% url 'leads:detalhe' h.lead_id %}">{{ h.lead.nome }}</a></td>
+                                        <td>
+                                            {% if h.lead.paciente %}
+                                                <a href="{% url 'pacientes:ficha' h.lead.paciente_id %}">{{ h.lead.paciente }}</a>
+                                            {% else %}
+                                                <span style="color:var(--text-muted);">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </details>
+                {% endfor %}
+            {% endif %}
+
             {% if usuario_e_administrador %}
                 <details style="margin-top:.75rem;">
                     <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">Ajustar meta</summary>
