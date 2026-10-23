@@ -169,7 +169,9 @@ def home(request):
         # "Consultas já pagas" é a meta de agendamento da SDR — conta pela
         # data em que a consulta foi marcada no sistema, não pela data da
         # consulta em si (ver consultas_agendadas_no_mes).
-        consultas_agendadas = [c for c in consultas_agendadas_no_mes(org, hoje.year, hoje.month) if c.total_recebido > 0]
+        todas_consultas_agendadas_mes = consultas_agendadas_no_mes(org, hoje.year, hoje.month)
+        consultas_agendadas = [c for c in todas_consultas_agendadas_mes if c.total_recebido > 0]
+        consultas_sem_recebimento = [c for c in todas_consultas_agendadas_mes if c.total_recebido <= 0]
         qtd_consultas_pagas = len(consultas_agendadas)
         faltam_faturamento = max(org.meta_faturamento_mensal - faturado, Decimal("0.00"))
         faltam_consultas = max(org.meta_consultas_mensal - qtd_consultas_pagas, 0)
@@ -186,6 +188,7 @@ def home(request):
             "qtd_consultas": qtd_consultas_pagas,
             "faltam_consultas": faltam_consultas,
             "detalhe_consultas_agendadas": consultas_agendadas,
+            "detalhe_consultas_sem_recebimento": consultas_sem_recebimento,
             "meta_fechamentos": org.meta_fechamentos_mensal,
             "qtd_fechamentos": qtd_fechamentos_pagos,
             "faltam_fechamentos": faltam_fechamentos,

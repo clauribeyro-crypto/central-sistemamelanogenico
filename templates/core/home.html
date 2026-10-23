@@ -131,6 +131,30 @@
                 {% endif %}
             </details>
 
+            {% if meta_mes.detalhe_consultas_sem_recebimento %}
+                <details style="margin-top:.5rem;">
+                    <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                        Ver as {{ meta_mes.detalhe_consultas_sem_recebimento|length }} agendadas este mês que ainda não têm nenhum valor recebido
+                    </summary>
+                    <table style="margin-top:.5rem;">
+                        <thead>
+                            <tr><th>Agendada em</th><th>Data da consulta</th><th>Paciente</th><th>Tipo</th><th>Valor</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for c in meta_mes.detalhe_consultas_sem_recebimento %}
+                                <tr>
+                                    <td>{{ c.criado_em|date:"d/m/Y" }}</td>
+                                    <td>{{ c.data_hora|date:"d/m/Y" }}</td>
+                                    <td><a href="{% url 'agenda:detalhe_consulta' c.pk %}">{{ c.paciente }}</a></td>
+                                    <td>{{ c.tipo_consulta }}</td>
+                                    <td>R$ {{ c.valor|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </details>
+            {% endif %}
+
             {% if usuario_e_administrador %}
                 <details style="margin-top:.75rem;">
                     <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">Ajustar meta</summary>
