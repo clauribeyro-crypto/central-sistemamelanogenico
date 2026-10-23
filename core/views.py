@@ -37,6 +37,40 @@ BADGE_POR_ETAPA = {
 }
 
 
+def _leads_agendados_no_mes(org, ano, mes, pessoa):
+    """
+    Leads distintos que `pessoa` agendou no mês (um só por lead, mesmo que
+    ela tenha mexido nele mais de uma vez), já com o status de pagamento da
+    consulta vinculada — é a base tanto da comissão da SDR (só conta quem
+    realmente pagou, não qualquer agendamento: se a paciente não aparece e
+    não paga, não gera comissão) quanto da conferência da administradora.
+    """
+    historico = (
+        HistoricoLead.objects.filter(
+            lead__organizacao=org, tipo=HistoricoLead.Tipo.AGENDAMENTO, responsavel=pessoa,
+            data_hora__year=ano, data_hora__month=mes,
+        )
+        .select_related("lead").order_by("lead_id", "data_hora")
+    )
+    vistos = set()
+    linhas = []
+    for h in historico:
+        if h.lead_id in vistos:
+            continue
+        vistos.add(h.lead_id)
+        consultas_ativas = h.lead.consultas.exclude(
+            status=Consulta.Status.CANCELADA
+        ).exclude(reagendamentos__isnull=False)
+        pago = False
+        for consulta in consultas_ativas:
+            pagamento = consulta.pagamento_vinculado()
+            if pagamento and pagamento.total_recebido > 0:
+                pago = True
+                break
+        linhas.append({"historico": h, "lead": h.lead, "pago": pago})
+    return linhas
+
+
 def _linha_da_fila(lead, hoje):
     pausa = lead.pausa_ativa
     if pausa and pausa.data_retomada_prevista <= hoje:
@@ -209,30 +243,20 @@ def home(request):
             )
 
             # Lista (por pessoa) dos leads agendados no mês, do jeito que a
-            # comissão da SDR é calculada — pra comparar lado a lado com a
-            # lista de consultas acima e achar sozinha, sem precisar logar
-            # como a pessoa, qual lead está contando num lado e não no outro.
+            # comissão da SDR é calculada — mostra quais já pagaram (contam
+            # comissão) e quais ainda não (não contam), pra administradora
+            # conferir sem precisar logar como a pessoa.
             detalhe_agendamentos_por_pessoa = []
             for pessoa in Usuario.objects.filter(
                 organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True
             ).order_by("first_name", "username"):
-                historico_pessoa = (
-                    HistoricoLead.objects.filter(
-                        lead__organizacao=org, tipo=HistoricoLead.Tipo.AGENDAMENTO, responsavel=pessoa,
-                        data_hora__year=hoje.year, data_hora__month=hoje.month,
-                    )
-                    .select_related("lead").order_by("lead_id", "data_hora")
-                )
-                vistos = set()
-                leads_da_pessoa = []
-                for h in historico_pessoa:
-                    if h.lead_id in vistos:
-                        continue
-                    vistos.add(h.lead_id)
-                    leads_da_pessoa.append(h)
-                if leads_da_pessoa:
+                linhas_pessoa = _leads_agendados_no_mes(org, hoje.year, hoje.month, pessoa)
+                if linhas_pessoa:
                     detalhe_agendamentos_por_pessoa.append({
-                        "pessoa": pessoa, "leads": leads_da_pessoa, "total": len(leads_da_pessoa),
+                        "pessoa": pessoa,
+                        "leads": linhas_pessoa,
+                        "total": len(linhas_pessoa),
+                        "total_pagos": sum(1 for l in linhas_pessoa if l["pago"]),
                     })
             contexto["meta_mes"]["detalhe_agendamentos_por_pessoa"] = detalhe_agendamentos_por_pessoa
 
@@ -247,22 +271,20 @@ def home(request):
         ).distinct().count()
 
     if request.user.papel == Usuario.Papel.COMERCIAL:
-        # .distinct("lead_id") em vez de .count() direto: se a mesma lead for
-        # reagendada mais de uma vez no mês (ex.: a consulta foi excluída por
-        # engano e recriada), só a primeira agendada conta comissão — senão
-        # corrigir um agendamento vira comissão em dobro pela mesma lead.
-        agendamentos_mes = HistoricoLead.objects.filter(
-            lead__organizacao=org,
-            tipo=HistoricoLead.Tipo.AGENDAMENTO,
-            responsavel=request.user,
-            data_hora__year=hoje.year,
-            data_hora__month=hoje.month,
-        ).values("lead_id").distinct().count()
+        # Um lead só conta comissão se já tiver algum pagamento registrado —
+        # agendamento sem comparecimento e sem pagamento não gera comissão
+        # (ver _leads_agendados_no_mes). Um lead só é contado uma vez, mesmo
+        # que ela tenha mexido nele mais de uma vez no mês.
+        linhas_agendamentos = _leads_agendados_no_mes(org, hoje.year, hoje.month, request.user)
+        agendamentos_mes = sum(1 for l in linhas_agendamentos if l["pago"])
+        agendamentos_sem_pagamento = [l for l in linhas_agendamentos if not l["pago"]]
         comissao_agendamentos = agendamentos_mes * request.user.comissao_por_agendamento
         contexto["remuneracao"] = {
             "fixo_mensal": request.user.comissao_fixo_mensal,
             "valor_por_agendamento": request.user.comissao_por_agendamento,
             "agendamentos_mes": agendamentos_mes,
+            "detalhe_agendamentos": linhas_agendamentos,
+            "agendamentos_sem_pagamento": agendamentos_sem_pagamento,
             "comissao_agendamentos": comissao_agendamentos,
             "total_mes": request.user.comissao_fixo_mensal + comissao_agendamentos,
         }

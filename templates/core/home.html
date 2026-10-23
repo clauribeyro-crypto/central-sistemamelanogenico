@@ -159,22 +159,30 @@
                 {% for grupo in meta_mes.detalhe_agendamentos_por_pessoa %}
                     <details style="margin-top:.5rem;">
                         <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
-                            Ver os {{ grupo.total }} leads que {{ grupo.pessoa }} agendou este mês (usado pra comissão dela)
+                            Ver os {{ grupo.total }} leads que {{ grupo.pessoa }} agendou este mês
+                            ({{ grupo.total_pagos }} pagos — é esse o número que conta pra comissão dela)
                         </summary>
                         <table style="margin-top:.5rem;">
                             <thead>
-                                <tr><th>Agendado em</th><th>Lead</th><th>Paciente vinculada</th></tr>
+                                <tr><th>Agendado em</th><th>Lead</th><th>Paciente vinculada</th><th>Status</th></tr>
                             </thead>
                             <tbody>
-                                {% for h in grupo.leads %}
+                                {% for l in grupo.leads %}
                                     <tr>
-                                        <td>{{ h.data_hora|date:"d/m/Y H:i" }}</td>
-                                        <td><a href="{% url 'leads:detalhe' h.lead_id %}">{{ h.lead.nome }}</a></td>
+                                        <td>{{ l.historico.data_hora|date:"d/m/Y H:i" }}</td>
+                                        <td><a href="{% url 'leads:detalhe' l.lead.pk %}">{{ l.lead.nome }}</a></td>
                                         <td>
-                                            {% if h.lead.paciente %}
-                                                <a href="{% url 'pacientes:ficha' h.lead.paciente_id %}">{{ h.lead.paciente }}</a>
+                                            {% if l.lead.paciente %}
+                                                <a href="{% url 'pacientes:ficha' l.lead.paciente_id %}">{{ l.lead.paciente }}</a>
                                             {% else %}
                                                 <span style="color:var(--text-muted);">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if l.pago %}
+                                                <span class="badge">✓ Pago</span>
+                                            {% else %}
+                                                <span class="badge badge-neutro">Sem pagamento</span>
                                             {% endif %}
                                         </td>
                                     </tr>
@@ -276,7 +284,7 @@
                 </div>
                 <div class="card stat">
                     <div class="num">{{ remuneracao.agendamentos_mes }}</div>
-                    <div class="rotulo">Consultas agendadas por você este mês</div>
+                    <div class="rotulo">Agendamentos pagos este mês</div>
                 </div>
                 <div class="card stat">
                     <div class="num">R$ {{ remuneracao.comissao_agendamentos|floatformat:2 }}</div>
@@ -288,8 +296,37 @@
                 </div>
             </div>
             <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
-                Cada consulta agendada a partir de um lead que você atendeu no CRM soma à sua comissão. Quanto mais agendamentos, maior o total do mês. 🚀
+                Só conta comissão o lead que você agendou e que já pagou alguma coisa — se a paciente não aparece
+                e não paga, esse agendamento não soma. Quanto mais agendamentos pagos, maior o total do mês. 🚀
             </p>
+            {% if remuneracao.detalhe_agendamentos %}
+                <details style="margin-top:.75rem;">
+                    <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                        Ver os {{ remuneracao.detalhe_agendamentos|length }} leads que você agendou este mês
+                        ({{ remuneracao.agendamentos_mes }} pagos, {{ remuneracao.agendamentos_sem_pagamento|length }} ainda sem pagamento)
+                    </summary>
+                    <table style="margin-top:.5rem;">
+                        <thead>
+                            <tr><th>Agendado em</th><th>Lead</th><th>Status</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for l in remuneracao.detalhe_agendamentos %}
+                                <tr>
+                                    <td>{{ l.historico.data_hora|date:"d/m/Y H:i" }}</td>
+                                    <td><a href="{% url 'leads:detalhe' l.lead.pk %}">{{ l.lead.nome }}</a></td>
+                                    <td>
+                                        {% if l.pago %}
+                                            <span class="badge">✓ Pago — conta comissão</span>
+                                        {% else %}
+                                            <span class="badge badge-neutro">Ainda sem pagamento</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </details>
+            {% endif %}
         </div>
     {% endif %}
 
