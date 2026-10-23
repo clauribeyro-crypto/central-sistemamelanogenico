@@ -5,19 +5,28 @@ from decimal import Decimal
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Sum
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.models import Organizacao, Usuario
 from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Venda
 from financeiro.models import Pagamento
-from financeiro.views import MESES, totais_fechamentos_mes
+from financeiro.views import (
+    MESES, consultas_agendadas_no_mes, detalhe_recebido_no_periodo, recebido_no_periodo, totais_fechamentos_mes,
+)
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
 from pacientes.models import Paciente
 from programas.models import Acompanhamento
+
+from .forms import ContratoMentoriaForm, ParcelaMentoriaForm, VendaKitMentoraForm
+from .models import (
+    ContratoMentoria, ParcelaMentoria, VendaKitMentora, totais_mentoria_no_periodo,
+    totais_vendas_kit_mentora_no_periodo,
+)
 
 BADGE_POR_ETAPA = {
     Lead.Etapa.NOVO: "1º contato",
@@ -26,6 +35,46 @@ BADGE_POR_ETAPA = {
     Lead.Etapa.CONTATO_3: "3º contato — prova social",
     Lead.Etapa.CONTATO_4: "4º contato — encerramento",
 }
+
+
+def _leads_agendados_no_mes(org, ano, mes, pessoa):
+    """
+    Leads distintos que `pessoa` agendou no mês (um só por lead, mesmo que
+    ela tenha mexido nele mais de uma vez), já com o status de pagamento da
+    consulta vinculada — é a base tanto da comissão da SDR (só conta quem
+    realmente pagou, não qualquer agendamento: se a paciente não aparece e
+    não paga, não gera comissão) quanto da conferência da administradora.
+
+    Leads de origem marcada como "para mentoria" (profissional interessado
+    em fazer a mentoria, não paciente da clínica) nem entram na lista — não
+    são da mesma natureza de um agendamento de consulta e nunca geram
+    comissão de agendamento.
+    """
+    historico = (
+        HistoricoLead.objects.filter(
+            lead__organizacao=org, tipo=HistoricoLead.Tipo.AGENDAMENTO, responsavel=pessoa,
+            data_hora__year=ano, data_hora__month=mes,
+        )
+        .exclude(lead__origem__para_mentoria=True)
+        .select_related("lead").order_by("lead_id", "data_hora")
+    )
+    vistos = set()
+    linhas = []
+    for h in historico:
+        if h.lead_id in vistos:
+            continue
+        vistos.add(h.lead_id)
+        consultas_ativas = h.lead.consultas.exclude(
+            status=Consulta.Status.CANCELADA
+        ).exclude(reagendamentos__isnull=False)
+        pago = False
+        for consulta in consultas_ativas:
+            pagamento = consulta.pagamento_vinculado()
+            if pagamento and pagamento.total_recebido > 0:
+                pago = True
+                break
+        linhas.append({"historico": h, "lead": h.lead, "pago": pago})
+    return linhas
 
 
 def _linha_da_fila(lead, hoje):
@@ -85,6 +134,30 @@ def home(request):
     limite_parado = timezone.now() - datetime.timedelta(days=org.dias_lead_parado)
     leads_parados = leads_ativos.filter(atualizado_em__lte=limite_parado).order_by("atualizado_em")
 
+    # Agrupado por etapa — sem isso, dava pra ver que tem N leads parados no
+    # total, mas não dava pra responder "onde estão parados, especificamente
+    # quem já passou o valor da consulta?" sem abrir o board e contar card
+    # por card. Mostra todos (sem cortar em 12), pra não esconder quem está
+    # parado numa etapa só porque outra etapa tem mais gente parada há mais
+    # tempo.
+    rotulos_etapa = dict(Lead.Etapa.choices)
+    leads_por_etapa = {}
+    for lead in leads_parados:
+        leads_por_etapa.setdefault(lead.etapa, []).append(lead)
+    leads_parados_por_etapa = [
+        {
+            "etapa": rotulos_etapa.get(etapa_valor, etapa_valor),
+            "total": len(leads_da_etapa),
+            "leads": [
+                {"lead": lead, "dias": (hoje - timezone.localtime(lead.atualizado_em).date()).days}
+                for lead in leads_da_etapa
+            ],
+        }
+        for etapa_valor in Lead.ETAPAS_KANBAN
+        for leads_da_etapa in [leads_por_etapa.get(etapa_valor, [])]
+        if leads_da_etapa
+    ]
+
     alertas_acompanhamentos = []
     for acomp in Acompanhamento.objects.filter(
         organizacao=org, status__in=Acompanhamento.STATUS_ATIVOS
@@ -102,11 +175,8 @@ def home(request):
         "contato_4": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_4).count(),
         "retomar_hoje": leads_pausados_hoje.count(),
         "atrasados": [lead for lead in leads_ativos if lead.esta_atrasado],
-        "leads_parados": [
-            {"lead": lead, "dias": (hoje - timezone.localtime(lead.atualizado_em).date()).days}
-            for lead in leads_parados[:12]
-        ],
-        "total_leads_parados": leads_parados.count(),
+        "leads_parados_por_etapa": leads_parados_por_etapa,
+        "total_leads_parados": len(leads_parados),
         "dias_lead_parado": org.dias_lead_parado,
         "fila": fila[:12],
         "alertas_acompanhamentos": alertas_acompanhamentos[:10],
@@ -130,10 +200,19 @@ def home(request):
     if org.modulo_financeiro_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         totais_mes_atual = totais_fechamentos_mes(org, hoje.year, hoje.month)
         # A meta é sobre dinheiro em caixa, não sobre valor fechado/contratado —
-        # tratamento ou consulta com saldo a receber não entra até ser pago.
-        faturado = totais_mes_atual["total_recebido_geral"]
+        # tratamento ou consulta com saldo a receber não entra até ser pago. Por
+        # isso usa recebido_no_periodo (soma pela data de cada recebimento) em
+        # vez do total_recebido_geral de totais_fechamentos_mes, que contaria
+        # errado um sinal pago num mês pra reservar consulta de outro mês.
+        faturado = recebido_no_periodo(org, hoje.year, hoje.month)
         qtd_fechamentos_pagos = sum(1 for t in totais_mes_atual["tratamentos"] if t.total_recebido > 0)
-        qtd_consultas_pagas = sum(1 for c in totais_mes_atual["consultas"] if c.total_recebido > 0)
+        # "Consultas já pagas" é a meta de agendamento da SDR — conta pela
+        # data em que a consulta foi marcada no sistema, não pela data da
+        # consulta em si (ver consultas_agendadas_no_mes).
+        todas_consultas_agendadas_mes = consultas_agendadas_no_mes(org, hoje.year, hoje.month)
+        consultas_agendadas = [c for c in todas_consultas_agendadas_mes if c.total_recebido > 0]
+        consultas_sem_recebimento = [c for c in todas_consultas_agendadas_mes if c.total_recebido <= 0]
+        qtd_consultas_pagas = len(consultas_agendadas)
         faltam_faturamento = max(org.meta_faturamento_mensal - faturado, Decimal("0.00"))
         faltam_consultas = max(org.meta_consultas_mensal - qtd_consultas_pagas, 0)
         faltam_fechamentos = max(org.meta_fechamentos_mensal - qtd_fechamentos_pagos, 0)
@@ -148,10 +227,44 @@ def home(request):
             "meta_consultas": org.meta_consultas_mensal,
             "qtd_consultas": qtd_consultas_pagas,
             "faltam_consultas": faltam_consultas,
+            "detalhe_consultas_agendadas": consultas_agendadas,
+            "detalhe_consultas_sem_recebimento": consultas_sem_recebimento,
             "meta_fechamentos": org.meta_fechamentos_mensal,
             "qtd_fechamentos": qtd_fechamentos_pagos,
             "faltam_fechamentos": faltam_fechamentos,
+            "detalhe_recebimentos": detalhe_recebido_no_periodo(org, hoje.year, hoje.month),
         }
+        if request.user.is_superuser:
+            ultimo_dia_mes = calendar.monthrange(hoje.year, hoje.month)[1]
+            inicio_mes = hoje.replace(day=1)
+            fim_mes = hoje.replace(day=ultimo_dia_mes)
+            contexto["meta_mes"]["vendas_kit_mentora"] = totais_vendas_kit_mentora_no_periodo(
+                org, inicio_mes, fim_mes
+            )
+            contexto["meta_mes"]["mentoria"] = totais_mentoria_no_periodo(org, inicio_mes, fim_mes)
+            contexto["meta_mes"]["parcelas_mentoria_previstas"] = list(
+                ParcelaMentoria.objects.filter(
+                    contrato__organizacao=org, data_pagamento__isnull=True,
+                ).select_related("contrato__mentorada").order_by("data_prevista")[:10]
+            )
+
+            # Lista (por pessoa) dos leads agendados no mês, do jeito que a
+            # comissão da SDR é calculada — mostra quais já pagaram (contam
+            # comissão) e quais ainda não (não contam), pra administradora
+            # conferir sem precisar logar como a pessoa.
+            detalhe_agendamentos_por_pessoa = []
+            for pessoa in Usuario.objects.filter(
+                organizacao=org, papel=Usuario.Papel.COMERCIAL, is_active=True
+            ).order_by("first_name", "username"):
+                linhas_pessoa = _leads_agendados_no_mes(org, hoje.year, hoje.month, pessoa)
+                if linhas_pessoa:
+                    detalhe_agendamentos_por_pessoa.append({
+                        "pessoa": pessoa,
+                        "leads": linhas_pessoa,
+                        "total": len(linhas_pessoa),
+                        "total_pagos": sum(1 for l in linhas_pessoa if l["pago"]),
+                    })
+            contexto["meta_mes"]["detalhe_agendamentos_por_pessoa"] = detalhe_agendamentos_por_pessoa
 
     if org.modulo_programas_ativo and request.user.papel != Usuario.Papel.COMERCIAL:
         contexto["total_fila_fechamento"] = Paciente.objects.filter(
@@ -164,22 +277,20 @@ def home(request):
         ).distinct().count()
 
     if request.user.papel == Usuario.Papel.COMERCIAL:
-        # .distinct("lead_id") em vez de .count() direto: se a mesma lead for
-        # reagendada mais de uma vez no mês (ex.: a consulta foi excluída por
-        # engano e recriada), só a primeira agendada conta comissão — senão
-        # corrigir um agendamento vira comissão em dobro pela mesma lead.
-        agendamentos_mes = HistoricoLead.objects.filter(
-            lead__organizacao=org,
-            tipo=HistoricoLead.Tipo.AGENDAMENTO,
-            responsavel=request.user,
-            data_hora__year=hoje.year,
-            data_hora__month=hoje.month,
-        ).values("lead_id").distinct().count()
+        # Um lead só conta comissão se já tiver algum pagamento registrado —
+        # agendamento sem comparecimento e sem pagamento não gera comissão
+        # (ver _leads_agendados_no_mes). Um lead só é contado uma vez, mesmo
+        # que ela tenha mexido nele mais de uma vez no mês.
+        linhas_agendamentos = _leads_agendados_no_mes(org, hoje.year, hoje.month, request.user)
+        agendamentos_mes = sum(1 for l in linhas_agendamentos if l["pago"])
+        agendamentos_sem_pagamento = [l for l in linhas_agendamentos if not l["pago"]]
         comissao_agendamentos = agendamentos_mes * request.user.comissao_por_agendamento
         contexto["remuneracao"] = {
             "fixo_mensal": request.user.comissao_fixo_mensal,
             "valor_por_agendamento": request.user.comissao_por_agendamento,
             "agendamentos_mes": agendamentos_mes,
+            "detalhe_agendamentos": linhas_agendamentos,
+            "agendamentos_sem_pagamento": agendamentos_sem_pagamento,
             "comissao_agendamentos": comissao_agendamentos,
             "total_mes": request.user.comissao_fixo_mensal + comissao_agendamentos,
         }
@@ -329,7 +440,7 @@ def painel_mentoradas(request):
     clinicas = []
     for org in Organizacao.objects.filter(ativo=True).order_by("nome"):
         totais = totais_fechamentos_mes(org, ano, mes)
-        faturado = totais["total_recebido_geral"]
+        faturado = recebido_no_periodo(org, ano, mes)
         meta = org.meta_faturamento_mensal
         clinicas.append({
             "org": org,
@@ -351,6 +462,216 @@ def painel_mentoradas(request):
         "clinicas": clinicas,
     }
     return render(request, "core/painel_mentoradas.html", contexto)
+
+
+@login_required
+def vendas_kit_mentoradas(request):
+    """
+    Controle de venda de kit/produto da Cláudia pras organizações
+    mentoradas — negócio à parte da clínica em si (cada mentorada compra
+    pra revender às próprias pacientes). Só a administradora geral vê isso.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode ver essa página.")
+        return redirect("core:home")
+
+    org = organizacao_do_usuario(request)
+
+    if request.method == "POST":
+        form = VendaKitMentoraForm(request.POST, organizacao=org)
+        if form.is_valid():
+            venda = form.save(commit=False)
+            venda.organizacao = org
+            venda.save()
+            form.save_m2m()
+            produtos_negativos = []
+            for produto in venda.produtos.all():
+                produto.estoque_atual = produto.estoque_atual - venda.quantidade
+                produto.save(update_fields=["estoque_atual"])
+                if produto.estoque_atual < 0:
+                    produtos_negativos.append(produto.nome)
+            if produtos_negativos:
+                messages.warning(
+                    request,
+                    "Venda registrada, mas o estoque de "
+                    + ", ".join(f'"{nome}"' for nome in produtos_negativos)
+                    + " ficou negativo — o estoque atual estava contando a menos do que o que "
+                    "realmente tinha. Ajuste com uma entrada de estoque.",
+                )
+            else:
+                messages.success(request, "Venda registrada.")
+            return redirect("core:vendas_kit_mentoradas")
+    else:
+        form = VendaKitMentoraForm(organizacao=org, initial={"data_venda": timezone.localdate()})
+
+    vendas = list(
+        VendaKitMentora.objects.filter(organizacao=org).select_related("mentorada").prefetch_related("produtos")
+    )
+
+    hoje = timezone.localdate()
+    for venda in vendas:
+        venda.previsao_vencida = bool(
+            venda.previsao_proxima_compra and venda.previsao_proxima_compra <= hoje
+        )
+
+    resumo_por_mentorada = {}
+    for venda in vendas:
+        resumo = resumo_por_mentorada.setdefault(venda.mentorada_id, {
+            "mentorada": venda.mentorada,
+            "total_comprado": Decimal("0.00"),
+            "total_pago": Decimal("0.00"),
+            "total_pendente": Decimal("0.00"),
+            "ultima_compra": None,
+        })
+        resumo["total_comprado"] += venda.valor_total
+        resumo["total_pago"] += venda.valor_pago
+        resumo["total_pendente"] += venda.saldo_pendente
+        if resumo["ultima_compra"] is None or venda.data_venda > resumo["ultima_compra"]:
+            resumo["ultima_compra"] = venda.data_venda
+    for resumo in resumo_por_mentorada.values():
+        resumo["dias_desde_ultima_compra"] = (
+            (hoje - resumo["ultima_compra"]).days if resumo["ultima_compra"] else None
+        )
+    resumos = sorted(resumo_por_mentorada.values(), key=lambda r: r["mentorada"].nome)
+
+    contexto = {
+        "form": form,
+        "vendas": vendas,
+        "resumos": resumos,
+        "hoje": hoje,
+    }
+    return render(request, "core/vendas_kit_mentoradas.html", contexto)
+
+
+@login_required
+@require_POST
+def vendas_kit_mentora_editar(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode alterar isso.")
+        return redirect("core:home")
+    org = organizacao_do_usuario(request)
+    venda = get_object_or_404(VendaKitMentora, pk=pk, organizacao=org)
+    try:
+        venda.valor_pago = Decimal(request.POST.get("valor_pago", "0") or "0")
+    except Exception:
+        messages.error(request, "Valor pago inválido.")
+        return redirect("core:vendas_kit_mentoradas")
+    venda.data_pagamento_restante = request.POST.get("data_pagamento_restante") or None
+    venda.previsao_proxima_compra = request.POST.get("previsao_proxima_compra") or None
+    venda.save(update_fields=["valor_pago", "data_pagamento_restante", "previsao_proxima_compra"])
+    messages.success(request, "Venda atualizada.")
+    return redirect("core:vendas_kit_mentoradas")
+
+
+@login_required
+@require_POST
+def vendas_kit_mentora_excluir(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode excluir isso.")
+        return redirect("core:home")
+    org = organizacao_do_usuario(request)
+    venda = get_object_or_404(VendaKitMentora, pk=pk, organizacao=org)
+    produtos = list(venda.produtos.all())
+    if produtos:
+        for produto in produtos:
+            produto.estoque_atual = produto.estoque_atual + venda.quantidade
+            produto.save(update_fields=["estoque_atual"])
+        venda.delete()
+        messages.success(request, "Venda excluída — a quantidade voltou pro seu estoque.")
+    else:
+        venda.delete()
+        messages.success(request, "Venda excluída.")
+    return redirect("core:vendas_kit_mentoradas")
+
+
+@login_required
+def pagamentos_mentoria(request):
+    """
+    Controle do contrato de mentoria de cada organização mentorada — quanto
+    foi combinado no total, quanto já entrou e o que falta, já que cada uma
+    paga aos poucos conforme bate as próprias metas (não é parcela fixa).
+    Só a administradora geral vê isso.
+    """
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode ver essa página.")
+        return redirect("core:home")
+
+    org = organizacao_do_usuario(request)
+
+    if request.method == "POST" and request.POST.get("acao") == "novo_contrato":
+        form_contrato = ContratoMentoriaForm(request.POST, organizacao=org)
+        form_parcela = ParcelaMentoriaForm(organizacao=org)
+        if form_contrato.is_valid():
+            contrato = form_contrato.save(commit=False)
+            contrato.organizacao = org
+            contrato.save()
+            messages.success(request, "Contrato de mentoria registrado.")
+            return redirect("core:pagamentos_mentoria")
+    elif request.method == "POST" and request.POST.get("acao") == "nova_parcela":
+        form_contrato = ContratoMentoriaForm(organizacao=org)
+        form_parcela = ParcelaMentoriaForm(request.POST, organizacao=org)
+        if form_parcela.is_valid():
+            form_parcela.save()
+            messages.success(request, "Parcela registrada.")
+            return redirect("core:pagamentos_mentoria")
+    else:
+        form_contrato = ContratoMentoriaForm(organizacao=org)
+        form_parcela = ParcelaMentoriaForm(organizacao=org)
+
+    contratos = list(
+        ContratoMentoria.objects.filter(organizacao=org)
+        .select_related("mentorada").prefetch_related("parcelas")
+    )
+    hoje = timezone.localdate()
+    for contrato in contratos:
+        parcelas = sorted(
+            contrato.parcelas.all(),
+            key=lambda p: p.data_pagamento or p.data_prevista or hoje,
+            reverse=True,
+        )
+        contrato.parcelas_ordenadas = parcelas
+        contrato.proximas_previstas = [p for p in parcelas if not p.paga]
+
+    contexto = {
+        "form_contrato": form_contrato,
+        "form_parcela": form_parcela,
+        "contratos": contratos,
+        "hoje": hoje,
+    }
+    return render(request, "core/pagamentos_mentoria.html", contexto)
+
+
+@login_required
+@require_POST
+def pagamentos_mentoria_parcela_editar(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode alterar isso.")
+        return redirect("core:home")
+    org = organizacao_do_usuario(request)
+    parcela = get_object_or_404(ParcelaMentoria, pk=pk, contrato__organizacao=org)
+    try:
+        parcela.valor = Decimal(request.POST.get("valor", "0") or "0")
+    except Exception:
+        messages.error(request, "Valor inválido.")
+        return redirect("core:pagamentos_mentoria")
+    parcela.data_prevista = request.POST.get("data_prevista") or None
+    parcela.data_pagamento = request.POST.get("data_pagamento") or None
+    parcela.save(update_fields=["valor", "data_prevista", "data_pagamento"])
+    messages.success(request, "Parcela atualizada.")
+    return redirect("core:pagamentos_mentoria")
+
+
+@login_required
+@require_POST
+def pagamentos_mentoria_parcela_excluir(request, pk):
+    if not request.user.is_superuser:
+        messages.error(request, "Só a administradora geral pode excluir isso.")
+        return redirect("core:home")
+    org = organizacao_do_usuario(request)
+    parcela = get_object_or_404(ParcelaMentoria, pk=pk, contrato__organizacao=org)
+    parcela.delete()
+    messages.success(request, "Parcela excluída.")
+    return redirect("core:pagamentos_mentoria")
 
 
 @login_required

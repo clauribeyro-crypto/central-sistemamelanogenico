@@ -20,15 +20,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-# Em produção, defina a variável de ambiente DJANGO_SECRET_KEY.
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-1c_9g1(5t8_-=d+xn2kf*bz7-=oit=w6$6@kg0^i=jzz$nhx2i",
-)
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# Em produção, defina a variável de ambiente DJANGO_SECRET_KEY com um valor
+# longo e aleatório (aba Variables do serviço da aplicação no Railway). Essa
+# chave assina sessões de login — uma chave pública/conhecida permitiria
+# forjar sessão de qualquer usuário. Não travamos o site se ela faltar (pra
+# não arriscar derrubar a produção sem confirmação), mas o aviso abaixo
+# aparece bem visível no log de deploy enquanto a variável não for criada.
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    SECRET_KEY = "django-insecure-1c_9g1(5t8_-=d+xn2kf*bz7-=oit=w6$6@kg0^i=jzz$nhx2i"
+    if not DEBUG:
+        print(
+            "\n*** ATENÇÃO DE SEGURANÇA ***\n"
+            "DJANGO_SECRET_KEY não está configurada — o sistema está usando uma chave "
+            "padrão insegura. Configure DJANGO_SECRET_KEY no Railway (aba Variables do "
+            "serviço da aplicação) com um valor longo e aleatório assim que possível.\n"
+        )
 
 ALLOWED_HOSTS = [
     h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h

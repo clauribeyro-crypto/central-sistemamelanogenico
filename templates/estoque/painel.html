@@ -9,6 +9,9 @@
         <a class="{% if aba_atual == 'producao' %}ativo{% endif %}" href="?aba=producao">Produção pendente</a>
         <a class="{% if aba_atual == 'recompras' %}ativo{% endif %}" href="?aba=recompras">Recompras das pacientes</a>
         <a class="{% if aba_atual == 'vendas' %}ativo{% endif %}" href="?aba=vendas">Vendas</a>
+        {% if request.user.is_superuser %}
+            <a href="{% url 'core:vendas_kit_mentoradas' %}">Vendas de kit pras mentoradas ›</a>
+        {% endif %}
     </div>
 
     {% if aba_atual == "geral" %}

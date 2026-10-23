@@ -15,5 +15,7 @@ urlpatterns = [
     path("<int:pk>/iniciar-protocolo/", views.iniciar_protocolo, name="iniciar_protocolo"),
     path("<int:pk>/descartar-fechamento/", views.descartar_fechamento, name="descartar_fechamento"),
     path("<int:pk>/reabrir-fechamento/", views.reabrir_fechamento, name="reabrir_fechamento"),
+    path("<int:pk>/salvar-oferta-consulta/", views.salvar_oferta_consulta, name="salvar_oferta_consulta"),
     path("crm/fechamento/", views.crm_fechamento, name="crm_fechamento"),
+    path("crm/fechamento/salvar-limite/", views.salvar_limite_fila_fechamento, name="salvar_limite_fila_fechamento"),
 ]

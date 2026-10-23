@@ -11,6 +11,7 @@ urlpatterns = [
     path("importacao/", views.configuracao_importacao, name="configuracao_importacao"),
     path("social-selling/", views.registrar_social_selling, name="registrar_social_selling"),
     path("marketing/", views.painel_marketing, name="painel_marketing"),
+    path("marketing/relatorio-diario-sdr/", views.relatorio_diario_sdr, name="relatorio_diario_sdr"),
     path("duplicados/", views.duplicados, name="duplicados"),
     path("duplicados/mesclar/", views.mesclar_duplicados, name="mesclar_duplicados"),
     path("webhook/<str:token>/", views.webhook_importar_lead, name="webhook_importar_lead"),

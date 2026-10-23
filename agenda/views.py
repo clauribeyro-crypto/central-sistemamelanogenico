@@ -335,6 +335,18 @@ def detalhe_consulta(request, pk):
                 messages.success(request, "Recebimento registrado.")
                 return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
+        elif acao == "editar_recebimento" and pagamento:
+            recebimento = get_object_or_404(
+                Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
+            )
+            form_recebimento_editar = RecebimentoForm(request.POST, instance=recebimento)
+            if form_recebimento_editar.is_valid():
+                form_recebimento_editar.save()
+                messages.success(request, "Recebimento atualizado.")
+            else:
+                messages.error(request, "Não deu pra salvar o recebimento — confira os valores.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
         elif acao == "excluir_recebimento" and pagamento:
             recebimento = get_object_or_404(
                 Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
@@ -381,6 +393,21 @@ def detalhe_consulta(request, pk):
             consulta.status = Consulta.Status.NAO_COMPARECEU
             consulta.save()
             messages.success(request, "Consulta marcada como não compareceu.")
+            return redirect("agenda:detalhe_consulta", pk=consulta.pk)
+
+        elif acao == "corrigir_nao_compareceu" and consulta.status == Consulta.Status.REALIZADA:
+            # Consulta marcada como realizada por engano — a paciente pagou um
+            # sinal mas não fez a consulta de verdade (desistiu antes ou não
+            # apareceu). Corrige pra "não compareceu" sem mexer no pagamento
+            # já recebido, e devolve o item do checklist do programa (se tiver
+            # sido vinculado) pra pendente.
+            consulta.status = Consulta.Status.NAO_COMPARECEU
+            consulta.save()
+            _desvincular_consulta_prevista(consulta)
+            messages.success(
+                request,
+                "Consulta corrigida para 'não compareceu'. O pagamento já feito continua registrado.",
+            )
             return redirect("agenda:detalhe_consulta", pk=consulta.pk)
 
         elif acao == "cancelar_consulta":

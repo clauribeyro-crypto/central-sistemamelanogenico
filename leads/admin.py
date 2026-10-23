@@ -10,14 +10,20 @@ from .models import (
 
 @admin.register(Origem)
 class OrigemAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
-    list_display = ("nome", "ativo")
-    list_editable = ("ativo",)
+    # "organizacao" aparece pra administradora geral conseguir diferenciar
+    # nomes repetidos entre clínicas (ex.: "Instagram" de cada mentorada) —
+    # pra quem não é superusuária, o próprio mixin já filtra só a própria
+    # organização, então a coluna não teria repetição mesmo sem isso.
+    list_display = ("nome", "organizacao", "ativo", "para_mentoria")
+    list_filter = ("organizacao", "para_mentoria")
+    list_editable = ("ativo", "para_mentoria")
     search_fields = ("nome",)
 
 
 @admin.register(MotivoPerda)
 class MotivoPerdaAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
-    list_display = ("nome", "ativo")
+    list_display = ("nome", "organizacao", "ativo")
+    list_filter = ("organizacao",)
     list_editable = ("ativo",)
     search_fields = ("nome",)
 
