@@ -3,6 +3,34 @@
 {% block content %}
     <h1>O que preciso fazer hoje?</h1>
 
+    {% if organizacoes_acesso_vencendo %}
+        <div class="card" style="border:2px solid #f59e0b;">
+            <h2 style="margin-top:0;">⏰ Acesso de mentorada vencendo</h2>
+            <table>
+                <thead><tr><th>Organização</th><th>Acesso válido até</th><th>Situação</th></tr></thead>
+                <tbody>
+                    {% for item in organizacoes_acesso_vencendo %}
+                        <tr>
+                            <td>{{ item.organizacao.nome }}</td>
+                            <td>{{ item.organizacao.acesso_valido_ate|date:"d/m/Y" }}</td>
+                            <td>
+                                {% if item.vencido %}
+                                    <span class="badge" style="background:#fee2e2; color:#991b1b;">Vencido há {{ item.dias }} dia{{ item.dias|pluralize }}</span>
+                                {% else %}
+                                    <span class="badge badge-neutro">Vence em {{ item.dias }} dia{{ item.dias|pluralize }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-top:.5rem; margin-bottom:0;">
+                Pra renovar: edite a data em /admin/ → Contas → Organizações. Pra suspender o acesso:
+                /admin/ → Contas → Usuários → desmarque "Ativo" no(s) usuário(s) dessa organização.
+            </p>
+        </div>
+    {% endif %}
+
     {% if meta_mes %}
         <div class="card" style="border:2px solid #6366f1;">
             <h2>🎯 Meta do mês — R$ {{ meta_mes.meta_faturamento|floatformat:0 }}</h2>

@@ -7,7 +7,7 @@ from .models import Organizacao, TentativaLoginFalha, Usuario
 @admin.register(Organizacao)
 class OrganizacaoAdmin(admin.ModelAdmin):
     list_display = (
-        "nome", "slug", "ativo",
+        "nome", "slug", "ativo", "acesso_valido_ate",
         "meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal",
         "modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo",
         "criado_em",
@@ -16,7 +16,7 @@ class OrganizacaoAdmin(admin.ModelAdmin):
     search_fields = ("nome", "slug")
     prepopulated_fields = {"slug": ("nome",)}
     fieldsets = (
-        (None, {"fields": ("nome", "slug", "ativo")}),
+        (None, {"fields": ("nome", "slug", "ativo", "acesso_valido_ate")}),
         ("Agenda", {"fields": ("agenda_hora_inicio", "agenda_hora_fim", "agenda_intervalo_minutos")}),
         ("Leads", {"fields": ("dias_lead_parado",)}),
         ("Financeiro", {"fields": ("saldo_inicial_financeiro",)}),

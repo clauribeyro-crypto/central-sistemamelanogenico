@@ -165,8 +165,26 @@ def home(request):
         for alerta in acomp.alertas():
             alertas_acompanhamentos.append({"acompanhamento": acomp, "texto": alerta})
 
+    organizacoes_acesso_vencendo = []
+    if request.user.is_superuser:
+        # Contrato de acesso por tempo determinado (ex.: mentorada que pagou
+        # 1 ano de acesso ao sistema) — avisa com 30 dias de antecedência e
+        # continua avisando se já passou, pra administradora não perder o
+        # momento de renovar ou desativar o acesso.
+        limite_aviso = hoje + datetime.timedelta(days=30)
+        for outra_org in Organizacao.objects.filter(
+            acesso_valido_ate__isnull=False, acesso_valido_ate__lte=limite_aviso,
+        ).order_by("acesso_valido_ate"):
+            dias = (outra_org.acesso_valido_ate - hoje).days
+            organizacoes_acesso_vencendo.append({
+                "organizacao": outra_org,
+                "dias": abs(dias),
+                "vencido": dias < 0,
+            })
+
     contexto = {
         "org": org,
+        "organizacoes_acesso_vencendo": organizacoes_acesso_vencendo,
         "usuario_e_administrador": usuario_e_administrador(request),
         "novos_hoje": leads_ativos.filter(etapa=Lead.Etapa.NOVO, entrou_em__date=hoje).count(),
         "contato_1": leads_ativos.filter(etapa=Lead.Etapa.CONTATO_1).count(),

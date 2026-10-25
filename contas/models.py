@@ -71,6 +71,17 @@ class Organizacao(models.Model):
         help_text="Quando a fila de fechamento (quem já fez consulta de diagnóstico e ainda não decidiu) atingir esse tanto de gente, mostra um aviso no CRM de fechamento.",
     )
 
+    acesso_valido_ate = models.DateField(
+        blank=True, null=True,
+        verbose_name="acesso válido até",
+        help_text=(
+            "Pra organizações mentoradas com contrato de acesso por tempo determinado (ex.: "
+            "1 ano de acesso ao sistema). Deixe em branco pra acesso sem prazo (ex.: a própria "
+            "clínica). Quando a data se aproxima ou passa, aparece um aviso na home da "
+            "administradora geral — desativar o acesso continua sendo manual, em Usuários."
+        ),
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
 
     class Meta:
