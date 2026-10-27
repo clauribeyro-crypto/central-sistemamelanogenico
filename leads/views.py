@@ -1162,6 +1162,15 @@ def webhook_importar_lead(request, token):
     nome_origem = str(dados_normalizados.get("origem") or "").strip()
     if nome_origem:
         origem = Origem.objects.filter(organizacao=webhook.organizacao, nome__iexact=nome_origem).first()
+        if origem is None:
+            # O formulário mandou uma origem, mas ela não bate com nenhuma
+            # origem cadastrada (nome diferente, cadastro desativado etc.) —
+            # sem isso, a lead caía na origem padrão do webhook em silêncio e
+            # não tinha como descobrir depois qual origem o formulário
+            # realmente mandou (campos reconhecidos como "origem" nem entram
+            # em dados_extras). Fica registrado na ficha da lead pra dar pra
+            # conferir e corrigir o nome da origem ou o que o formulário envia.
+            dados_extras["origem_recebida_sem_correspondencia"] = nome_origem
 
     data_primeiro_contato = None
     valor_data = (
