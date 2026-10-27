@@ -116,11 +116,15 @@
         <h2 style="margin-top:0;">De onde vêm as leads</h2>
         <p style="font-size:.85rem; color:var(--text-muted);">
             Das leads que entraram em {{ mes_nome }}/{{ ano|stringformat:'d' }} por cada origem, quantas já
-            têm consulta agendada — pra saber qual canal está trazendo gente que realmente agenda.
+            têm consulta agendada e, dessas, quantas já fecharam tratamento — pra saber qual canal está
+            trazendo gente que realmente agenda e fecha.
         </p>
         <table>
             <thead>
-                <tr><th>Origem</th><th>Leads</th><th>Agendaram</th><th>Taxa de conversão</th></tr>
+                <tr>
+                    <th>Origem</th><th>Leads</th><th>Agendaram</th><th>Taxa de conversão</th>
+                    <th>Fecharam</th><th>Taxa de fechamento</th>
+                </tr>
             </thead>
             <tbody>
                 {% for linha in origem_resumo %}
@@ -129,12 +133,18 @@
                         <td>{{ linha.leads }}</td>
                         <td>{{ linha.agendaram }}</td>
                         <td>{% if linha.taxa != None %}{{ linha.taxa|floatformat:0 }}%{% else %}—{% endif %}</td>
+                        <td>{{ linha.fecharam }}</td>
+                        <td>{% if linha.taxa_fechamento != None %}{{ linha.taxa_fechamento|floatformat:0 }}%{% else %}—{% endif %}</td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="4">Nenhuma origem cadastrada.</td></tr>
+                    <tr><td colspan="6">Nenhuma origem cadastrada.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
+        <p style="font-size:.78rem; color:var(--text-muted); margin-top:.5rem;">
+            "Taxa de fechamento" é fecharam ÷ agendaram (das que marcaram consulta, quantas viraram tratamento
+            fechado) — não depende de quando o fechamento aconteceu, só se já aconteceu.
+        </p>
     </div>
 
     <div class="card">

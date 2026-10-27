@@ -371,14 +371,30 @@ def painel_marketing(request):
             status=Lead.Status.AGENDADA,
         ).values("origem_id").annotate(total=Count("id"))
     }
+    # Fechou = a paciente vinculada a essa lead tem pelo menos um Acompanhamento
+    # (qualquer status — cancelado também conta como fechamento que aconteceu,
+    # mesma lógica de "vendas" usada mais acima nesta view). Não tem relação
+    # com a data do Acompanhamento: é "essa lead, que entrou nesse período,
+    # chegou a fechar tratamento alguma hora", pra fechar o funil com Leads/
+    # Agendaram que já seguem essa mesma lógica de "aconteceu alguma hora".
+    fecharam_por_origem = {
+        row["origem_id"]: row["total"]
+        for row in Lead.objects.filter(
+            organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
+            paciente__acompanhamentos__isnull=False,
+        ).values("origem_id").annotate(total=Count("id", distinct=True))
+    }
     origem_resumo = []
     for origem, total_leads in zip(origens, totais["leads_por_origem"]):
         agendaram = agendaram_por_origem.get(origem.pk, 0)
+        fecharam = fecharam_por_origem.get(origem.pk, 0)
         origem_resumo.append({
             "origem": origem,
             "leads": total_leads,
             "agendaram": agendaram,
             "taxa": (agendaram / total_leads * 100) if total_leads else None,
+            "fecharam": fecharam,
+            "taxa_fechamento": (fecharam / agendaram * 100) if agendaram else None,
         })
 
     # "Quem está agendando, por origem": todo agendamento passa por
