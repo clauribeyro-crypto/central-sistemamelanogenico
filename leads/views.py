@@ -264,7 +264,8 @@ def painel_marketing(request):
 
     ultimo_dia_mes = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)
-    data_fim = min(datetime.date(ano, mes, ultimo_dia_mes), hoje)
+    data_fim_mes = datetime.date(ano, mes, ultimo_dia_mes)
+    data_fim = min(data_fim_mes, hoje)
 
     if data_fim >= data_inicio:
         dias_ja = set(RegistroMarketingDiario.objects.filter(
@@ -314,8 +315,13 @@ def painel_marketing(request):
             data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
         ).values("data_hora__date").annotate(total=Count("id"))
     }
+    # Usa data_fim_mes (o mês inteiro), não o data_fim capado em "hoje" — um
+    # fechamento pode ter sido assinado hoje com o protocolo pra começar daqui
+    # a uns dias, ainda dentro do mesmo mês, e ele já conta como venda do mês
+    # mesmo que esse dia ainda não tenha chegado (mesma regra de
+    # financeiro.views.totais_fechamentos_mes, que também não capa em hoje).
     fechamentos_do_periodo = Acompanhamento.objects.filter(
-        organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
+        organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim_mes,
     ).prefetch_related("pagamentos")
     vendas_por_dia = {}
     valor_por_dia = {}
@@ -356,8 +362,13 @@ def painel_marketing(request):
             sum((l["leads_por_origem"][i] for l in linhas), 0) for i in range(len(origens))
         ],
         "reunioes": sum((l["reunioes"] for l in linhas), 0),
-        "vendas": sum((l["vendas"] for l in linhas), 0),
-        "valor": sum((l["valor"] for l in linhas), Decimal("0.00")),
+        # Soma de vendas_por_dia/valor_por_dia direto (mês inteiro), não de
+        # linhas (só vai até hoje) — ver comentário acima de fechamentos_do_periodo.
+        "vendas": sum(vendas_por_dia.values(), 0),
+        "valor": sum(valor_por_dia.values(), Decimal("0.00")),
+        "consultas_no_mes": Consulta.objects.filter(
+            organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim_mes,
+        ).exclude(status=Consulta.Status.CANCELADA).exclude(reagendamentos__isnull=False).count(),
     }
 
     # "De onde vêm as leads": pra cada origem, quantas entraram no período e

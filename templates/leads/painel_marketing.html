@@ -42,6 +42,10 @@
             <div class="num">{{ totais.reunioes }}</div>
             <div class="rotulo">Reuniões realizadas</div>
         </div>
+        <div class="card stat">
+            <div class="num">{{ totais.consultas_no_mes }}</div>
+            <div class="rotulo">Consultas agendadas no mês (todos os status, não só as realizadas)</div>
+        </div>
         <div class="card stat" style="background:#22c55e11;">
             <div class="num">{{ totais.vendas }}</div>
             <div class="rotulo">Vendas (R$ {{ totais.valor|floatformat:2 }})</div>
