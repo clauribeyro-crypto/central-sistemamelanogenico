@@ -491,8 +491,17 @@ class WebhookImportacao(ModeloDaOrganizacao):
         próprio no Lead (idade, orçamento, queixa etc.) — guardadas junto pra
         aparecer na ficha, sem precisar abrir a planilha de origem.
         """
-        nome = (nome or "").strip()
-        telefone_normalizado = "".join(ch for ch in (telefone or "") if ch.isdigit())
+        # Formulário externo manda nome/telefone sempre como texto, mas a
+        # planilha de origem (Respondi) pode ter a célula do telefone
+        # formatada como número — nesse caso o JSON chega com um número de
+        # verdade (ex.: 11988887777), não uma string, e sem isso o sistema
+        # quebra tentando iterar um int como se fosse texto.
+        if isinstance(nome, float) and nome.is_integer():
+            nome = int(nome)
+        nome = str(nome).strip() if nome is not None else ""
+        if isinstance(telefone, float) and telefone.is_integer():
+            telefone = int(telefone)
+        telefone_normalizado = "".join(ch for ch in str(telefone or "") if ch.isdigit())
 
         if not nome or not telefone_normalizado:
             return None, False, "Nome e telefone são obrigatórios."

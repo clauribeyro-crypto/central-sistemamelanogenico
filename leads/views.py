@@ -1179,6 +1179,9 @@ def webhook_importar_lead(request, token):
         or dados_normalizados.get("timestamp")
     )
     if valor_data:
+        # Mesmo motivo do nome/telefone: a célula pode não vir como texto
+        # (ex.: planilha manda só os milissegundos de um timestamp).
+        valor_data = str(valor_data)
         data_primeiro_contato = parse_datetime(valor_data)
         if not data_primeiro_contato:
             # aceita também "dd/mm/aaaa hh:mm:ss", formato comum de planilha do Google
