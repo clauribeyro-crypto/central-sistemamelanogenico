@@ -20,6 +20,7 @@ from financeiro.models import Pagamento, Recebimento
 from financeiro.views import MESES
 from leads.models import HistoricoLead
 from programas.models import Acompanhamento, ConsultaPrevista, CustoAcompanhamento, FaseModulacao, FotoEvolucao
+from prontuarios.forms import GravacaoConsultaForm
 from prontuarios.models import Anamnese, Documento
 
 from .forms import IniciarProtocoloForm, PacienteRapidoForm
@@ -34,13 +35,14 @@ ABAS = [
     ("consultas", "Consultas"),
     ("fotos", "Fotos"),
     ("documentos", "Exames/Documentos"),
+    ("gravacoes", "Gravações de consulta"),
     ("produtos", "Produtos"),
     ("financeiro", "Financeiro"),
     ("historico", "Histórico"),
 ]
 ABAS_PRONTAS = {
     "geral", "anamnese", "evolucao", "modulacao", "feedbacks", "consultas", "fotos",
-    "documentos", "produtos", "financeiro", "historico",
+    "documentos", "gravacoes", "produtos", "financeiro", "historico",
 }
 
 
@@ -462,6 +464,10 @@ def ficha(request, pk):
 
     if aba == "documentos":
         contexto["documentos"] = paciente.documentos.order_by("-criado_em")
+
+    if aba == "gravacoes":
+        contexto["gravacoes"] = paciente.gravacoes_consulta.select_related("consulta").order_by("-data", "-criado_em")
+        contexto["form_gravacao"] = GravacaoConsultaForm(paciente=paciente)
 
     if aba == "consultas":
         if acompanhamento:

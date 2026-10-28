@@ -3,7 +3,10 @@ from django import forms
 from agenda.models import Consulta
 from profissionais.models import Profissional
 
-from .models import SATISFACOES, SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, RegistroEvolucao
+from .models import (
+    SATISFACOES, SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, GravacaoConsulta,
+    RegistroEvolucao,
+)
 
 
 class DecimalVirgulaField(forms.DecimalField):
@@ -144,3 +147,18 @@ class DocumentoForm(forms.ModelForm):
         model = Documento
         fields = ["nome", "tipo", "arquivo", "observacoes"]
         widgets = {"observacoes": forms.Textarea(attrs={"rows": 2})}
+
+
+class GravacaoConsultaForm(forms.ModelForm):
+    class Meta:
+        model = GravacaoConsulta
+        fields = ["data", "consulta", "link_drive", "arquivo_audio"]
+        widgets = {"data": forms.DateInput(attrs={"type": "date"})}
+
+    def __init__(self, *args, paciente=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["consulta"].required = False
+        self.fields["consulta"].queryset = (
+            Consulta.objects.filter(paciente=paciente).order_by("-data_hora")
+            if paciente else Consulta.objects.none()
+        )

@@ -222,6 +222,13 @@ CLOUDINARY_STORAGE = {
 if CLOUDINARY_STORAGE["CLOUD_NAME"]:
     STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
 
+# Análise de gravação de consulta por IA (prontuarios.services_ia): a OpenAI
+# transcreve o áudio, a Anthropic lê a transcrição e extrai as queixas da
+# paciente. Sem essas variáveis configuradas, o botão de análise avisa que
+# falta configurar em vez de quebrar.
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
