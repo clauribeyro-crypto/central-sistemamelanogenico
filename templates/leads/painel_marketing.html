@@ -137,7 +137,25 @@
                         <td>{{ linha.leads }}</td>
                         <td>{{ linha.agendaram }}</td>
                         <td>{% if linha.taxa != None %}{{ linha.taxa|floatformat:0 }}%{% else %}—{% endif %}</td>
-                        <td>{{ linha.fecharam }}</td>
+                        <td>
+                            {% if linha.leads_fecharam %}
+                                <details>
+                                    <summary style="cursor:pointer;">{{ linha.fecharam }}</summary>
+                                    <ul style="margin:.4rem 0 0; padding-left:1.1rem; font-size:.85rem;">
+                                        {% for lead in linha.leads_fecharam %}
+                                            <li>
+                                                <a href="{% url 'leads:detalhe' lead.pk %}">{{ lead.nome }}</a>
+                                                {% if lead.paciente %}
+                                                    — <a href="{% url 'pacientes:ficha' lead.paciente_id %}">ficha</a>
+                                                {% endif %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </details>
+                            {% else %}
+                                {{ linha.fecharam }}
+                            {% endif %}
+                        </td>
                         <td>{% if linha.taxa_fechamento != None %}{{ linha.taxa_fechamento|floatformat:0 }}%{% else %}—{% endif %}</td>
                     </tr>
                 {% empty %}

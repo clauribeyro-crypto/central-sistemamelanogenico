@@ -388,17 +388,23 @@ def painel_marketing(request):
     # com a data do Acompanhamento: é "essa lead, que entrou nesse período,
     # chegou a fechar tratamento alguma hora", pra fechar o funil com Leads/
     # Agendaram que já seguem essa mesma lógica de "aconteceu alguma hora".
-    fecharam_por_origem = {
-        row["origem_id"]: row["total"]
-        for row in Lead.objects.filter(
+    # Lista de verdade (não só a contagem) de quem fechou, por origem — pra
+    # dar pra ver exatamente quais pacientes estão por trás do número, sem
+    # precisar abrir uma lead de cada vez.
+    leads_que_fecharam_por_origem = {}
+    for lead in (
+        Lead.objects.filter(
             organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
             paciente__acompanhamentos__isnull=False,
-        ).values("origem_id").annotate(total=Count("id", distinct=True))
-    }
+        ).select_related("paciente").distinct().order_by("nome")
+    ):
+        leads_que_fecharam_por_origem.setdefault(lead.origem_id, []).append(lead)
+
     origem_resumo = []
     for origem, total_leads in zip(origens, totais["leads_por_origem"]):
         agendaram = agendaram_por_origem.get(origem.pk, 0)
-        fecharam = fecharam_por_origem.get(origem.pk, 0)
+        leads_fecharam = leads_que_fecharam_por_origem.get(origem.pk, [])
+        fecharam = len(leads_fecharam)
         origem_resumo.append({
             "origem": origem,
             "leads": total_leads,
@@ -406,6 +412,7 @@ def painel_marketing(request):
             "taxa": (agendaram / total_leads * 100) if total_leads else None,
             "fecharam": fecharam,
             "taxa_fechamento": (fecharam / agendaram * 100) if agendaram else None,
+            "leads_fecharam": leads_fecharam,
         })
 
     # "Quem está agendando, por origem": todo agendamento passa por
