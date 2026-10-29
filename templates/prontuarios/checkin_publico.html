@@ -84,5 +84,15 @@
         {% endfor %}
         <button class="btn-enviar" type="submit">Enviar check-in</button>
     </form>
+    <script>
+        // Apertar Enter num campo de texto no meio do formulário não deve
+        // enviar o check-in inteiro sem querer — só o botão "Enviar
+        // check-in" no fim deve enviar.
+        document.querySelector("form").addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" && ev.target.tagName === "INPUT") {
+                ev.preventDefault();
+            }
+        });
+    </script>
 </body>
 </html>

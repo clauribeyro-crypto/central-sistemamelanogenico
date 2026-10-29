@@ -180,6 +180,28 @@
             </div>
         {% endif %}
 
+        {% if dados_formulario or respostas_formulario_manual %}
+            <div class="card">
+                <h2 style="margin-top:0;">Respostas do formulário</h2>
+                <p style="font-size:.85rem; color:var(--text-muted); margin-top:-.5rem;">
+                    O que ela respondeu no formulário/quiz de origem — sem precisar abrir a planilha.
+                </p>
+                {% if dados_formulario %}
+                    <table style="width:100%; border-collapse:collapse;">
+                        {% for rotulo, valor in dados_formulario %}
+                            <tr>
+                                <td style="padding:.35rem .5rem .35rem 0; white-space:nowrap; vertical-align:top; color:var(--text-muted);">{{ rotulo }}</td>
+                                <td style="padding:.35rem 0;">{{ valor }}</td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                {% endif %}
+                {% if respostas_formulario_manual %}
+                    <p style="white-space:pre-line; margin-bottom:0;">{{ respostas_formulario_manual }}</p>
+                {% endif %}
+            </div>
+        {% endif %}
+
         <div class="tabs">
             {% for slug, label in abas %}
                 <a class="{% if slug == aba_atual %}ativo{% endif %}" href="?aba={{ slug }}">{{ label }}</a>
@@ -691,6 +713,80 @@
                     <div><label>Arquivo</label><input type="file" name="arquivo" required></div>
                     <div><label>Observações</label><textarea name="observacoes" rows="2"></textarea></div>
                     <button class="btn" type="submit">Anexar</button>
+                </form>
+            </div>
+        {% elif aba_atual == "gravacoes" %}
+            <div class="card">
+                <h2>Gravações de consulta</h2>
+                <p style="font-size:.85rem; color:var(--text-muted);">
+                    O link do Drive é só pra abrir a gravação completa depois — a análise por IA (transcrição +
+                    queixas identificadas) precisa do áudio enviado junto, não funciona só com o link.
+                </p>
+                {% if gravacoes %}
+                    {% for g in gravacoes %}
+                        <div class="card" style="background:var(--bg-secundario, #f7f5fb); margin-bottom:1rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:.5rem;">
+                                <div>
+                                    <strong>{{ g.data|date:"d/m/Y" }}</strong>
+                                    {% if g.consulta %} — consulta com {{ g.consulta.profissional }}{% endif %}
+                                    <span class="badge {% if g.status == 'ERRO' %}badge-atrasado{% elif g.status != 'CONCLUIDA' %}badge-neutro{% endif %}" style="margin-left:.5rem;">
+                                        {{ g.get_status_display }}
+                                    </span>
+                                </div>
+                                {% if usuario_e_administrador %}
+                                    <form method="post" action="{% url 'prontuarios:gravacao_excluir' g.pk %}" onsubmit="return confirm('Excluir esta gravação?');">
+                                        {% csrf_token %}
+                                        <button type="submit" style="background:none;border:none;color:#8f2e45;text-decoration:underline;cursor:pointer;padding:0;font-size:.82rem;">Excluir</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                            {% if g.link_drive %}
+                                <p style="margin:.4rem 0;"><a href="{{ g.link_drive }}" target="_blank">Abrir gravação no Drive ›</a></p>
+                            {% endif %}
+                            {% if g.arquivo_audio %}
+                                <p style="margin:.4rem 0; font-size:.85rem;">
+                                    <a href="{{ g.arquivo_audio.url }}" target="_blank">Baixar áudio enviado</a>
+                                    {% if g.status == "PENDENTE" or g.status == "ERRO" %}
+                                        · <form method="post" action="{% url 'prontuarios:gravacao_processar' g.pk %}" style="display:inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" style="background:none;border:none;color:var(--primary,#6366f1);text-decoration:underline;cursor:pointer;padding:0;font-size:.85rem;">
+                                                {% if g.status == "ERRO" %}Tentar analisar de novo{% else %}Analisar com IA{% endif %}
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </p>
+                            {% else %}
+                                <p style="margin:.4rem 0; font-size:.85rem; color:var(--text-muted);">Sem áudio enviado — não dá pra analisar por IA.</p>
+                            {% endif %}
+                            {% if g.status == "ERRO" and g.erro_detalhe %}
+                                <p style="color:#8f2e45; font-size:.85rem;">{{ g.erro_detalhe }}</p>
+                            {% endif %}
+                            {% if g.status == "CONCLUIDA" %}
+                                <details style="margin-top:.5rem;">
+                                    <summary style="cursor:pointer; font-weight:600;">Queixas identificadas pela IA</summary>
+                                    <p style="white-space:pre-line; margin-top:.4rem;">{{ g.dores_identificadas }}</p>
+                                    <p style="font-size:.78rem; color:var(--text-muted);">Gerado automaticamente — sempre confira com a gravação original antes de usar clinicamente.</p>
+                                </details>
+                                <details style="margin-top:.4rem;">
+                                    <summary style="cursor:pointer; color:var(--text-muted); font-size:.85rem;">Ver transcrição completa</summary>
+                                    <p style="white-space:pre-line; margin-top:.4rem; font-size:.85rem;">{{ g.transcricao }}</p>
+                                </details>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>Nenhuma gravação registrada ainda.</p>
+                {% endif %}
+            </div>
+            <div class="card">
+                <h2>Registrar nova gravação</h2>
+                <form method="post" action="{% url 'prontuarios:gravacao_criar' paciente.pk %}" enctype="multipart/form-data" class="acao">
+                    {% csrf_token %}
+                    <div><label>Data</label>{{ form_gravacao.data }}</div>
+                    <div><label>Consulta vinculada (opcional)</label>{{ form_gravacao.consulta }}</div>
+                    <div><label>Link da gravação no Drive (opcional, só referência)</label>{{ form_gravacao.link_drive }}</div>
+                    <div><label>Áudio pra análise por IA (opcional)</label>{{ form_gravacao.arquivo_audio }}</div>
+                    <button class="btn" type="submit">Registrar</button>
                 </form>
             </div>
         {% elif aba_atual == "produtos" %}

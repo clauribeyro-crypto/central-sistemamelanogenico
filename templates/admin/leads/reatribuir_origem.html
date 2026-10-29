@@ -1,0 +1,26 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    <p>
+        <strong>{{ leads|length }}</strong> lead{{ leads|length|pluralize }} selecionada{{ leads|length|pluralize }}
+        vai{{ leads|length|pluralize:"i,rem" }} ter a origem trocada pra:
+    </p>
+    <ul style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem;">
+        {% for lead in leads %}
+            <li>{{ lead.nome }} — origem atual: {{ lead.origem }} ({{ lead.entrou_em|date:"d/m/Y H:i" }})</li>
+        {% endfor %}
+    </ul>
+
+    <div>
+        {{ form.as_p }}
+    </div>
+
+    {% for lead in leads %}
+        <input type="hidden" name="{{ action_checkbox_name }}" value="{{ lead.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="{{ action_name }}">
+    <input type="submit" name="aplicar" value="Reatribuir origem" class="default">
+</form>
+{% endblock %}

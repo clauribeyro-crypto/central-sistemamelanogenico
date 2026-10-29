@@ -770,3 +770,57 @@ class Documento(ModeloDaOrganizacao):
 
     def __str__(self):
         return f"{self.nome} ({self.get_tipo_display()}) — {self.paciente}"
+
+
+class GravacaoConsulta(ModeloDaOrganizacao):
+    """
+    Gravação de uma consulta online (feita fora do sistema, ex.: Google Meet
+    gravado direto no Drive) — o link fica só como referência pra abrir a
+    gravação completa; a análise por IA (transcrição + queixas) precisa do
+    arquivo de áudio de verdade, enviado separadamente, porque o Drive não
+    libera download automático de arquivo grande por link (ver
+    webhook_importar_lead pra um caso parecido de "link não é a mesma coisa
+    que o conteúdo").
+    """
+
+    class Status(models.TextChoices):
+        PENDENTE = "PENDENTE", "Aguardando análise"
+        PROCESSANDO = "PROCESSANDO", "Processando"
+        CONCLUIDA = "CONCLUIDA", "Concluída"
+        ERRO = "ERRO", "Erro ao processar"
+
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="gravacoes_consulta")
+    consulta = models.ForeignKey(
+        Consulta, on_delete=models.SET_NULL, related_name="gravacoes", blank=True, null=True,
+        help_text="Consulta a que essa gravação pertence, se houver uma marcada no sistema.",
+    )
+    data = models.DateField(default=timezone.localdate)
+    link_drive = models.URLField(
+        "link da gravação (Drive)", blank=True,
+        help_text="Só pra abrir a gravação completa depois — a análise por IA usa o áudio enviado abaixo, não esse link.",
+    )
+    arquivo_audio = models.FileField(
+        "áudio pra análise", upload_to="gravacoes_consulta/%Y/%m/", storage=_storage_documento,
+        blank=True, null=True,
+        help_text="O áudio da consulta (de preferência só o áudio, não o vídeo inteiro — arquivo bem menor).",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    transcricao = models.TextField(blank=True)
+    dores_identificadas = models.TextField(
+        "queixas identificadas pela IA", blank=True,
+        help_text="Gerado automaticamente a partir da transcrição — sempre conferir com a gravação original antes de usar clinicamente.",
+    )
+    erro_detalhe = models.TextField(blank=True)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "gravação de consulta"
+        verbose_name_plural = "gravações de consulta"
+        ordering = ["-data", "-criado_em"]
+
+    def __str__(self):
+        return f"Gravação de {self.paciente} em {self.data:%d/%m/%Y}"

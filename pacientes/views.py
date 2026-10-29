@@ -13,11 +13,14 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
-from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
+from contas.utils import (
+    modulo_ativo_obrigatorio, organizacao_do_usuario, rotular_dados_formulario, usuario_e_administrador,
+)
 from financeiro.models import Pagamento, Recebimento
 from financeiro.views import MESES
 from leads.models import HistoricoLead
 from programas.models import Acompanhamento, ConsultaPrevista, CustoAcompanhamento, FaseModulacao, FotoEvolucao
+from prontuarios.forms import GravacaoConsultaForm
 from prontuarios.models import Anamnese, Documento
 
 from .forms import IniciarProtocoloForm, PacienteRapidoForm
@@ -32,13 +35,14 @@ ABAS = [
     ("consultas", "Consultas"),
     ("fotos", "Fotos"),
     ("documentos", "Exames/Documentos"),
+    ("gravacoes", "Gravações de consulta"),
     ("produtos", "Produtos"),
     ("financeiro", "Financeiro"),
     ("historico", "Histórico"),
 ]
 ABAS_PRONTAS = {
     "geral", "anamnese", "evolucao", "modulacao", "feedbacks", "consultas", "fotos",
-    "documentos", "produtos", "financeiro", "historico",
+    "documentos", "gravacoes", "produtos", "financeiro", "historico",
 }
 
 
@@ -366,19 +370,35 @@ def ficha(request, pk):
     paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
     acompanhamento = paciente.acompanhamento_atual
 
+    abas = ABAS if org.modulo_gravacao_ia_ativo else [
+        (slug, label) for slug, label in ABAS if slug != "gravacoes"
+    ]
+
     aba = request.GET.get("aba", "geral")
-    if aba not in dict(ABAS):
+    if aba not in dict(abas):
         aba = "geral"
+
+    # Respostas do formulário/quiz de origem (ex.: Respondi) — vêm do(s)
+    # lead(s) que deram origem a essa paciente, pra secretária não precisar
+    # abrir a planilha pra conferir o que ela respondeu.
+    dados_formulario_merge = {}
+    respostas_formulario_manual = []
+    for lead in paciente.leads.order_by("criado_em"):
+        dados_formulario_merge.update(lead.dados_formulario)
+        if lead.respostas_formulario_manual:
+            respostas_formulario_manual.append(lead.respostas_formulario_manual)
 
     contexto = {
         "paciente": paciente,
+        "dados_formulario": rotular_dados_formulario(dados_formulario_merge),
+        "respostas_formulario_manual": "\n\n".join(respostas_formulario_manual),
         "acompanhamento": acompanhamento,
         "tem_algum_acompanhamento": paciente.acompanhamentos.exists(),
         "acompanhamentos_anteriores": paciente.acompanhamentos.exclude(
             pk=acompanhamento.pk if acompanhamento else None
         ).select_related("programa").order_by("-data_inicio"),
         "usuario_e_administrador": usuario_e_administrador(request),
-        "abas": ABAS,
+        "abas": abas,
         "aba_atual": aba,
         "aba_pronta": aba in ABAS_PRONTAS,
         "jornada": acompanhamento.jornada() if acompanhamento else None,
@@ -448,6 +468,10 @@ def ficha(request, pk):
 
     if aba == "documentos":
         contexto["documentos"] = paciente.documentos.order_by("-criado_em")
+
+    if aba == "gravacoes":
+        contexto["gravacoes"] = paciente.gravacoes_consulta.select_related("consulta").order_by("-data", "-criado_em")
+        contexto["form_gravacao"] = GravacaoConsultaForm(paciente=paciente)
 
     if aba == "consultas":
         if acompanhamento:
@@ -544,6 +568,7 @@ def iniciar_protocolo(request, pk):
     if request.method == "POST":
         form = IniciarProtocoloForm(request.POST, organizacao=org)
         if form.is_valid():
+            ja_paga = form.cleaned_data["ja_paga_em_outro_lancamento"]
             acompanhamento = Acompanhamento.iniciar(
                 paciente=paciente,
                 programa=form.cleaned_data["programa"],
@@ -552,16 +577,25 @@ def iniciar_protocolo(request, pk):
                 desconto=form.cleaned_data["desconto"] or 0,
                 forma_pagamento=form.cleaned_data["forma_pagamento"],
                 observacoes=form.cleaned_data["observacoes"],
+                gerar_cobranca=not ja_paga,
             )
             valor_recebido = form.cleaned_data.get("valor_recebido_agora")
-            if valor_recebido:
+            if valor_recebido and not ja_paga:
                 pagamento = acompanhamento.pagamentos.exclude(status=Pagamento.Status.CANCELADO).first()
                 Recebimento.objects.create(
                     organizacao=org, pagamento=pagamento, valor=valor_recebido,
                     forma_pagamento=form.cleaned_data["forma_recebimento"],
                     data=form.cleaned_data["data_inicio"],
                 )
-            messages.success(request, "Protocolo de acompanhamento iniciado.")
+            if ja_paga:
+                messages.success(
+                    request,
+                    "Protocolo iniciado, sem gerar cobrança nova. Pra ligar o pagamento que já existe a "
+                    "esse tratamento, vá no lançamento dela no Financeiro e escolha esse programa em "
+                    "\"Tratamento/programa vinculado\".",
+                )
+            else:
+                messages.success(request, "Protocolo de acompanhamento iniciado.")
             return redirect("pacientes:ficha", pk=paciente.pk)
     else:
         # Sem isso o campo de data começa em branco — fácil de digitar/
@@ -611,6 +645,44 @@ def reabrir_fechamento(request, pk):
     )
     messages.success(request, "Paciente voltou pra fila de fechamento.")
     return redirect("pacientes:ficha", pk=paciente.pk)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def salvar_oferta_consulta(request, pk):
+    """Anotação rápida de quem atendeu: o que foi ofertado na consulta de diagnóstico — ajuda a planejar uma ação de retomada pra quem ainda não decidiu."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    paciente.oferta_consulta_diagnostico = request.POST.get("oferta_consulta_diagnostico", "").strip()
+    paciente.save(update_fields=["oferta_consulta_diagnostico", "atualizado_em"])
+    messages.success(request, f"Anotação de {paciente.nome} salva.")
+    proximo = request.POST.get("proximo")
+    if proximo and url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        return redirect(proximo)
+    return redirect("pacientes:crm_fechamento")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_programas_ativo", "Programas/Acompanhamento")
+@require_POST
+def salvar_limite_fila_fechamento(request):
+    """Admin ajusta a partir de quantas pessoas na fila de fechamento o CRM de fechamento mostra um aviso."""
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem alterar esse ajuste.")
+        return redirect("pacientes:crm_fechamento")
+    try:
+        limite = int(request.POST.get("limite_fila_fechamento", "0"))
+    except ValueError:
+        limite = 0
+    if limite > 0:
+        org.limite_fila_fechamento = limite
+        org.save(update_fields=["limite_fila_fechamento"])
+        messages.success(request, "Aviso da fila de fechamento atualizado.")
+    else:
+        messages.error(request, "Valor inválido.")
+    return redirect("pacientes:crm_fechamento")
 
 
 @login_required
@@ -681,6 +753,11 @@ def crm_fechamento(request):
 
     total_decisoes = fechados_no_mes + perdidos_no_mes
     taxa_conversao = round(fechados_no_mes / total_decisoes * 100) if total_decisoes else None
+    # Métrica diferente da de cima: aqui a base é TODA consulta de diagnóstico
+    # realizada no mês (inclui quem ainda está na fila, esperando decisão),
+    # não só quem já foi fechado ou perdido — dá o "quantas consultas viraram
+    # venda" que a Cláudia espera bater com o controle manual dela.
+    taxa_conversao_consultas = round(fechados_no_mes / consultas_no_mes * 100) if consultas_no_mes else None
 
     contexto = {
         "ano": ano,
@@ -690,10 +767,14 @@ def crm_fechamento(request):
         "anos": range(hoje.year - 3, hoje.year + 2),
         "fila_fechamento": fila,
         "total_fila_fechamento": len(fila),
+        "limite_fila_fechamento": org.limite_fila_fechamento,
+        "fila_atingiu_limite": len(fila) >= org.limite_fila_fechamento,
+        "usuario_e_administrador": usuario_e_administrador(request),
         "consultas_no_mes": consultas_no_mes,
         "fechados_no_mes": fechados_no_mes,
         "perdidos_no_mes": perdidos_no_mes,
         "taxa_conversao": taxa_conversao,
+        "taxa_conversao_consultas": taxa_conversao_consultas,
         "lista_perdidos": perdidos_qs[:50],
         "lista_fechados": fechados_qs[:50],
         "lista_consultas_mes": lista_consultas_mes,

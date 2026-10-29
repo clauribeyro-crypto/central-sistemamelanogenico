@@ -5,7 +5,12 @@
         <h1 style="font-size:1.1rem;">Entrar</h1>
         <form method="post" class="acao">
             {% csrf_token %}
-            {% if form.errors %}
+            {% if bloqueado %}
+                <p style="color:#991b1b;">
+                    Muitas tentativas de login erradas seguidas. Por segurança, espere
+                    uns {{ minutos_bloqueio }} minutos antes de tentar de novo.
+                </p>
+            {% elif form.errors %}
                 <p style="color:#991b1b;">Usuário ou senha inválidos.</p>
             {% endif %}
             <div>
@@ -16,7 +21,7 @@
                 <label for="{{ form.password.id_for_label }}">Senha</label>
                 {{ form.password }}
             </div>
-            <button class="btn" type="submit">Entrar</button>
+            <button class="btn" type="submit"{% if bloqueado %} disabled{% endif %}>Entrar</button>
             <input type="hidden" name="next" value="{{ next }}">
         </form>
     </div>

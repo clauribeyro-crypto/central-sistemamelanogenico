@@ -93,6 +93,16 @@
         {% endfor %}
         <button class="btn-enviar" type="submit">Enviar anamnese</button>
     </form>
+    <script>
+        // Apertar Enter num campo de texto no meio do formulário não deve
+        // enviar a anamnese inteira sem querer — só o botão "Enviar
+        // anamnese" no fim deve enviar.
+        document.querySelector("form").addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" && ev.target.tagName === "INPUT") {
+                ev.preventDefault();
+            }
+        });
+    </script>
     {% if form.errors %}
         <script>
             document.getElementById("aviso-erro").scrollIntoView({ behavior: "smooth", block: "start" });
