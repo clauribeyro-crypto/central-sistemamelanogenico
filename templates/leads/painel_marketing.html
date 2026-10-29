@@ -50,6 +50,14 @@
             <div class="num">{{ totais.vendas }}</div>
             <div class="rotulo">Vendas (R$ {{ totais.valor|floatformat:2 }})</div>
         </div>
+        <div class="card stat">
+            <div class="num">{% if totais.taxa_agendamento != None %}{{ totais.taxa_agendamento|floatformat:0 }}%{% else %}—{% endif %}</div>
+            <div class="rotulo">Taxa de agendamento (total) — {{ totais.agendaram }} de {{ totais.leads }} leads</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{% if totais.taxa_fechamento_sobre_reunioes != None %}{{ totais.taxa_fechamento_sobre_reunioes|floatformat:0 }}%{% else %}—{% endif %}</div>
+            <div class="rotulo">Taxa de fechamento sobre consultas realizadas — {{ totais.fecharam }} de {{ totais.reunioes }} reuniões</div>
+        </div>
     </div>
 
     <div class="card">
@@ -162,10 +170,22 @@
                     <tr><td colspan="6">Nenhuma origem cadastrada.</td></tr>
                 {% endfor %}
             </tbody>
+            <tfoot>
+                <tr style="font-weight:600;">
+                    <td>Total</td>
+                    <td>{{ totais.leads }}</td>
+                    <td>{{ totais.agendaram }}</td>
+                    <td>{% if totais.taxa_agendamento != None %}{{ totais.taxa_agendamento|floatformat:0 }}%{% else %}—{% endif %}</td>
+                    <td>{{ totais.fecharam }}</td>
+                    <td>{% if totais.taxa_fechamento != None %}{{ totais.taxa_fechamento|floatformat:0 }}%{% else %}—{% endif %}</td>
+                </tr>
+            </tfoot>
         </table>
         <p style="font-size:.78rem; color:var(--text-muted); margin-top:.5rem;">
             "Taxa de fechamento" é fecharam ÷ agendaram (das que marcaram consulta, quantas viraram tratamento
-            fechado) — não depende de quando o fechamento aconteceu, só se já aconteceu.
+            fechado) — não depende de quando o fechamento aconteceu, só se já aconteceu. A linha "Total" soma
+            todas as origens, inclusive uma origem desativada que não apareça mais na lista acima, por isso
+            pode não bater exatamente com a soma visual das linhas de cima.
         </p>
     </div>
 

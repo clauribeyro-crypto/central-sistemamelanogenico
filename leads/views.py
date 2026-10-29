@@ -415,6 +415,22 @@ def painel_marketing(request):
             "leads_fecharam": leads_fecharam,
         })
 
+    # Totais do funil inteiro (não só por origem) — soma por todas as chaves
+    # dos dicionários de origem (incluindo origem desativada, que não aparece
+    # na tabela por origem mas ainda conta no total geral de leads).
+    total_agendaram = sum(agendaram_por_origem.values())
+    total_fecharam = sum(len(v) for v in leads_que_fecharam_por_origem.values())
+    totais["agendaram"] = total_agendaram
+    totais["taxa_agendamento"] = (total_agendaram / totais["leads"] * 100) if totais["leads"] else None
+    totais["fecharam"] = total_fecharam
+    totais["taxa_fechamento"] = (total_fecharam / total_agendaram * 100) if total_agendaram else None
+    # Essa é diferente da de cima: aqui a base é quem de fato compareceu à
+    # consulta (reunião realizada), não quem só marcou — pra saber a taxa de
+    # conversão real de quem sentou com a equipe pra fechamento.
+    totais["taxa_fechamento_sobre_reunioes"] = (
+        (total_fecharam / totais["reunioes"] * 100) if totais["reunioes"] else None
+    )
+
     # "Quem está agendando, por origem": todo agendamento passa por
     # Lead.marcar_agendada (CRM, arrastar no board ou direto na Agenda), que
     # sempre registra um HistoricoLead com quem fez — dá pra cruzar com a
