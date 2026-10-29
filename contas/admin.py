@@ -21,6 +21,10 @@ class OrganizacaoAdmin(admin.ModelAdmin):
         ("Agenda", {"fields": ("agenda_hora_inicio", "agenda_hora_fim", "agenda_intervalo_minutos")}),
         ("Leads", {"fields": ("dias_lead_parado",)}),
         ("Financeiro", {"fields": ("saldo_inicial_financeiro",)}),
+        ("Marketing", {
+            "fields": ("planilha_campanhas_url",),
+            "description": "Link \"Publicar na web\" (CSV) da planilha de campanhas do Meta Ads, usado no painel de Marketing.",
+        }),
         ("Meta do mês", {
             "fields": ("meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal"),
             "description": "Meta que aparece no card \"Meta do mês\" da tela inicial dessa organização.",

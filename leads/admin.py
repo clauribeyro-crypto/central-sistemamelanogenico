@@ -31,7 +31,7 @@ class OrigemAdmin(OrganizacaoAdminMixin, admin.ModelAdmin):
     # nomes repetidos entre clínicas (ex.: "Instagram" de cada mentorada) —
     # pra quem não é superusuária, o próprio mixin já filtra só a própria
     # organização, então a coluna não teria repetição mesmo sem isso.
-    list_display = ("nome", "organizacao", "ativo", "para_mentoria")
+    list_display = ("nome", "organizacao", "ativo", "para_mentoria", "padrao_campanha")
     list_filter = ("organizacao", "para_mentoria")
     list_editable = ("ativo", "para_mentoria")
     search_fields = ("nome",)

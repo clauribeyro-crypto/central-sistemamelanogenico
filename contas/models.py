@@ -81,6 +81,16 @@ class Organizacao(models.Model):
         help_text="Quando a fila de fechamento (quem já fez consulta de diagnóstico e ainda não decidiu) atingir esse tanto de gente, mostra um aviso no CRM de fechamento.",
     )
 
+    planilha_campanhas_url = models.URLField(
+        "link da planilha de campanhas (CSV publicado)", blank=True,
+        help_text=(
+            "Link \"Publicar na web\" (formato CSV) da planilha que recebe os dados diários "
+            "de campanha do Meta Ads. O painel de Marketing usa esse link pra somar o "
+            "investimento automaticamente e montar a tabela \"Por funil de campanha\" — sem "
+            "esse link configurado, essas duas partes ficam zeradas/com aviso."
+        ),
+    )
+
     acesso_valido_ate = models.DateField(
         blank=True, null=True,
         verbose_name="acesso válido até",

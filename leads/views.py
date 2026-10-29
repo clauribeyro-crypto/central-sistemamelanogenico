@@ -7,7 +7,6 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from django.forms import modelformset_factory
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -27,13 +26,14 @@ from programas.models import Acompanhamento
 
 from .forms import (
     AgendarConsultaForm, EditarLeadForm, EnviarWhatsAppForm, NovoLeadForm, OrigemForm,
-    PausarCadenciaForm, PerderLeadForm, RegistrarLigacaoForm, RegistroMarketingDiarioForm,
+    PausarCadenciaForm, PerderLeadForm, RegistrarLigacaoForm,
     RegistroSocialSellingForm, ResultadoContatoForm,
 )
 from .models import (
-    HistoricoLead, Lead, MensagemModelo, Origem, PausaLead, RegistroMarketingDiario,
+    HistoricoLead, Lead, MensagemModelo, Origem, PausaLead,
     RegistroSocialSelling, WebhookImportacao,
 )
+from .services_marketing import PlanilhaCampanhasIndisponivel, buscar_linhas_campanhas
 
 MENSAGENS_PADRAO = {
     MensagemModelo.Etapa.CONTATO_1: (
@@ -241,9 +241,9 @@ def registrar_social_selling(request):
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def painel_marketing(request):
     """
-    Visão diária de marketing e funil comercial pra gestora de tráfego.
-    Investimento/impressões/cliques/pageview são lançados manualmente (o
-    sistema não tem integração com Meta/Google Ads); leads, reuniões
+    Visão mensal de marketing e funil comercial pra gestora de tráfego.
+    Investimento vem automaticamente da planilha de campanhas do Meta Ads
+    (link configurado em Organizações → Marketing); leads, reuniões
     realizadas, vendas e valor são calculados a partir do que já existe no
     CRM de leads e no CRM de fechamento — não duplica lançamento nem corre
     o risco desses números baterem diferente do resto do sistema.
@@ -267,108 +267,12 @@ def painel_marketing(request):
     data_fim_mes = datetime.date(ano, mes, ultimo_dia_mes)
     data_fim = min(data_fim_mes, hoje)
 
-    if data_fim >= data_inicio:
-        dias_ja = set(RegistroMarketingDiario.objects.filter(
-            organizacao=org, data__gte=data_inicio, data__lte=data_fim,
-        ).values_list("data", flat=True))
-        dia_atual = data_inicio
-        novos = []
-        while dia_atual <= data_fim:
-            if dia_atual not in dias_ja:
-                novos.append(RegistroMarketingDiario(organizacao=org, data=dia_atual))
-            dia_atual += datetime.timedelta(days=1)
-        if novos:
-            RegistroMarketingDiario.objects.bulk_create(novos)
-
-    queryset = RegistroMarketingDiario.objects.filter(
-        organizacao=org, data__gte=data_inicio, data__lte=data_fim,
-    ).order_by("data")
-    FormSet = modelformset_factory(RegistroMarketingDiario, form=RegistroMarketingDiarioForm, extra=0)
-
-    if request.method == "POST":
-        formset = FormSet(request.POST, queryset=queryset)
-        if formset.is_valid():
-            formset.save()
-            messages.success(request, "Números de marketing salvos.")
-            return redirect(f"{reverse('leads:painel_marketing')}?ano={ano}&mes={mes}")
-        messages.error(request, "Não deu pra salvar — confira os números.")
-    else:
-        formset = FormSet(queryset=queryset)
-
-    leads_por_dia = {
-        row["entrou_em__date"]: row["total"]
+    origens = list(Origem.objects.filter(organizacao=org, ativo=True).order_by("nome"))
+    leads_por_origem_contagem = {
+        row["origem_id"]: row["total"]
         for row in Lead.objects.filter(
             organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
-        ).values("entrou_em__date").annotate(total=Count("id"))
-    }
-    origens = list(Origem.objects.filter(organizacao=org, ativo=True).order_by("nome"))
-    leads_por_dia_e_origem = {}
-    for row in Lead.objects.filter(
-        organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
-    ).values("entrou_em__date", "origem_id").annotate(total=Count("id")):
-        leads_por_dia_e_origem.setdefault(row["entrou_em__date"], {})[row["origem_id"]] = row["total"]
-    reunioes_por_dia = {
-        row["data_hora__date"]: row["total"]
-        for row in Consulta.objects.filter(
-            organizacao=org, status=Consulta.Status.REALIZADA,
-            tipo_consulta__conta_para_fechamento=True,
-            data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
-        ).values("data_hora__date").annotate(total=Count("id"))
-    }
-    # Usa data_fim_mes (o mês inteiro), não o data_fim capado em "hoje" — um
-    # fechamento pode ter sido assinado hoje com o protocolo pra começar daqui
-    # a uns dias, ainda dentro do mesmo mês, e ele já conta como venda do mês
-    # mesmo que esse dia ainda não tenha chegado (mesma regra de
-    # financeiro.views.totais_fechamentos_mes, que também não capa em hoje).
-    fechamentos_do_periodo = Acompanhamento.objects.filter(
-        organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim_mes,
-    ).prefetch_related("pagamentos")
-    vendas_por_dia = {}
-    valor_por_dia = {}
-    for acompanhamento in fechamentos_do_periodo:
-        # Mesma regra do relatório de fechamentos (financeiro.views.totais_fechamentos_mes):
-        # o valor de verdade é o do pagamento vinculado, que pode ter sido corrigido
-        # direto no Financeiro — valor_contratado só entra se não existir pagamento.
-        pagamento = next(
-            (p for p in acompanhamento.pagamentos.all() if p.status != Pagamento.Status.CANCELADO), None
-        )
-        valor_liquido = pagamento.valor if pagamento else (acompanhamento.valor_contratado - acompanhamento.desconto)
-        vendas_por_dia[acompanhamento.data_inicio] = vendas_por_dia.get(acompanhamento.data_inicio, 0) + 1
-        valor_por_dia[acompanhamento.data_inicio] = (
-            valor_por_dia.get(acompanhamento.data_inicio, Decimal("0.00")) + valor_liquido
-        )
-
-    linhas = []
-    for form in formset:
-        data_linha = form.instance.data
-        origens_do_dia = leads_por_dia_e_origem.get(data_linha, {})
-        linhas.append({
-            "form": form,
-            "data": data_linha,
-            "leads": leads_por_dia.get(data_linha, 0),
-            "leads_por_origem": [origens_do_dia.get(o.pk, 0) for o in origens],
-            "reunioes": reunioes_por_dia.get(data_linha, 0),
-            "vendas": vendas_por_dia.get(data_linha, 0),
-            "valor": valor_por_dia.get(data_linha, Decimal("0.00")),
-        })
-
-    totais = {
-        "investimento": sum((l["form"].instance.investimento for l in linhas), Decimal("0.00")),
-        "impressoes": sum((l["form"].instance.impressoes for l in linhas), 0),
-        "cliques": sum((l["form"].instance.cliques for l in linhas), 0),
-        "pageviews": sum((l["form"].instance.pageviews for l in linhas), 0),
-        "leads": sum((l["leads"] for l in linhas), 0),
-        "leads_por_origem": [
-            sum((l["leads_por_origem"][i] for l in linhas), 0) for i in range(len(origens))
-        ],
-        "reunioes": sum((l["reunioes"] for l in linhas), 0),
-        # Soma de vendas_por_dia/valor_por_dia direto (mês inteiro), não de
-        # linhas (só vai até hoje) — ver comentário acima de fechamentos_do_periodo.
-        "vendas": sum(vendas_por_dia.values(), 0),
-        "valor": sum(valor_por_dia.values(), Decimal("0.00")),
-        "consultas_no_mes": Consulta.objects.filter(
-            organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim_mes,
-        ).exclude(status=Consulta.Status.CANCELADA).exclude(reagendamentos__isnull=False).count(),
+        ).values("origem_id").annotate(total=Count("id"))
     }
 
     # "De onde vêm as leads": pra cada origem, quantas entraram no período e
@@ -382,9 +286,20 @@ def painel_marketing(request):
             status=Lead.Status.AGENDADA,
         ).values("origem_id").annotate(total=Count("id"))
     }
+    # Reuniões de fato realizadas, por origem da lead que originou a consulta
+    # — usado na tabela "Por funil de campanha" (uma consulta agendada direto
+    # na Agenda, sem lead vinculado, não entra em nenhuma origem, igual já
+    # acontece com o resto do funil por origem).
+    reunioes_por_origem = {
+        row["lead__origem_id"]: row["total"]
+        for row in Consulta.objects.filter(
+            organizacao=org, status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True,
+            data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim, lead__isnull=False,
+        ).values("lead__origem_id").annotate(total=Count("id"))
+    }
     # Fechou = a paciente vinculada a essa lead tem pelo menos um Acompanhamento
     # (qualquer status — cancelado também conta como fechamento que aconteceu,
-    # mesma lógica de "vendas" usada mais acima nesta view). Não tem relação
+    # mesma lógica de "vendas" usada mais abaixo nesta view). Não tem relação
     # com a data do Acompanhamento: é "essa lead, que entrou nesse período,
     # chegou a fechar tratamento alguma hora", pra fechar o funil com Leads/
     # Agendaram que já seguem essa mesma lógica de "aconteceu alguma hora".
@@ -401,7 +316,8 @@ def painel_marketing(request):
         leads_que_fecharam_por_origem.setdefault(lead.origem_id, []).append(lead)
 
     origem_resumo = []
-    for origem, total_leads in zip(origens, totais["leads_por_origem"]):
+    for origem in origens:
+        total_leads = leads_por_origem_contagem.get(origem.pk, 0)
         agendaram = agendaram_por_origem.get(origem.pk, 0)
         leads_fecharam = leads_que_fecharam_por_origem.get(origem.pk, [])
         fecharam = len(leads_fecharam)
@@ -415,21 +331,127 @@ def painel_marketing(request):
             "leads_fecharam": leads_fecharam,
         })
 
+    # Vendas/valor do mês inteiro. Usa data_fim_mes (o mês inteiro), não o
+    # data_fim capado em "hoje" — um fechamento pode ter sido assinado hoje
+    # com o protocolo pra começar daqui a uns dias, ainda dentro do mesmo
+    # mês, e ele já conta como venda do mês mesmo que esse dia ainda não
+    # tenha chegado (mesma regra de financeiro.views.totais_fechamentos_mes,
+    # que também não capa em hoje).
+    total_vendas = 0
+    total_valor = Decimal("0.00")
+    for acompanhamento in Acompanhamento.objects.filter(
+        organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim_mes,
+    ).prefetch_related("pagamentos"):
+        # Mesma regra do relatório de fechamentos (financeiro.views.totais_fechamentos_mes):
+        # o valor de verdade é o do pagamento vinculado, que pode ter sido corrigido
+        # direto no Financeiro — valor_contratado só entra se não existir pagamento.
+        pagamento = next(
+            (p for p in acompanhamento.pagamentos.all() if p.status != Pagamento.Status.CANCELADO), None
+        )
+        valor_liquido = pagamento.valor if pagamento else (acompanhamento.valor_contratado - acompanhamento.desconto)
+        total_vendas += 1
+        total_valor += valor_liquido
+
     # Totais do funil inteiro (não só por origem) — soma por todas as chaves
     # dos dicionários de origem (incluindo origem desativada, que não aparece
     # na tabela por origem mas ainda conta no total geral de leads).
+    total_leads_periodo = sum(leads_por_origem_contagem.values())
     total_agendaram = sum(agendaram_por_origem.values())
     total_fecharam = sum(len(v) for v in leads_que_fecharam_por_origem.values())
-    totais["agendaram"] = total_agendaram
-    totais["taxa_agendamento"] = (total_agendaram / totais["leads"] * 100) if totais["leads"] else None
-    totais["fecharam"] = total_fecharam
-    totais["taxa_fechamento"] = (total_fecharam / total_agendaram * 100) if total_agendaram else None
-    # Essa é diferente da de cima: aqui a base é quem de fato compareceu à
-    # consulta (reunião realizada), não quem só marcou — pra saber a taxa de
-    # conversão real de quem sentou com a equipe pra fechamento.
-    totais["taxa_fechamento_sobre_reunioes"] = (
-        (total_fecharam / totais["reunioes"] * 100) if totais["reunioes"] else None
+    total_reunioes = Consulta.objects.filter(
+        organizacao=org, status=Consulta.Status.REALIZADA, tipo_consulta__conta_para_fechamento=True,
+        data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim,
+    ).count()
+
+    totais = {
+        "leads": total_leads_periodo,
+        "leads_por_origem": [leads_por_origem_contagem.get(o.pk, 0) for o in origens],
+        "agendaram": total_agendaram,
+        "taxa_agendamento": (total_agendaram / total_leads_periodo * 100) if total_leads_periodo else None,
+        "fecharam": total_fecharam,
+        "taxa_fechamento": (total_fecharam / total_agendaram * 100) if total_agendaram else None,
+        "reunioes": total_reunioes,
+        # Essa é diferente da de cima: aqui a base é quem de fato compareceu à
+        # consulta (reunião realizada), não quem só marcou — pra saber a taxa
+        # de conversão real de quem sentou com a equipe pra fechamento.
+        "taxa_fechamento_sobre_reunioes": (total_fecharam / total_reunioes * 100) if total_reunioes else None,
+        "vendas": total_vendas,
+        "valor": total_valor,
+        "consultas_no_mes": Consulta.objects.filter(
+            organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim_mes,
+        ).exclude(status=Consulta.Status.CANCELADA).exclude(reagendamentos__isnull=False).count(),
+    }
+
+    # Investimento e funil por campanha — vem da planilha de campanhas do
+    # Meta Ads (link configurado em Organizações → Marketing), não é mais
+    # lançado à mão. Cada campanha é associada a uma Origem pelo texto
+    # configurado em Origem.padrao_campanha (o texto mais específico — mais
+    # longo — vence quando mais de um bate no mesmo nome de campanha);
+    # campanhas sem nenhuma origem configurada (ex.: campanhas de
+    # engajamento/seguidores, que não captam lead) aparecem só com o
+    # investimento, sem Leads/Agendamento/Reunião/Vendas.
+    origens_com_padrao = sorted(
+        (o for o in origens if o.padrao_campanha), key=lambda o: -len(o.padrao_campanha)
     )
+
+    def origem_da_campanha(nome_campanha):
+        nome_lower = nome_campanha.lower()
+        for o in origens_com_padrao:
+            if o.padrao_campanha.lower() in nome_lower:
+                return o
+        return None
+
+    erro_planilha = None
+    investimento_total = Decimal("0.00")
+    investimento_por_campanha = {}
+    objetivo_por_campanha = {}
+    try:
+        for linha in buscar_linhas_campanhas(org.planilha_campanhas_url, data_inicio, data_fim):
+            investimento_total += linha["investimento"]
+            investimento_por_campanha[linha["campanha"]] = (
+                investimento_por_campanha.get(linha["campanha"], Decimal("0.00")) + linha["investimento"]
+            )
+            # Uma campanha pode mudar de nome de evento de resultado dia a dia,
+            # mas o objetivo (OUTCOME_LEADS/TRAFFIC/ENGAGEMENT) é fixo por
+            # campanha no Meta Ads — guarda o último valor visto, é o mesmo.
+            if linha["objetivo"]:
+                objetivo_por_campanha[linha["campanha"]] = linha["objetivo"]
+    except PlanilhaCampanhasIndisponivel as exc:
+        erro_planilha = str(exc)
+
+    totais["investimento"] = investimento_total
+    totais["custo_lead"] = (investimento_total / total_leads_periodo) if total_leads_periodo else None
+    totais["custo_reuniao_agendada"] = (investimento_total / total_agendaram) if total_agendaram else None
+    totais["custo_reuniao_realizada"] = (investimento_total / total_reunioes) if total_reunioes else None
+
+    funil_campanhas = []
+    for nome_campanha, investimento in sorted(investimento_por_campanha.items(), key=lambda item: -item[1]):
+        # Só associa a uma Origem campanha com objetivo "captação de lead"
+        # (OUTCOME_LEADS) de verdade — evita que uma campanha de outro
+        # objetivo (ex.: engajamento/tráfego pra seguidores) bata sem querer
+        # com o texto configurado só porque o nome contém a mesma palavra.
+        origem = (
+            origem_da_campanha(nome_campanha)
+            if objetivo_por_campanha.get(nome_campanha) == "OUTCOME_LEADS" else None
+        )
+        if origem:
+            leads_campanha = leads_por_origem_contagem.get(origem.pk, 0)
+            agendamento_campanha = agendaram_por_origem.get(origem.pk, 0)
+            reuniao_campanha = reunioes_por_origem.get(origem.pk, 0)
+            vendas_campanha = len(leads_que_fecharam_por_origem.get(origem.pk, []))
+        else:
+            leads_campanha = agendamento_campanha = reuniao_campanha = vendas_campanha = None
+        funil_campanhas.append({
+            "campanha": nome_campanha,
+            "origem": origem,
+            "investimento": investimento,
+            "leads": leads_campanha,
+            "custo_lead": (investimento / leads_campanha) if leads_campanha else None,
+            "agendamento": agendamento_campanha,
+            "reuniao_realizada": reuniao_campanha,
+            "vendas": vendas_campanha,
+            "custo_venda": (investimento / vendas_campanha) if vendas_campanha else None,
+        })
 
     # "Quem está agendando, por origem": todo agendamento passa por
     # Lead.marcar_agendada (CRM, arrastar no board ou direto na Agenda), que
@@ -513,13 +535,13 @@ def painel_marketing(request):
     ]
 
     contexto = {
-        "formset": formset,
-        "linhas": linhas,
         "totais": totais,
         "origens": origens,
         "origem_resumo": origem_resumo,
         "matriz_quem_agendou": matriz_quem_agendou,
         "atividade_equipe": atividade_equipe,
+        "funil_campanhas": funil_campanhas,
+        "erro_planilha": erro_planilha,
         "ano": ano,
         "mes": mes,
         "mes_nome": dict(MESES)[mes],

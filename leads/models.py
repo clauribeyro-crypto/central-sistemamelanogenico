@@ -21,6 +21,16 @@ class Origem(ModeloDaOrganizacao):
             "origem não contam pra comissão de agendamento da equipe comercial."
         ),
     )
+    padrao_campanha = models.CharField(
+        "texto da campanha", max_length=100, blank=True,
+        help_text=(
+            "Se o nome de uma campanha de anúncio (na planilha de campanhas do Meta Ads) "
+            "contiver esse texto, ela conta pra essa origem na tabela \"Por funil de "
+            "campanha\" do painel de Marketing. Quando mais de uma origem combinar com o "
+            "mesmo nome de campanha, vence o texto mais específico (mais longo). Deixe em "
+            "branco se essa origem não vem de campanha paga."
+        ),
+    )
 
     class Meta:
         verbose_name = "origem do lead"

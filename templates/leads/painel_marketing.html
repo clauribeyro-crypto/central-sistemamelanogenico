@@ -3,9 +3,16 @@
 {% block content %}
     <h1>📈 Marketing</h1>
     <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
-        Investimento, impressões, cliques e pageview são lançados manualmente — o resto (leads, reuniões, vendas e valor)
-        já vem do CRM de leads e do CRM de fechamento, sem precisar digitar de novo.
+        Investimento vem automaticamente da planilha de campanhas do Meta Ads — o resto (leads, reuniões, vendas e
+        valor) já vem do CRM de leads e do CRM de fechamento. Nada aqui precisa ser digitado à mão.
     </p>
+
+    {% if erro_planilha %}
+        <p style="background:#fdf1d9; color:#8a5a10; padding:.6rem 1rem; border-radius:8px; font-size:.85rem;">
+            ⚠️ {{ erro_planilha }} Os números de Investimento, Custo por lead/reunião e a tabela "Por funil de
+            campanha" ficam zerados até isso ser resolvido — o resto do painel continua normal.
+        </p>
+    {% endif %}
 
     <form class="filtro no-print" method="get">
         <div>
@@ -39,6 +46,10 @@
             <div class="rotulo">Leads no mês</div>
         </div>
         <div class="card stat">
+            <div class="num">{% if totais.custo_lead != None %}R$ {{ totais.custo_lead|floatformat:2 }}{% else %}—{% endif %}</div>
+            <div class="rotulo">Custo por lead</div>
+        </div>
+        <div class="card stat">
             <div class="num">{{ totais.reunioes }}</div>
             <div class="rotulo">Reuniões realizadas</div>
         </div>
@@ -58,70 +69,47 @@
             <div class="num">{% if totais.taxa_fechamento_sobre_reunioes != None %}{{ totais.taxa_fechamento_sobre_reunioes|floatformat:0 }}%{% else %}—{% endif %}</div>
             <div class="rotulo">Taxa de fechamento sobre consultas realizadas — {{ totais.fecharam }} de {{ totais.reunioes }} reuniões</div>
         </div>
+        <div class="card stat">
+            <div class="num">{% if totais.custo_reuniao_agendada != None %}R$ {{ totais.custo_reuniao_agendada|floatformat:2 }}{% else %}—{% endif %}</div>
+            <div class="rotulo">Custo por reunião agendada</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{% if totais.custo_reuniao_realizada != None %}R$ {{ totais.custo_reuniao_realizada|floatformat:2 }}{% else %}—{% endif %}</div>
+            <div class="rotulo">Custo por reunião realizada</div>
+        </div>
     </div>
 
     <div class="card">
-        <form method="post">
-            {% csrf_token %}
-            {{ formset.management_form }}
-            <table>
-                <thead>
+        <h2 style="margin-top:0;">Por funil de campanha</h2>
+        <p style="font-size:.85rem; color:var(--text-muted);">
+            Investimento vem direto da planilha de campanhas do Meta Ads. Leads/Agendamento/Reunião Realizada/Vendas
+            só aparecem pras campanhas de captação de lead (associadas a uma Origem em Leads → Origens) — campanhas
+            de engajamento, seguidores etc. mostram só o investimento.
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Campanha</th><th>Investimento</th><th>Leads</th><th>Custo por lead</th>
+                    <th>Agendamento</th><th>Reunião realizada</th><th>Vendas</th><th>Custo por venda</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in funil_campanhas %}
                     <tr>
-                        <th>Data</th>
-                        <th>Investimento</th>
-                        <th>Impressões</th>
-                        <th>Cliques</th>
-                        <th>Pageview</th>
-                        <th>Leads</th>
-                        {% for origem in origens %}
-                            <th>{{ origem.nome }}</th>
-                        {% endfor %}
-                        <th>Reunião realizada</th>
-                        <th>Vendas</th>
-                        <th>Valor (R$)</th>
+                        <td>{{ linha.campanha }}{% if linha.origem %} <span style="color:var(--text-muted); font-size:.78rem;">({{ linha.origem.nome }})</span>{% endif %}</td>
+                        <td>R$ {{ linha.investimento|floatformat:2 }}</td>
+                        <td>{% if linha.leads != None %}{{ linha.leads }}{% else %}—{% endif %}</td>
+                        <td>{% if linha.custo_lead != None %}R$ {{ linha.custo_lead|floatformat:2 }}{% else %}—{% endif %}</td>
+                        <td>{% if linha.agendamento != None %}{{ linha.agendamento }}{% else %}—{% endif %}</td>
+                        <td>{% if linha.reuniao_realizada != None %}{{ linha.reuniao_realizada }}{% else %}—{% endif %}</td>
+                        <td>{% if linha.vendas != None %}{{ linha.vendas }}{% else %}—{% endif %}</td>
+                        <td>{% if linha.custo_venda != None %}R$ {{ linha.custo_venda|floatformat:2 }}{% else %}—{% endif %}</td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for linha in linhas %}
-                        <tr>
-                            <td>{{ linha.data|date:"d/m" }}</td>
-                            <td>
-                                {{ linha.form.id }}
-                                {{ linha.form.data }}
-                                {{ linha.form.investimento }}
-                            </td>
-                            <td>{{ linha.form.impressoes }}</td>
-                            <td>{{ linha.form.cliques }}</td>
-                            <td>{{ linha.form.pageviews }}</td>
-                            <td>{{ linha.leads }}</td>
-                            {% for total_origem in linha.leads_por_origem %}
-                                <td>{{ total_origem }}</td>
-                            {% endfor %}
-                            <td>{{ linha.reunioes }}</td>
-                            <td>{{ linha.vendas }}</td>
-                            <td>R$ {{ linha.valor|floatformat:2 }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-                <tfoot>
-                    <tr style="font-weight:600;">
-                        <td>Total</td>
-                        <td>R$ {{ totais.investimento|floatformat:2 }}</td>
-                        <td>{{ totais.impressoes }}</td>
-                        <td>{{ totais.cliques }}</td>
-                        <td>{{ totais.pageviews }}</td>
-                        <td>{{ totais.leads }}</td>
-                        {% for total_origem in totais.leads_por_origem %}
-                            <td>{{ total_origem }}</td>
-                        {% endfor %}
-                        <td>{{ totais.reunioes }}</td>
-                        <td>{{ totais.vendas }}</td>
-                        <td>R$ {{ totais.valor|floatformat:2 }}</td>
-                    </tr>
-                </tfoot>
-            </table>
-            <button class="btn" type="submit" style="margin-top:1rem;">Salvar</button>
-        </form>
+                {% empty %}
+                    <tr><td colspan="8">Nenhum dado de campanha nesse período{% if erro_planilha %} (veja o aviso acima){% endif %}.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 
     <div class="card">
