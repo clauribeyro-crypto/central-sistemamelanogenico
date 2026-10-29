@@ -1,0 +1,29 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    <p>
+        <strong>{{ consultas|length }}</strong> consulta{{ consultas|length|pluralize }} selecionada{{ consultas|length|pluralize }}
+        vai{{ consultas|length|pluralize:"i,rem" }} ter o tipo trocado pra:
+    </p>
+    <ul style="max-height: 300px; overflow-y: auto; margin-bottom: 1rem;">
+        {% for consulta in consultas %}
+            <li>
+                {{ consulta.paciente }} — tipo atual: {{ consulta.tipo_consulta }}
+                ({{ consulta.data_hora|date:"d/m/Y H:i" }})
+            </li>
+        {% endfor %}
+    </ul>
+
+    <div>
+        {{ form.as_p }}
+    </div>
+
+    {% for consulta in consultas %}
+        <input type="hidden" name="{{ action_checkbox_name }}" value="{{ consulta.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="{{ action_name }}">
+    <input type="submit" name="aplicar" value="Reatribuir tipo" class="default">
+</form>
+{% endblock %}
