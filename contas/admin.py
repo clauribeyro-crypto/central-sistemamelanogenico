@@ -10,6 +10,7 @@ class OrganizacaoAdmin(admin.ModelAdmin):
         "nome", "slug", "ativo", "acesso_valido_ate",
         "meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal",
         "modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo",
+        "modulo_gravacao_ia_ativo",
         "criado_em",
     )
     list_filter = ("ativo",)
@@ -25,8 +26,17 @@ class OrganizacaoAdmin(admin.ModelAdmin):
             "description": "Meta que aparece no card \"Meta do mês\" da tela inicial dessa organização.",
         }),
         ("Módulos ativos", {
-            "fields": ("modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo"),
-            "description": "Desmarque um módulo pra escondê-lo do menu e bloquear o acesso pra essa organização.",
+            "fields": (
+                "modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo",
+                "modulo_gravacao_ia_ativo",
+            ),
+            "description": (
+                "Desmarque um módulo pra escondê-lo do menu e bloquear o acesso pra essa "
+                "organização. \"Gravação de consulta com IA\" é diferente: vem desmarcado "
+                "pra todo mundo, incluindo organizações mentoradas, e só deve ser marcado "
+                "pra quem tem acesso a esse recurso (paga à parte, já que a IA usada tem "
+                "custo por conta da clínica)."
+            ),
         }),
     )
 

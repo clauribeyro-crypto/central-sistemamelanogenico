@@ -370,8 +370,12 @@ def ficha(request, pk):
     paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
     acompanhamento = paciente.acompanhamento_atual
 
+    abas = ABAS if org.modulo_gravacao_ia_ativo else [
+        (slug, label) for slug, label in ABAS if slug != "gravacoes"
+    ]
+
     aba = request.GET.get("aba", "geral")
-    if aba not in dict(ABAS):
+    if aba not in dict(abas):
         aba = "geral"
 
     # Respostas do formulário/quiz de origem (ex.: Respondi) — vêm do(s)
@@ -394,7 +398,7 @@ def ficha(request, pk):
             pk=acompanhamento.pk if acompanhamento else None
         ).select_related("programa").order_by("-data_inicio"),
         "usuario_e_administrador": usuario_e_administrador(request),
-        "abas": ABAS,
+        "abas": abas,
         "aba_atual": aba,
         "aba_pronta": aba in ABAS_PRONTAS,
         "jornada": acompanhamento.jornada() if acompanhamento else None,

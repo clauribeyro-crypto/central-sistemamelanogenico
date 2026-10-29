@@ -49,6 +49,16 @@ class Organizacao(models.Model):
         default=True, verbose_name="módulo Programas/Acompanhamento ativo",
         help_text="Desmarque para esconder Programas e o início de protocolo de acompanhamento dessa organização.",
     )
+    modulo_gravacao_ia_ativo = models.BooleanField(
+        default=False, verbose_name="módulo Gravação de consulta com IA ativo",
+        help_text=(
+            "Diferente dos outros módulos, vem desligado por padrão: a transcrição e "
+            "análise usam IA paga (OpenAI/Anthropic) por conta da organização dona do "
+            "sistema. Marque só pras organizações que têm acesso a esse recurso "
+            "(ex.: mediante pagamento à parte) — sem isso, a aba \"Gravações de consulta\" "
+            "nem aparece na ficha da paciente pra essa organização."
+        ),
+    )
 
     meta_faturamento_mensal = models.DecimalField(
         max_digits=10, decimal_places=2, default=50000,

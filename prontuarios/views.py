@@ -6,7 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from contas.utils import organizacao_do_usuario, usuario_e_administrador
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
 
 from .forms import AnamneseForm, AtendimentoForm, DocumentoForm, GravacaoConsultaForm, RegistroEvolucaoForm
@@ -351,6 +351,7 @@ def documento_excluir(request, pk):
 
 
 @login_required
+@modulo_ativo_obrigatorio("modulo_gravacao_ia_ativo", "Gravação de consulta com IA")
 def gravacao_criar(request, paciente_pk):
     org = organizacao_do_usuario(request)
     paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
@@ -370,6 +371,7 @@ def gravacao_criar(request, paciente_pk):
 
 @login_required
 @require_POST
+@modulo_ativo_obrigatorio("modulo_gravacao_ia_ativo", "Gravação de consulta com IA")
 def gravacao_processar(request, pk):
     """Dispara a transcrição + análise por IA — roda na hora (sem fila em segundo plano), pode demorar um pouco."""
     org = organizacao_do_usuario(request)
@@ -393,6 +395,7 @@ def gravacao_processar(request, pk):
 
 @login_required
 @require_POST
+@modulo_ativo_obrigatorio("modulo_gravacao_ia_ativo", "Gravação de consulta com IA")
 def gravacao_excluir(request, pk):
     """Excluir uma gravação já enviada exige administrador — anexar uma nova é livre."""
     org = organizacao_do_usuario(request)
