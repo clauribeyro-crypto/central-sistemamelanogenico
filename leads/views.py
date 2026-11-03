@@ -1123,6 +1123,26 @@ def perder(request, pk):
 def agendar(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
+
+    # Se já existe uma consulta ativa pra essa lead, "Agendar" de novo criaria
+    # uma segunda consulta solta (sem ligação com a primeira) — conta de novo
+    # na meta do mês e gera uma segunda comissão de agendamento pra mesma
+    # lead, mesmo sendo a mesma pessoa. O jeito certo de trocar a data de uma
+    # consulta que já existe é "Remarcar consulta" (agenda.views.
+    # remarcar_consulta), que mantém a cobrança ligada à consulta original.
+    consulta_ativa = lead.consultas.filter(
+        status__in=[Consulta.Status.AGENDADA, Consulta.Status.CONFIRMADA]
+    ).order_by("-data_hora").first()
+    if consulta_ativa:
+        messages.error(
+            request,
+            f"Essa lead já tem uma consulta marcada pra "
+            f"{timezone.localtime(consulta_ativa.data_hora):%d/%m/%Y %H:%M} — pra trocar a data, "
+            f"use \"Remarcar consulta\" nessa consulta (não agende uma nova), senão conta duas vezes "
+            f"na meta do mês e na comissão.",
+        )
+        return redirect("agenda:detalhe_consulta", pk=consulta_ativa.pk)
+
     if request.method == "POST":
         form = AgendarConsultaForm(request.POST, organizacao=org)
         if form.is_valid():
