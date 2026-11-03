@@ -204,12 +204,15 @@ def detalhe_recebido_no_periodo(org, ano, mes):
 
 def consultas_agendadas_no_mes(org, ano, mes):
     """
-    Consultas cobradas *criadas* (agendadas no sistema) no mês — diferente
-    das "consultas cobradas no mês" de totais_fechamentos_mes, que conta
-    pela data da consulta em si. Uma consulta marcada em setembro pra
-    acontecer em outubro, com sinal pago em setembro, deve contar pra meta
-    de agendamento de setembro (é quando a SDR fez o trabalho), não pra de
-    outubro — é essa a meta de "consultas por mês" da organização.
+    Consultas de diagnóstico (tipo_consulta.conta_para_fechamento=True) cobradas
+    *criadas* (agendadas no sistema) no mês — diferente das "consultas cobradas
+    no mês" de totais_fechamentos_mes, que conta pela data da consulta em si.
+    Uma consulta marcada em setembro pra acontecer em outubro, com sinal pago
+    em setembro, deve contar pra meta de agendamento de setembro (é quando a
+    SDR fez o trabalho), não pra de outubro — é essa a meta de "consultas por
+    mês" da organização. Só entra consulta de diagnóstico (a meta é de
+    agendamento de consulta de diagnóstico, não de qualquer tipo de consulta
+    cobrada) — um outro tipo de consulta marcado com valor não deve contar.
     """
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)
@@ -217,6 +220,7 @@ def consultas_agendadas_no_mes(org, ano, mes):
     consultas = list(
         Consulta.objects.filter(
             organizacao=org, criado_em__date__gte=data_inicio, criado_em__date__lte=data_fim, valor__gt=0,
+            tipo_consulta__conta_para_fechamento=True,
         ).exclude(status=Consulta.Status.CANCELADA)
         .exclude(reagendamentos__isnull=False)
         .select_related("paciente", "tipo_consulta").order_by("criado_em")
