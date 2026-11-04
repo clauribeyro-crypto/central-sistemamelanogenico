@@ -213,18 +213,31 @@ def consultas_agendadas_no_mes(org, ano, mes):
     mês" da organização. Só entra consulta de diagnóstico (a meta é de
     agendamento de consulta de diagnóstico, não de qualquer tipo de consulta
     cobrada) — um outro tipo de consulta marcado com valor não deve contar.
+
+    Remarcar (ver agenda.views.remarcar_consulta) cria uma consulta nova, com
+    criado_em de hoje — usar esse criado_em direto faria uma remarcação mudar
+    o mês em que o agendamento conta, mesmo sem nenhum trabalho novo de
+    agendamento ter sido feito. Por isso sobe a cadeia de reagendada_de até a
+    consulta raiz (a primeira, nunca remarcada) e usa o criado_em dela: uma
+    consulta remarcada continua contando pro mês em que foi agendada a
+    primeira vez, não pro mês da remarcação.
     """
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)
     data_fim = datetime.date(ano, mes, ultimo_dia)
-    consultas = list(
-        Consulta.objects.filter(
-            organizacao=org, criado_em__date__gte=data_inicio, criado_em__date__lte=data_fim, valor__gt=0,
-            tipo_consulta__conta_para_fechamento=True,
-        ).exclude(status=Consulta.Status.CANCELADA)
-        .exclude(reagendamentos__isnull=False)
-        .select_related("paciente", "tipo_consulta").order_by("criado_em")
+    candidatas = (
+        Consulta.objects.filter(organizacao=org, valor__gt=0, tipo_consulta__conta_para_fechamento=True)
+        .exclude(status__in=[Consulta.Status.CANCELADA, Consulta.Status.REAGENDADA])
+        .select_related("paciente", "tipo_consulta")
     )
+    consultas = []
+    for c in candidatas:
+        raiz = c
+        while raiz.reagendada_de_id:
+            raiz = raiz.reagendada_de
+        if data_inicio <= raiz.criado_em.date() <= data_fim:
+            consultas.append(c)
+    consultas.sort(key=lambda c: c.criado_em)
     for c in consultas:
         pagamento = c.pagamento_vinculado()
         c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
