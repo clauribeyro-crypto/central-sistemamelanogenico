@@ -13,6 +13,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -797,8 +798,17 @@ def detalhe(request, pk):
     lead = get_object_or_404(leads_qs, pk=pk)
     historico = lead.historico.all()[:50]
 
+    # "Voltar ao CRM" mantém o filtro (origem/período/aba) que a usuária
+    # tinha montado antes de entrar nesse lead — sem isso, cada clique num
+    # card perdia o filtro e ela tinha que refazer tudo de novo pra conferir
+    # o próximo lead da mesma busca.
+    proximo = request.GET.get("proximo")
+    if proximo and not url_has_allowed_host_and_scheme(proximo, allowed_hosts={request.get_host()}):
+        proximo = None
+
     contexto = {
         "lead": lead,
+        "url_voltar": proximo or reverse("leads:kanban"),
         "dados_formulario": rotular_dados_formulario(lead.dados_formulario),
         "historico": historico,
         "pausa_ativa": lead.pausa_ativa,

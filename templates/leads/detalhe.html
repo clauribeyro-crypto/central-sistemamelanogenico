@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ lead.nome }} · CRM · Sistema da Clínica{% endblock %}
 {% block content %}
-    <p><a href="{% url 'leads:kanban' %}">← Voltar ao CRM</a></p>
+    <p><a href="{{ url_voltar }}">← Voltar ao CRM</a></p>
 
     {% if dados_formulario or lead.respostas_formulario_manual %}
         <div class="card" style="border:2px solid var(--primary, #6366f1);">
