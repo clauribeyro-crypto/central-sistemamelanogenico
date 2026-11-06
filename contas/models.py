@@ -49,6 +49,16 @@ class Organizacao(models.Model):
         default=True, verbose_name="módulo Programas/Acompanhamento ativo",
         help_text="Desmarque para esconder Programas e o início de protocolo de acompanhamento dessa organização.",
     )
+    modulo_gravacao_ia_ativo = models.BooleanField(
+        default=False, verbose_name="módulo Gravação de consulta com IA ativo",
+        help_text=(
+            "Diferente dos outros módulos, vem desligado por padrão: a transcrição e "
+            "análise usam IA paga (OpenAI/Anthropic) por conta da organização dona do "
+            "sistema. Marque só pras organizações que têm acesso a esse recurso "
+            "(ex.: mediante pagamento à parte) — sem isso, a aba \"Gravações de consulta\" "
+            "nem aparece na ficha da paciente pra essa organização."
+        ),
+    )
 
     meta_faturamento_mensal = models.DecimalField(
         max_digits=10, decimal_places=2, default=50000,
@@ -64,6 +74,32 @@ class Organizacao(models.Model):
         default=8,
         verbose_name="meta de fechamentos por mês",
         help_text="Quantidade mínima de tratamentos/programas fechados no mês pra bater a meta de faturamento.",
+    )
+    limite_fila_fechamento = models.PositiveIntegerField(
+        default=40,
+        verbose_name="alerta da fila de fechamento",
+        help_text="Quando a fila de fechamento (quem já fez consulta de diagnóstico e ainda não decidiu) atingir esse tanto de gente, mostra um aviso no CRM de fechamento.",
+    )
+
+    planilha_campanhas_url = models.URLField(
+        "link da planilha de campanhas (CSV publicado)", blank=True,
+        help_text=(
+            "Link \"Publicar na web\" (formato CSV) da planilha que recebe os dados diários "
+            "de campanha do Meta Ads. O painel de Marketing usa esse link pra somar o "
+            "investimento automaticamente e montar a tabela \"Por funil de campanha\" — sem "
+            "esse link configurado, essas duas partes ficam zeradas/com aviso."
+        ),
+    )
+
+    acesso_valido_ate = models.DateField(
+        blank=True, null=True,
+        verbose_name="acesso válido até",
+        help_text=(
+            "Pra organizações mentoradas com contrato de acesso por tempo determinado (ex.: "
+            "1 ano de acesso ao sistema). Deixe em branco pra acesso sem prazo (ex.: a própria "
+            "clínica). Quando a data se aproxima ou passa, aparece um aviso na home da "
+            "administradora geral — desativar o acesso continua sendo manual, em Usuários."
+        ),
     )
 
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -134,3 +170,24 @@ class ModeloDaOrganizacao(models.Model):
 
     class Meta:
         abstract = True
+
+
+class TentativaLoginFalha(models.Model):
+    """
+    Registro de uma tentativa de login com usuário/senha errados — usado só
+    pra limitar tentativas repetidas do mesmo endereço (proteção contra
+    força bruta tentando adivinhar senha). Não guarda a senha digitada, só
+    o usuário tentado e o IP, e linhas antigas são descartadas sozinhas.
+    """
+
+    ip = models.GenericIPAddressField()
+    username = models.CharField(max_length=150, blank=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "tentativa de login com senha errada"
+        verbose_name_plural = "tentativas de login com senha errada"
+        ordering = ["-criado_em"]
+
+    def __str__(self):
+        return f"{self.ip} ({self.username or '—'}) em {self.criado_em:%d/%m/%Y %H:%M}"

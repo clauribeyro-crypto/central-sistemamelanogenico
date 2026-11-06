@@ -44,6 +44,13 @@
             </div>
         </div>
         <div class="card stat">
+            <div class="num">{{ qtd_consultas_realizadas }}</div>
+            <div class="rotulo">Consultas realizadas no mês</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
+                Das {{ qtd_consultas }} cobradas, só essas aconteceram de verdade — veja o status de cada uma na lista abaixo.
+            </div>
+        </div>
+        <div class="card stat">
             <div class="num">R$ {{ total_geral|floatformat:2 }}</div>
             <div class="rotulo">Total fechado no mês</div>
         </div>
@@ -93,7 +100,7 @@
         {% if consultas %}
             <table>
                 <thead>
-                    <tr><th>Data</th><th>Paciente</th><th>Tipo</th><th>Profissional</th><th>Valor</th><th>Recebido</th><th class="no-print"></th></tr>
+                    <tr><th>Data</th><th>Paciente</th><th>Tipo</th><th>Profissional</th><th>Status</th><th>Valor</th><th>Recebido</th><th class="no-print"></th></tr>
                 </thead>
                 <tbody>
                 {% for c in consultas %}
@@ -102,6 +109,9 @@
                         <td>{{ c.paciente }}</td>
                         <td>{{ c.tipo_consulta.nome|default:"—" }}</td>
                         <td>{{ c.profissional.nome|default:"—" }}</td>
+                        <td{% if c.status != "REALIZADA" %} style="color:var(--text-muted);"{% endif %}>
+                            {{ c.get_status_display }}
+                        </td>
                         <td>R$ {{ c.valor|floatformat:2 }}</td>
                         <td>R$ {{ c.total_recebido|floatformat:2 }}</td>
                         <td class="no-print" style="white-space:nowrap;">

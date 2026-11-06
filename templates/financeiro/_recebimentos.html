@@ -27,19 +27,27 @@
             <tbody>
             {% for r in recebimentos %}
                 <tr>
-                    <td>{{ r.data|date:"d/m/Y" }}</td>
-                    <td>R$ {{ r.valor|floatformat:2 }}</td>
-                    <td>{{ r.get_forma_pagamento_display }}</td>
-                    <td>{{ r.observacoes|default:"—" }}</td>
-                    <td>
-                        <form method="post" style="display:inline;" onsubmit="return confirm('Excluir este recebimento de R$ {{ r.valor|floatformat:2 }}?');">
-                            {% csrf_token %}
-                            <input type="hidden" name="acao" value="excluir_recebimento">
-                            <input type="hidden" name="recebimento_id" value="{{ r.pk }}">
-                            <input type="hidden" name="next" value="{{ next }}">
-                            <button type="submit" style="color:#8f2e45; background:none; border:none; padding:0; cursor:pointer; font-size:.82rem; text-decoration:underline;">Excluir</button>
-                        </form>
-                    </td>
+                    <form method="post" style="display:contents;">
+                        {% csrf_token %}
+                        <input type="hidden" name="recebimento_id" value="{{ r.pk }}">
+                        <input type="hidden" name="next" value="{{ next }}">
+                        <td><input type="date" name="data" value="{{ r.data|date:'Y-m-d' }}" style="font-size:.82rem; padding:.2rem; width:9.5rem;"></td>
+                        <td><input type="number" step="0.01" min="0.01" name="valor" value="{{ r.valor|stringformat:'.2f' }}" style="font-size:.82rem; padding:.2rem; width:5.5rem;"></td>
+                        <td>
+                            <select name="forma_pagamento" style="font-size:.82rem; padding:.2rem;">
+                                {% for valor_opcao, rotulo_opcao in pagamento.FormaPagamento.choices %}
+                                    <option value="{{ valor_opcao }}" {% if valor_opcao == r.forma_pagamento %}selected{% endif %}>{{ rotulo_opcao }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><input type="text" name="observacoes" value="{{ r.observacoes }}" style="font-size:.82rem; padding:.2rem; width:100%;"></td>
+                        <td style="white-space:nowrap;">
+                            <button type="submit" name="acao" value="editar_recebimento" style="background:none; border:none; padding:0; cursor:pointer; font-size:.82rem; text-decoration:underline;">Salvar</button>
+                            <button type="submit" name="acao" value="excluir_recebimento"
+                                    onclick="return confirm('Excluir este recebimento de R$ {{ r.valor|floatformat:2 }}?');"
+                                    style="color:#8f2e45; background:none; border:none; padding:0; margin-left:.5rem; cursor:pointer; font-size:.82rem; text-decoration:underline;">Excluir</button>
+                        </td>
+                    </form>
                 </tr>
             {% endfor %}
             </tbody>

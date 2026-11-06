@@ -1,32 +1,46 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import Organizacao, Usuario
+from .models import Organizacao, TentativaLoginFalha, Usuario
 
 
 @admin.register(Organizacao)
 class OrganizacaoAdmin(admin.ModelAdmin):
     list_display = (
-        "nome", "slug", "ativo",
+        "nome", "slug", "ativo", "acesso_valido_ate",
         "meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal",
         "modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo",
+        "modulo_gravacao_ia_ativo",
         "criado_em",
     )
     list_filter = ("ativo",)
     search_fields = ("nome", "slug")
     prepopulated_fields = {"slug": ("nome",)}
     fieldsets = (
-        (None, {"fields": ("nome", "slug", "ativo")}),
+        (None, {"fields": ("nome", "slug", "ativo", "acesso_valido_ate")}),
         ("Agenda", {"fields": ("agenda_hora_inicio", "agenda_hora_fim", "agenda_intervalo_minutos")}),
         ("Leads", {"fields": ("dias_lead_parado",)}),
         ("Financeiro", {"fields": ("saldo_inicial_financeiro",)}),
+        ("Marketing", {
+            "fields": ("planilha_campanhas_url",),
+            "description": "Link \"Publicar na web\" (CSV) da planilha de campanhas do Meta Ads, usado no painel de Marketing.",
+        }),
         ("Meta do mês", {
             "fields": ("meta_faturamento_mensal", "meta_consultas_mensal", "meta_fechamentos_mensal"),
             "description": "Meta que aparece no card \"Meta do mês\" da tela inicial dessa organização.",
         }),
         ("Módulos ativos", {
-            "fields": ("modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo"),
-            "description": "Desmarque um módulo pra escondê-lo do menu e bloquear o acesso pra essa organização.",
+            "fields": (
+                "modulo_leads_ativo", "modulo_financeiro_ativo", "modulo_programas_ativo",
+                "modulo_gravacao_ia_ativo",
+            ),
+            "description": (
+                "Desmarque um módulo pra escondê-lo do menu e bloquear o acesso pra essa "
+                "organização. \"Gravação de consulta com IA\" é diferente: vem desmarcado "
+                "pra todo mundo, incluindo organizações mentoradas, e só deve ser marcado "
+                "pra quem tem acesso a esse recurso (paga à parte, já que a IA usada tem "
+                "custo por conta da clínica)."
+            ),
         }),
     )
 
@@ -52,6 +66,22 @@ class UsuarioAdmin(UserAdmin):
         if request.user.is_superuser:
             return qs
         return qs.filter(organizacao=request.user.organizacao)
+
+
+@admin.register(TentativaLoginFalha)
+class TentativaLoginFalhaAdmin(admin.ModelAdmin):
+    """Só leitura — serve pra conferir se alguém está tentando adivinhar senha."""
+
+    list_display = ("ip", "username", "criado_em")
+    list_filter = ("ip",)
+    search_fields = ("ip", "username")
+    readonly_fields = ("ip", "username", "criado_em")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 class OrganizacaoAdminMixin:
