@@ -7,6 +7,7 @@ from contas.models import ModeloDaOrganizacao
 CAMPOS_MESCLAVEIS = [
     "cpf", "data_nascimento", "sexo", "telefone", "email",
     "endereco", "cidade", "profissao", "historico_saude", "observacoes",
+    "achados_primeira_consulta",
 ]
 
 
@@ -36,6 +37,14 @@ class Paciente(ModeloDaOrganizacao):
         help_text="Alergias, comorbidades, medicações em uso, observações gerais.",
     )
     observacoes = models.TextField("observações administrativas", blank=True)
+    achados_primeira_consulta = models.TextField(
+        "achados da primeira consulta", blank=True,
+        help_text=(
+            "Escrito pela clínica a partir da primeira consulta — diferente da anamnese "
+            "(que é o que a própria paciente respondeu), isso aqui é o que aparece pra "
+            "paciente no link de evolução dela."
+        ),
+    )
 
     ativo = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)

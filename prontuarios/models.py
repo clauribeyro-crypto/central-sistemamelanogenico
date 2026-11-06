@@ -746,11 +746,18 @@ class LinkCheckin(models.Model):
 
 
 class Documento(ModeloDaOrganizacao):
-    """Exame, laudo ou outro documento anexado à paciente (não ligado a um acompanhamento específico)."""
+    """
+    Exame, laudo ou outro documento anexado à paciente (não ligado a um
+    acompanhamento específico). Tipo "Modulação" é especial: esses arquivos
+    aparecem pra paciente baixar no link público dela (ver
+    prontuarios.views.checkin_publico) — os outros tipos continuam
+    só internos à equipe.
+    """
 
     class Tipo(models.TextChoices):
         EXAME = "EXAME", "Exame"
         DOCUMENTO = "DOCUMENTO", "Documento"
+        MODULACAO = "MODULACAO", "Modulação"
         OUTRO = "OUTRO", "Outro"
 
     paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, related_name="documentos")

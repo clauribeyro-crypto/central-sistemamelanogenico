@@ -23,7 +23,7 @@ from programas.models import Acompanhamento, ConsultaPrevista, CustoAcompanhamen
 from prontuarios.forms import GravacaoConsultaForm
 from prontuarios.models import Anamnese, Documento
 
-from .forms import IniciarProtocoloForm, PacienteRapidoForm
+from .forms import AchadosPrimeiraConsultaForm, IniciarProtocoloForm, PacienteRapidoForm
 from .models import HistoricoFechamento, Paciente
 
 ABAS = [
@@ -406,6 +406,14 @@ def ficha(request, pk):
         "historico_fechamento": paciente.historico_fechamento.select_related("responsavel"),
     }
 
+    if aba == "geral":
+        contexto["form_achados"] = AchadosPrimeiraConsultaForm(instance=paciente)
+        contexto["link_checkin"] = getattr(paciente, "link_checkin", None)
+        if contexto["link_checkin"]:
+            contexto["link_checkin_url"] = request.build_absolute_uri(
+                reverse("prontuarios:checkin_publico", args=[contexto["link_checkin"].token])
+            )
+
     if acompanhamento and aba == "financeiro":
         pagamentos = Pagamento.objects.filter(acompanhamento=acompanhamento).order_by("-data_vencimento")
         custos = CustoAcompanhamento.objects.filter(acompanhamento=acompanhamento).order_by("-data")
@@ -557,6 +565,21 @@ def ficha(request, pk):
         contexto.update(_financeiro_do_acompanhamento(acompanhamento))
 
     return render(request, "pacientes/ficha.html", contexto)
+
+
+@login_required
+@require_POST
+def achados_editar(request, pk):
+    """Salva os achados da primeira consulta — texto que a paciente vê no link dela, separado da anamnese."""
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=pk, organizacao=org)
+    form = AchadosPrimeiraConsultaForm(request.POST, instance=paciente)
+    if form.is_valid():
+        form.save()
+        messages.success(request, "Achados da primeira consulta salvos.")
+    else:
+        messages.error(request, "Não deu pra salvar — confira o texto.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=geral")
 
 
 @login_required

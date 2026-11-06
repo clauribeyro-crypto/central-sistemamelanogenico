@@ -10,6 +10,7 @@ urlpatterns = [
     path("nova/rapido/", views.criar_rapido_json, name="criar_rapido_json"),
     path("<int:pk>/", views.ficha, name="ficha"),
     path("<int:pk>/excluir/", views.excluir, name="excluir"),
+    path("<int:pk>/achados/", views.achados_editar, name="achados_editar"),
     path("<int:pk>/mesclar/", views.mesclar_selecionar, name="mesclar_selecionar"),
     path("<int:pk>/mesclar/<int:duplicada_pk>/", views.mesclar_confirmar, name="mesclar_confirmar"),
     path("<int:pk>/iniciar-protocolo/", views.iniciar_protocolo, name="iniciar_protocolo"),

@@ -14,6 +14,15 @@ class PacienteRapidoForm(forms.ModelForm):
         fields = ["nome", "telefone", "cidade"]
 
 
+class AchadosPrimeiraConsultaForm(forms.ModelForm):
+    """Separado da anamnese de propósito — isso é o que a clínica escreve, não o que a paciente respondeu."""
+
+    class Meta:
+        model = Paciente
+        fields = ["achados_primeira_consulta"]
+        widgets = {"achados_primeira_consulta": forms.Textarea(attrs={"rows": 5})}
+
+
 class IniciarProtocoloForm(forms.Form):
     programa = forms.ModelChoiceField(queryset=Programa.objects.none(), label="Programa")
     data_inicio = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))

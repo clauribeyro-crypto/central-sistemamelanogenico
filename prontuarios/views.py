@@ -8,6 +8,8 @@ from django.views.decorators.http import require_POST
 
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
+from pacientes.views import _grafico_evolucao
+from programas.models import FotoEvolucao
 
 from .forms import AnamneseForm, AtendimentoForm, DocumentoForm, GravacaoConsultaForm, RegistroEvolucaoForm
 from .models import (
@@ -310,8 +312,44 @@ def checkin_publico(request, token):
     else:
         form = RegistroEvolucaoForm()
 
+    # Modulações que a clínica fez upload pra essa paciente baixar (ver
+    # Documento.Tipo.MODULACAO) — só esse tipo aparece aqui, os outros
+    # (exame, documento, outro) continuam só internos à equipe.
+    modulacoes = Documento.objects.filter(paciente=paciente, tipo=Documento.Tipo.MODULACAO).order_by("-criado_em")
+
+    registros = list(paciente.registros_evolucao.order_by("-criado_em"))
+    anamnese_da_paciente = Anamnese.objects.filter(paciente=paciente).first()
+    grafico_evolucao = _grafico_evolucao(list(reversed(registros)), anamnese=anamnese_da_paciente)
+
+    # Fotos de evolução de qualquer acompanhamento da paciente (não só o
+    # atual) — a grade mostra a mais recente de cada ângulo/momento, igual
+    # já é feito na aba interna "Fotos" da ficha.
+    fotos = list(
+        FotoEvolucao.objects.filter(acompanhamento__paciente=paciente)
+        .order_by("angulo", "momento", "-criado_em")
+    )
+    mais_recente_por_combo = {}
+    for f in fotos:
+        chave = (f.angulo, f.momento)
+        if chave not in mais_recente_por_combo:
+            mais_recente_por_combo[chave] = f
+    grade_fotos = []
+    for angulo, angulo_label in FotoEvolucao.Angulo.choices:
+        colunas = [
+            {"momento": momento, "momento_label": momento_label, "foto": mais_recente_por_combo.get((angulo, momento))}
+            for momento, momento_label in FotoEvolucao.Momento.choices
+        ]
+        grade_fotos.append({
+            "angulo": angulo, "angulo_label": angulo_label, "colunas": colunas,
+            "tem_foto": any(c["foto"] for c in colunas),
+        })
+
     return render(request, "prontuarios/checkin_publico.html", {
         "paciente": paciente, "form": form, "secoes": SECOES_CHECKIN,
+        "modulacoes": modulacoes,
+        "grafico_evolucao": grafico_evolucao,
+        "grade_fotos": grade_fotos,
+        "tem_fotos": bool(fotos),
     })
 
 

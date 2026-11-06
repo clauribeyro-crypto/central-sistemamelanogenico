@@ -213,6 +213,29 @@
                 <p>Esta aba ({{ aba_atual }}) faz parte do módulo de Anamnese/Evolução, ainda em construção.</p>
             </div>
         {% elif aba_atual == "geral" %}
+            <div class="card">
+                <h2 style="margin-top:0;">Achados da primeira consulta</h2>
+                <p style="font-size:.85rem; color:var(--text-muted);">
+                    Isso é diferente da anamnese (que é o que a própria paciente respondeu) — é o que você
+                    escreve a partir da primeira consulta, e é o que ela vê no link de evolução dela (abaixo).
+                </p>
+                <form method="post" action="{% url 'pacientes:achados_editar' paciente.pk %}">
+                    {% csrf_token %}
+                    {{ form_achados.achados_primeira_consulta }}
+                    <button class="btn" type="submit" style="margin-top:.5rem;">Salvar</button>
+                </form>
+                {% if link_checkin_url %}
+                    <p style="font-size:.85rem; margin-top:1rem;">
+                        Link de evolução da paciente (achados, modulações pra baixar e evolução dela):<br>
+                        <code style="word-break:break-all;">{{ link_checkin_url }}</code>
+                    </p>
+                {% else %}
+                    <p style="font-size:.85rem; color:var(--text-muted); margin-top:1rem;">
+                        Ainda não tem link de evolução gerado pra essa paciente — gera um na aba "Evolução".
+                    </p>
+                {% endif %}
+            </div>
+
             <div class="grid-2-1">
                 <div class="card">
                     <h2>Checklist do programa</h2>
