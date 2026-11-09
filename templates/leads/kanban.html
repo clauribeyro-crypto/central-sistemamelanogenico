@@ -236,7 +236,30 @@
         }
 
         // ---- Drag and drop ----
+        // Move o card de verdade (chama o backend e realoca no DOM) — usado
+        // tanto pelo "drop" do mouse (HTML5 drag-and-drop) quanto pelo touch
+        // (celular/tablet), que não tem suporte nativo a esse drag-and-drop.
+        function executarMovimentoCard(card, coluna) {
+            const leadId = card.dataset.leadId;
+            const novaEtapa = coluna.dataset.etapa;
+            const colunaOrigem = card.closest(".kanban-col");
+            if (!colunaOrigem || colunaOrigem === coluna) return;
+
+            post("/leads/" + leadId + "/mover/", new URLSearchParams({ etapa: novaEtapa })).then(({ status, json }) => {
+                if (status !== 200 || !json.ok) return;
+                const placeholder = coluna.querySelector(".placeholder-vazio");
+                if (placeholder) placeholder.remove();
+                coluna.querySelector(".kanban-col-cards").insertAdjacentElement("afterbegin", card);
+                atualizarContador(colunaOrigem);
+                atualizarContador(coluna);
+            });
+        }
+
+        const LIMIAR_TOQUE_LONGO_MS = 350;
+        const LIMIAR_CANCELAR_PX = 10;
+
         function ligarDragCard(card) {
+            // Mouse/desktop — drag-and-drop nativo do HTML5.
             card.addEventListener("dragstart", function (ev) {
                 card.classList.add("arrastando");
                 ev.dataTransfer.setData("text/plain", card.dataset.leadId);
@@ -244,6 +267,76 @@
             });
             card.addEventListener("dragend", function () {
                 card.classList.remove("arrastando");
+            });
+
+            // Celular/tablet — o drag-and-drop nativo do HTML5 não existe em
+            // touch, então reimplementamos com um toque longo (segurar ~1/3
+            // de segundo sem arrastar o dedo) pra começar a mover o card, sem
+            // interferir no toque rápido normal (abrir a lead, marcar como
+            // respondido) nem no gesto de rolar a tela.
+            let timerToqueLongo = null;
+            let emArraste = false;
+            let origemToqueX = 0;
+            let origemToqueY = 0;
+            let colunaAlvoAtual = null;
+
+            function cancelarToqueLongo() {
+                if (timerToqueLongo) {
+                    clearTimeout(timerToqueLongo);
+                    timerToqueLongo = null;
+                }
+            }
+
+            function finalizarArraste() {
+                emArraste = false;
+                card.classList.remove("arrastando");
+                if (colunaAlvoAtual) colunaAlvoAtual.classList.remove("drop-alvo");
+                colunaAlvoAtual = null;
+            }
+
+            card.addEventListener("touchstart", function (ev) {
+                if (ev.touches.length !== 1) return;
+                origemToqueX = ev.touches[0].clientX;
+                origemToqueY = ev.touches[0].clientY;
+                cancelarToqueLongo();
+                timerToqueLongo = setTimeout(function () {
+                    emArraste = true;
+                    card.classList.add("arrastando");
+                }, LIMIAR_TOQUE_LONGO_MS);
+            }, { passive: true });
+
+            card.addEventListener("touchmove", function (ev) {
+                if (ev.touches.length !== 1) return;
+                const toque = ev.touches[0];
+                if (!emArraste) {
+                    const dx = Math.abs(toque.clientX - origemToqueX);
+                    const dy = Math.abs(toque.clientY - origemToqueY);
+                    if (dx > LIMIAR_CANCELAR_PX || dy > LIMIAR_CANCELAR_PX) {
+                        cancelarToqueLongo();
+                    }
+                    return;
+                }
+                ev.preventDefault();
+                const elementoSobDedo = document.elementFromPoint(toque.clientX, toque.clientY);
+                const novaColunaAlvo = elementoSobDedo ? elementoSobDedo.closest(".kanban-col") : null;
+                if (novaColunaAlvo !== colunaAlvoAtual) {
+                    if (colunaAlvoAtual) colunaAlvoAtual.classList.remove("drop-alvo");
+                    colunaAlvoAtual = novaColunaAlvo;
+                    if (colunaAlvoAtual) colunaAlvoAtual.classList.add("drop-alvo");
+                }
+            }, { passive: false });
+
+            card.addEventListener("touchend", function () {
+                cancelarToqueLongo();
+                if (!emArraste) return;
+                const colunaAlvo = colunaAlvoAtual;
+                finalizarArraste();
+                if (colunaAlvo) executarMovimentoCard(card, colunaAlvo);
+            });
+
+            card.addEventListener("touchcancel", function () {
+                cancelarToqueLongo();
+                finalizarArraste();
             });
         }
 
@@ -269,20 +362,9 @@
                 ev.preventDefault();
                 coluna.classList.remove("drop-alvo");
                 const leadId = ev.dataTransfer.getData("text/plain");
-                const novaEtapa = coluna.dataset.etapa;
                 const card = document.querySelector('.lead-card[data-lead-id="' + leadId + '"]');
                 if (!card) return;
-                const colunaOrigem = card.closest(".kanban-col");
-                if (colunaOrigem === coluna) return;
-
-                post("/leads/" + leadId + "/mover/", new URLSearchParams({ etapa: novaEtapa })).then(({ status, json }) => {
-                    if (status !== 200 || !json.ok) return;
-                    const placeholder = coluna.querySelector(".placeholder-vazio");
-                    if (placeholder) placeholder.remove();
-                    coluna.querySelector(".kanban-col-cards").insertAdjacentElement("afterbegin", card);
-                    atualizarContador(colunaOrigem);
-                    atualizarContador(coluna);
-                });
+                executarMovimentoCard(card, coluna);
             });
         });
 
