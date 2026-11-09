@@ -145,7 +145,30 @@
                 method: "POST",
                 headers: { "X-CSRFToken": csrf },
                 body: dados,
-            }).then((r) => r.json().then((json) => ({ status: r.status, json })));
+            }).then((r) => r.text().then((texto) => {
+                let json = null;
+                try { json = JSON.parse(texto); } catch (e) { /* resposta não era JSON — provavelmente um erro do servidor */ }
+                return { status: r.status, json, texto };
+            }));
+        }
+
+        // Falha silenciosa (card "voltando pro lugar" sem explicação nenhuma)
+        // é a pior experiência possível — mostra o que realmente aconteceu,
+        // pra dar pra mandar o print em vez de só "não funcionou".
+        function avisarFalhaAcao(acao, status, json, texto) {
+            let detalhe;
+            if (json && json.erro) {
+                detalhe = json.erro;
+            } else if (status === 403) {
+                detalhe = "Acesso negado (403) — a sessão pode ter expirado. Recarregue a página e entre de novo.";
+            } else if (status >= 500) {
+                detalhe = "Erro interno do servidor (código " + status + ").";
+            } else if (status === 0) {
+                detalhe = "Falha de conexão com o servidor: " + (texto || "");
+            } else {
+                detalhe = "Resposta inesperada do servidor (código " + status + "): " + (texto || "").slice(0, 300);
+            }
+            alert("Não foi possível " + acao + ".\n\n" + detalhe + "\n\nTire um print dessa mensagem.");
         }
 
         // ---- Novo lead ----
@@ -211,12 +234,16 @@
                 ev.stopPropagation();
                 const leadId = botao.dataset.leadId;
                 botao.disabled = true;
-                post("/leads/" + leadId + "/responder-rapido/", new FormData()).then(({ status, json }) => {
+                post("/leads/" + leadId + "/responder-rapido/", new FormData()).then(({ status, json, texto }) => {
                     botao.disabled = false;
-                    if (status !== 200 || !json.ok) return;
+                    if (status !== 200 || !json || !json.ok) {
+                        avisarFalhaAcao("marcar essa lead como respondida", status, json, texto);
+                        return;
+                    }
                     moverCardParaEtapa(leadId, json.etapa, json.html);
-                }).catch(function () {
+                }).catch(function (erro) {
                     botao.disabled = false;
+                    avisarFalhaAcao("marcar essa lead como respondida", 0, null, String(erro));
                 });
             });
         }
@@ -245,13 +272,18 @@
             const colunaOrigem = card.closest(".kanban-col");
             if (!colunaOrigem || colunaOrigem === coluna) return;
 
-            post("/leads/" + leadId + "/mover/", new URLSearchParams({ etapa: novaEtapa })).then(({ status, json }) => {
-                if (status !== 200 || !json.ok) return;
+            post("/leads/" + leadId + "/mover/", new URLSearchParams({ etapa: novaEtapa })).then(({ status, json, texto }) => {
+                if (status !== 200 || !json || !json.ok) {
+                    avisarFalhaAcao("mover essa lead de etapa", status, json, texto);
+                    return;
+                }
                 const placeholder = coluna.querySelector(".placeholder-vazio");
                 if (placeholder) placeholder.remove();
                 coluna.querySelector(".kanban-col-cards").insertAdjacentElement("afterbegin", card);
                 atualizarContador(colunaOrigem);
                 atualizarContador(coluna);
+            }).catch(function (erro) {
+                avisarFalhaAcao("mover essa lead de etapa", 0, null, String(erro));
             });
         }
 
