@@ -766,7 +766,7 @@ def crm_fechamento(request):
         c.possivel_duplicada = contagem_por_paciente[c.paciente_id] > 1
     fechados_qs = Acompanhamento.objects.filter(
         organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
-    ).select_related("paciente", "programa").order_by("-data_inicio")
+    ).exclude(status=Acompanhamento.Status.CANCELADO).select_related("paciente", "programa").order_by("-data_inicio")
     fechados_no_mes = fechados_qs.count()
     perdidos_qs = HistoricoFechamento.objects.filter(
         paciente__organizacao=org, tipo=HistoricoFechamento.Tipo.PERDA,

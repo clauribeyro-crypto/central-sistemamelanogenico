@@ -266,7 +266,7 @@ def totais_fechamentos_mes(org, ano, mes):
     tratamentos = list(
         Acompanhamento.objects.filter(
             organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
-        ).select_related("paciente", "programa").order_by("data_inicio")
+        ).exclude(status=Acompanhamento.Status.CANCELADO).select_related("paciente", "programa").order_by("data_inicio")
     )
     for t in tratamentos:
         # O valor de verdade é o do pagamento vinculado — é ele que pode ter

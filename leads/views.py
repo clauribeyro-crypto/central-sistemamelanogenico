@@ -342,7 +342,7 @@ def painel_marketing(request):
     total_valor = Decimal("0.00")
     for acompanhamento in Acompanhamento.objects.filter(
         organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim_mes,
-    ).prefetch_related("pagamentos"):
+    ).exclude(status=Acompanhamento.Status.CANCELADO).prefetch_related("pagamentos"):
         # Mesma regra do relatório de fechamentos (financeiro.views.totais_fechamentos_mes):
         # o valor de verdade é o do pagamento vinculado, que pode ter sido corrigido
         # direto no Financeiro — valor_contratado só entra se não existir pagamento.
