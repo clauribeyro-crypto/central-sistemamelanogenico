@@ -141,10 +141,21 @@
         const csrf = document.getElementById("csrf-form").querySelector("[name=csrfmiddlewaretoken]").value;
 
         function post(url, dados) {
-            return fetch(url, {
+            // cache: "no-store" + um parâmetro que muda a cada chamada: um 404
+            // real visto nessas ações (mover/responder-rápido), mas só nelas,
+            // e só por POST (confirmado que o mesmo endereço, pela barra do
+            // navegador, dá uma resposta diferente), é o retrato de uma cache
+            // no meio do caminho (CDN/proxy) guardando uma resposta de erro
+            // antiga pra esse endereço específico — isso aqui garante que
+            // cada chamada bate num endereço "novo" pra nunca bater nessa
+            // cache por acidente.
+            const separador = url.includes("?") ? "&" : "?";
+            const urlSemCache = url + separador + "_=" + Date.now();
+            return fetch(urlSemCache, {
                 method: "POST",
                 headers: { "X-CSRFToken": csrf },
                 body: dados,
+                cache: "no-store",
             }).then((r) => r.text().then((texto) => {
                 let json = null;
                 try { json = JSON.parse(texto); } catch (e) { /* resposta não era JSON — provavelmente um erro do servidor */ }
