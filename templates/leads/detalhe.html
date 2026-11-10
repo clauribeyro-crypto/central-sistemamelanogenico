@@ -133,6 +133,11 @@
                 {% endif %}
                 <a class="btn btn-danger" href="{% url 'leads:perder' lead.pk %}">✖ Marcar como perdida</a>
             </div>
+            <form method="post" action="{% url 'leads:converter_em_paciente' lead.pk %}" style="margin-top:.75rem;"
+                  onsubmit="return confirm('Criar a ficha de {{ lead.nome|escapejs }} como paciente, sem agendar consulta de diagnóstico? Use isso só pra quem já é cliente de antes e não precisa passar pelo Fábio de novo.');">
+                {% csrf_token %}
+                <button class="btn btn-secondary" type="submit">🔁 Já é cliente — converter em paciente (sem consulta)</button>
+            </form>
         </div>
     {% else %}
         <div class="card">

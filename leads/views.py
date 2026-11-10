@@ -1130,6 +1130,33 @@ def perder(request, pk):
 
 @login_required
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+@require_POST
+def converter_em_paciente(request, pk):
+    """
+    Pra lead que já é cliente de antes (ex.: já fez o protocolo e quer
+    repetir) e não precisa passar pela consulta de diagnóstico de novo —
+    cria a ficha da paciente direto a partir da lead, sem agendar nenhuma
+    consulta, e manda já pra "Iniciar protocolo".
+    """
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    paciente = lead.paciente
+    if paciente is None:
+        paciente = Paciente.objects.create(organizacao=org, nome=lead.nome, telefone=lead.whatsapp)
+    lead.paciente = paciente
+    lead.status = Lead.Status.AGENDADA
+    lead.save(update_fields=["paciente", "status", "atualizado_em"])
+    lead.registrar_historico(
+        HistoricoLead.Tipo.AGENDAMENTO,
+        "Convertida direto em paciente, sem consulta de diagnóstico (já era cliente antes)",
+        request.user,
+    )
+    messages.success(request, f"Ficha de {paciente.nome} criada — já pode iniciar o protocolo dela.")
+    return redirect("pacientes:iniciar_protocolo", pk=paciente.pk)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 def agendar(request, pk):
     leads_qs, org = _leads_do_usuario(request)
     lead = get_object_or_404(leads_qs, pk=pk)
