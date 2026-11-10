@@ -136,11 +136,26 @@ def relatorio(request):
     if paciente_busca:
         pagamentos = Pagamento.objects.filter(organizacao=org, paciente__nome__icontains=paciente_busca)
 
+    # Pendências de fora do período: um lançamento que venceu num mês
+    # anterior (ex.: tratamento fechado em outubro, com saldo ainda a
+    # receber) nunca aparece na tabela acima enquanto nada for recebido
+    # dele dentro do período selecionado — mas ainda é dinheiro em aberto
+    # que a clínica precisa cobrar/acertar, então mostra à parte, com a
+    # data de vencimento original pra saber há quanto tempo está parado.
+    pendencias_de_outros_periodos = (
+        Pagamento.objects.filter(organizacao=org, status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL])
+        .exclude(pk__in=pagamentos_vencendo_no_periodo.values_list("pk", flat=True))
+        .order_by("data_vencimento")
+    )
+    if paciente_busca:
+        pendencias_de_outros_periodos = pendencias_de_outros_periodos.filter(paciente__nome__icontains=paciente_busca)
+
     contexto = {
         "data_inicio": data_inicio,
         "data_fim": data_fim,
         "paciente_busca": paciente_busca,
         "pagamentos": pagamentos.order_by("-data_vencimento"),
+        "pendencias_de_outros_periodos": pendencias_de_outros_periodos,
         "total_pago": total_pago,
         "total_pendente": total_pendente,
         "por_forma_pagamento": por_forma_pagamento,

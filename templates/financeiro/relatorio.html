@@ -100,6 +100,37 @@
         {% endif %}
     </div>
 
+    {% if pendencias_de_outros_periodos %}
+        <div class="card" style="background:#f59e0b11; border:1px solid #f59e0b33;">
+            <h2 style="margin-top:0;">Pendências de outros períodos ({{ pendencias_de_outros_periodos|length }})</h2>
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                Saldo ainda a receber de lançamentos que venceram antes ou depois do período filtrado acima —
+                ex.: um tratamento fechado num mês, com parcelas combinadas pra acertar depois.
+            </p>
+            <table>
+                <thead>
+                    <tr><th>Vencimento</th><th>Paciente</th><th>Total</th><th>Recebido</th><th>Pendente</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                {% for p in pendencias_de_outros_periodos %}
+                    <tr>
+                        <td>{{ p.data_vencimento|date:"d/m/Y"|default:"—" }}</td>
+                        <td>{{ p.paciente }}</td>
+                        <td>R$ {{ p.valor|floatformat:2 }}</td>
+                        <td>R$ {{ p.total_recebido|floatformat:2 }}</td>
+                        <td>R$ {{ p.saldo_pendente|floatformat:2 }}</td>
+                        <td>
+                            {% if p.status == p.Status.PARCIAL %}<span class="badge badge-parcial">Parcial</span>
+                            {% else %}<span class="badge badge-neutro">Pendente</span>{% endif %}
+                        </td>
+                        <td><a href="{% url 'financeiro:editar_pagamento' p.pk %}?next={{ request.get_full_path|urlencode }}">Gerenciar ›</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
     <div class="card">
         <h2>
             {% if paciente_busca %}
