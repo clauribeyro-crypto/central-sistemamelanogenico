@@ -1,4 +1,5 @@
-<div class="lead-card" draggable="true" data-lead-id="{{ lead.pk }}" data-etapa="{{ lead.etapa }}" data-nome="{{ lead.nome }}" data-telefone="{{ lead.whatsapp }} {{ lead.telefone }}">
+{% load l10n %}
+<div class="lead-card" draggable="true" data-lead-id="{{ lead.pk|unlocalize }}" data-etapa="{{ lead.etapa }}" data-nome="{{ lead.nome }}" data-telefone="{{ lead.whatsapp }} {{ lead.telefone }}">
     <a class="nome" href="{% url 'leads:detalhe' lead.pk %}?proximo={{ request.get_full_path|urlencode }}">{{ lead.nome }}</a>
     <div class="meta">
         {% if lead.cidade or lead.estado %}{{ lead.cidade }}{% if lead.cidade and lead.estado %}/{% endif %}{{ lead.estado }} · {% endif %}{{ lead.origem }}
@@ -13,5 +14,5 @@
         {% endif %}
         <span>{{ lead.ultimo_contato_em|default:lead.entrou_em|date:"d/m H:i" }}</span>
     </div>
-    <button type="button" class="btn-respondido" data-lead-id="{{ lead.pk }}">✓ Marcar como respondido</button>
+    <button type="button" class="btn-respondido" data-lead-id="{{ lead.pk|unlocalize }}">✓ Marcar como respondido</button>
 </div>

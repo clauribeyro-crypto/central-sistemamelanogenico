@@ -731,40 +731,13 @@ def relatorio_diario_sdr(request):
     return render(request, "leads/relatorio_diario_sdr.html", contexto)
 
 
-def _lead_ou_diagnostico(leads_qs, org, pk):
-    """
-    Busca a lead em leads_qs; se não achar, monta um diagnóstico do porquê
-    (em vez de só um 404 seco) — uso temporário pra investigar um caso real
-    de 404 nessas duas ações específicas (mover/responder-rápido) que não
-    acontece nas outras ações da mesma lead (ficha, pausar).
-    """
-    lead = leads_qs.filter(pk=pk).first()
-    if lead is not None:
-        return lead, None
-    existe_em_outra_org = Lead.objects.filter(pk=pk).exclude(organizacao=org).first()
-    diagnostico = {
-        "pk_pedido": pk,
-        "org_do_usuario_id": org.id,
-        "org_do_usuario_nome": org.nome,
-        "lead_existe_sem_filtro_org": Lead.objects.filter(pk=pk).exists(),
-        "lead_existe_em_outra_organizacao": (
-            {"org_id": existe_em_outra_org.organizacao_id, "org_nome": str(existe_em_outra_org.organizacao)}
-            if existe_em_outra_org else None
-        ),
-        "total_leads_na_org_do_usuario": leads_qs.model.objects.filter(organizacao=org).count(),
-    }
-    return None, diagnostico
-
-
 @login_required
 @modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
 @require_POST
 def mover_etapa(request, pk):
     """Arrastar e soltar o card entre colunas do board."""
     leads_qs, org = _leads_do_usuario(request)
-    lead, diagnostico = _lead_ou_diagnostico(leads_qs, org, pk)
-    if lead is None:
-        return JsonResponse({"ok": False, "erro": "Lead não encontrada.", "diagnostico": diagnostico}, status=404)
+    lead = get_object_or_404(leads_qs, pk=pk)
     nova_etapa = request.POST.get("etapa")
     if nova_etapa not in Lead.ETAPAS_KANBAN:
         return JsonResponse({"ok": False, "erro": "Etapa inválida."}, status=400)
@@ -778,9 +751,7 @@ def mover_etapa(request, pk):
 def marcar_respondido_rapido(request, pk):
     """Botão rápido do card: avança a cadência sem abrir a tela de detalhe."""
     leads_qs, org = _leads_do_usuario(request)
-    lead, diagnostico = _lead_ou_diagnostico(leads_qs, org, pk)
-    if lead is None:
-        return JsonResponse({"ok": False, "erro": "Lead não encontrada.", "diagnostico": diagnostico}, status=404)
+    lead = get_object_or_404(leads_qs, pk=pk)
     lead.marcar_respondido(responsavel=request.user)
     html = render_to_string("leads/_lead_card.html", {"lead": lead}, request=request)
     return JsonResponse({"ok": True, "etapa": lead.etapa, "html": html})

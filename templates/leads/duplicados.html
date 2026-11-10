@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load l10n %}
 {% block title %}Leads duplicadas · Sistema da Clínica{% endblock %}
 {% block content %}
     <h1>Leads duplicadas</h1>
@@ -31,8 +32,8 @@
                         <tbody>
                         {% for lead in grupo %}
                             <tr>
-                                <td><input type="radio" name="manter" value="{{ lead.pk }}" {% if forloop.first %}checked{% endif %} required></td>
-                                <td><input type="hidden" name="grupo" value="{{ lead.pk }}">{{ lead.nome }}</td>
+                                <td><input type="radio" name="manter" value="{{ lead.pk|unlocalize }}" {% if forloop.first %}checked{% endif %} required></td>
+                                <td><input type="hidden" name="grupo" value="{{ lead.pk|unlocalize }}">{{ lead.nome }}</td>
                                 <td>{{ lead.whatsapp|default:"—" }}</td>
                                 <td>{{ lead.telefone|default:"—" }}</td>
                                 <td>{{ lead.origem }}</td>
@@ -71,8 +72,8 @@
                         <tbody>
                         {% for lead in grupo %}
                             <tr>
-                                <td><input type="radio" name="manter" value="{{ lead.pk }}" {% if forloop.first %}checked{% endif %} required></td>
-                                <td><input type="hidden" name="grupo" value="{{ lead.pk }}">{{ lead.nome }}</td>
+                                <td><input type="radio" name="manter" value="{{ lead.pk|unlocalize }}" {% if forloop.first %}checked{% endif %} required></td>
+                                <td><input type="hidden" name="grupo" value="{{ lead.pk|unlocalize }}">{{ lead.nome }}</td>
                                 <td>{{ lead.whatsapp|default:"—" }}</td>
                                 <td>{{ lead.telefone|default:"—" }}</td>
                                 <td>{{ lead.origem }}</td>
