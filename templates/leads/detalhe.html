@@ -151,6 +151,27 @@
     {% endif %}
 
     <div class="card">
+        <h2>Ficha de paciente vinculada</h2>
+        {% if lead.paciente %}
+            <p>Vinculada a <a href="{% url 'pacientes:ficha' lead.paciente.pk %}">{{ lead.paciente.nome }}</a>.
+            Se estiver errado (ficha duplicada, vínculo que não pegou certo), escolha a ficha certa abaixo.</p>
+        {% else %}
+            <p style="color:var(--text-muted);">Essa lead ainda não está vinculada a nenhuma ficha de paciente —
+            por isso ela não aparece como "fechou" nos relatórios de Marketing, mesmo que o tratamento já exista.</p>
+        {% endif %}
+        <form method="post" action="{% url 'leads:vincular_paciente_existente' lead.pk %}" style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+            {% csrf_token %}
+            <select name="paciente_id" required>
+                <option value="">Escolha a paciente…</option>
+                {% for p in pacientes_da_org %}
+                    <option value="{{ p.pk }}" {% if lead.paciente_id == p.pk %}selected{% endif %}>{{ p.nome }}{% if p.telefone %} — {{ p.telefone }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">🔗 Vincular a esta ficha</button>
+        </form>
+    </div>
+
+    <div class="card">
         <h2>Excluir lead</h2>
         <p style="font-size:.85rem; color:var(--text-muted);">
             Remove esta lead definitivamente (cadastro por engano, duplicado, teste…).

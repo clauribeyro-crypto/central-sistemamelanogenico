@@ -29,4 +29,5 @@ urlpatterns = [
     path("<int:pk>/excluir/", views.excluir, name="excluir"),
     path("<int:pk>/agendar/", views.agendar, name="agendar"),
     path("<int:pk>/converter-em-paciente/", views.converter_em_paciente, name="converter_em_paciente"),
+    path("<int:pk>/vincular-paciente/", views.vincular_paciente_existente, name="vincular_paciente_existente"),
 ]

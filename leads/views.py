@@ -834,6 +834,7 @@ def detalhe(request, pk):
             and not (lead.etapa == Lead.Etapa.CONTATO_1 and lead.tentativas_etapa_atual < 2)
         ),
         "falta_contato": not lead.whatsapp and lead.status in (Lead.Status.PENDENTE, Lead.Status.EM_ANDAMENTO),
+        "pacientes_da_org": Paciente.objects.filter(organizacao=org).order_by("nome"),
     }
     return render(request, "leads/detalhe.html", contexto)
 
@@ -1153,6 +1154,31 @@ def converter_em_paciente(request, pk):
     )
     messages.success(request, f"Ficha de {paciente.nome} criada — já pode iniciar o protocolo dela.")
     return redirect("pacientes:iniciar_protocolo", pk=paciente.pk)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_leads_ativo", "CRM de leads")
+@require_POST
+def vincular_paciente_existente(request, pk):
+    """
+    Corrige o vínculo lead -> paciente quando ele nunca foi feito ou ficou
+    errado (ex.: a consulta foi agendada direto na Agenda com uma ficha de
+    paciente diferente da que já existia, deixando a lead órfã) — sem esse
+    vínculo, a lead nunca aparece como "fechou" nos relatórios de marketing,
+    mesmo com o tratamento rodando normalmente.
+    """
+    leads_qs, org = _leads_do_usuario(request)
+    lead = get_object_or_404(leads_qs, pk=pk)
+    paciente = get_object_or_404(Paciente, pk=request.POST.get("paciente_id"), organizacao=org)
+    lead.paciente = paciente
+    lead.save(update_fields=["paciente", "atualizado_em"])
+    lead.registrar_historico(
+        HistoricoLead.Tipo.AGENDAMENTO,
+        f"Vínculo com a ficha de {paciente.nome} corrigido manualmente.",
+        request.user,
+    )
+    messages.success(request, f"Lead vinculada à ficha de {paciente.nome}.")
+    return redirect("leads:detalhe", pk=lead.pk)
 
 
 @login_required
