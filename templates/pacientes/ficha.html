@@ -820,6 +820,50 @@
             </div>
         {% elif aba_atual == "produtos" %}
             <div class="card">
+                <h2>Compras de produtos</h2>
+                {% if compras_produtos %}
+                    <table>
+                        <thead><tr><th>Data</th><th>Produtos</th><th>Total</th><th>Recebido</th><th>Status</th><th></th></tr></thead>
+                        <tbody>
+                        {% for venda in compras_produtos %}
+                            <tr>
+                                <td>{{ venda.data|date:"d/m/Y" }}</td>
+                                <td>
+                                    {% for item in venda.itens.all %}
+                                        {{ item.quantidade }}x {{ item.produto.nome }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td>R$ {{ venda.valor_total|floatformat:2 }}</td>
+                                {% with pagamento=venda.pagamentos.first %}
+                                    {% if pagamento %}
+                                        <td>R$ {{ pagamento.total_recebido|floatformat:2 }}</td>
+                                        <td>
+                                            <a href="{% url 'financeiro:editar_pagamento' pagamento.pk %}?next={{ request.get_full_path|urlencode }}">
+                                                {% if pagamento.status == "PAGO" %}
+                                                    <span class="badge">Pago</span>
+                                                {% elif pagamento.status == "PARCIAL" %}
+                                                    <span class="badge badge-parcial">Parcial — falta R$ {{ pagamento.saldo_pendente|floatformat:2 }}</span>
+                                                {% elif pagamento.status == "CANCELADO" %}
+                                                    <span class="badge badge-atrasado">Cancelado</span>
+                                                {% else %}
+                                                    <span class="badge badge-atrasado">Pendente</span>
+                                                {% endif %}
+                                            </a>
+                                        </td>
+                                    {% else %}
+                                        <td>R$ {{ venda.valor_total|floatformat:2 }}</td>
+                                        <td><span class="badge">Pago na hora</span></td>
+                                    {% endif %}
+                                {% endwith %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="color:var(--text-muted);">Nenhuma compra de produto registrada ainda.</p>
+                {% endif %}
+            </div>
+            <div class="card">
                 <h2>Produtos / kits</h2>
                 <table>
                     <thead><tr><th>Kit</th><th>Status</th><th>Data de envio</th><th>Produtos</th><th></th></tr></thead>

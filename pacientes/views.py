@@ -498,8 +498,12 @@ def ficha(request, pk):
             organizacao=org, paciente=paciente, status=Consulta.Status.REALIZADA,
         ).exclude(pk__in=consulta_ja_vinculada).order_by("-data_hora")
 
-    if acompanhamento and aba == "produtos":
-        contexto["kits"] = acompanhamento.kits_previstos.prefetch_related("itens__produto").order_by("numero")
+    if aba == "produtos":
+        if acompanhamento:
+            contexto["kits"] = acompanhamento.kits_previstos.prefetch_related("itens__produto").order_by("numero")
+        contexto["compras_produtos"] = paciente.compras_produtos.prefetch_related(
+            "itens__produto", "pagamentos"
+        ).order_by("-data")
 
     if aba == "historico":
         eventos = []
