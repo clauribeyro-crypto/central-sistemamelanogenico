@@ -86,6 +86,12 @@
                         <input type="hidden" name="acao" value="migrar">
                         <button class="btn" type="submit">Migrar para outro programa</button>
                     </form>
+                    <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}"
+                          onsubmit="return confirm('Cancelar este acompanhamento? A paciente desistiu/não quis dar continuidade — isso encerra o programa como \'Cancelado\'. Qualquer valor já recebido continua registrado no financeiro, nada é apagado.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="acao" value="cancelar">
+                        <button class="btn btn-danger" type="submit">Cancelar</button>
+                    </form>
                     {% if acompanhamento.status != "MANUTENCAO" %}
                         <form method="post" action="{% url 'programas:mudar_status_acompanhamento' acompanhamento.pk %}">
                             {% csrf_token %}
