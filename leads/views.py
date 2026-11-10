@@ -298,20 +298,24 @@ def painel_marketing(request):
             data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim, lead__isnull=False,
         ).values("lead__origem_id").annotate(total=Count("id"))
     }
-    # Fechou = a paciente vinculada a essa lead tem pelo menos um Acompanhamento
-    # (qualquer status — cancelado também conta como fechamento que aconteceu,
-    # mesma lógica de "vendas" usada mais abaixo nesta view). Não tem relação
-    # com a data do Acompanhamento: é "essa lead, que entrou nesse período,
-    # chegou a fechar tratamento alguma hora", pra fechar o funil com Leads/
-    # Agendaram que já seguem essa mesma lógica de "aconteceu alguma hora".
+    # Fechou = a paciente vinculada a essa lead tem um Acompanhamento (não
+    # cancelado) cuja venda (data_inicio) caiu dentro do mês selecionado —
+    # mesmo critério/mesmo período usado em "Vendas" mais abaixo nesta view,
+    # pra bater exatamente com aquele número. Não usa a data de entrada da
+    # lead no CRM: uma lead antiga que fechou agora conta como fechamento
+    # deste mês, não do mês em que entrou.
     # Lista de verdade (não só a contagem) de quem fechou, por origem — pra
     # dar pra ver exatamente quais pacientes estão por trás do número, sem
     # precisar abrir uma lead de cada vez.
+    pacientes_que_fecharam_no_mes = set(
+        Acompanhamento.objects.filter(
+            organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim_mes,
+        ).exclude(status=Acompanhamento.Status.CANCELADO).values_list("paciente_id", flat=True)
+    )
     leads_que_fecharam_por_origem = {}
     for lead in (
         Lead.objects.filter(
-            organizacao=org, entrou_em__date__gte=data_inicio, entrou_em__date__lte=data_fim,
-            paciente__acompanhamentos__isnull=False,
+            organizacao=org, paciente_id__in=pacientes_que_fecharam_no_mes,
         ).select_related("paciente").distinct().order_by("nome")
     ):
         leads_que_fecharam_por_origem.setdefault(lead.origem_id, []).append(lead)
