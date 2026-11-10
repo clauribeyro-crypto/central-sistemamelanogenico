@@ -159,6 +159,9 @@
             let detalhe;
             if (json && json.erro) {
                 detalhe = json.erro;
+                if (json.diagnostico) {
+                    detalhe += "\n\nDiagnóstico: " + JSON.stringify(json.diagnostico, null, 2);
+                }
             } else if (status === 403) {
                 detalhe = "Acesso negado (403) — a sessão pode ter expirado. Recarregue a página e entre de novo.";
             } else if (status >= 500) {
