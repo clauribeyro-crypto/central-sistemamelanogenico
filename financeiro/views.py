@@ -398,6 +398,29 @@ def editar_pagamento(request, pk):
             messages.success(request, "Recebimento excluído.")
             return redirect(url_desta_pagina)
 
+        elif acao == "cancelar_pagamento":
+            # Pra uma venda/cobrança que não vai mais acontecer (ex.: tratamento
+            # cancelado) sem apagar nenhum recebimento já registrado — diferente
+            # de "Excluir lançamento", que some com tudo. recalcular_status()
+            # nunca mexe sozinho num lançamento já cancelado (ver o método), por
+            # isso esse status só muda por ação manual como essa.
+            pagamento.status = Pagamento.Status.CANCELADO
+            pagamento.save(update_fields=["status", "atualizado_em"])
+            messages.success(request, "Cobrança cancelada — não conta mais como pendente no financeiro.")
+            return redirect(url_desta_pagina)
+
+        elif acao == "reativar_pagamento":
+            # recalcular_status() ignora o lançamento enquanto o status for
+            # Cancelado (de propósito — ver o método) — por isso muda pra
+            # Pendente primeiro, e só depois deixa o recálculo normal decidir
+            # o status certo (Pendente/Parcial/Pago) a partir dos recebimentos
+            # que já existirem.
+            pagamento.status = Pagamento.Status.PENDENTE
+            pagamento.save(update_fields=["status", "atualizado_em"])
+            pagamento.recalcular_status()
+            messages.success(request, "Cobrança reativada.")
+            return redirect(url_desta_pagina)
+
     if form is None:
         form = PagamentoForm(instance=pagamento)
     if recebimento_form is None:
