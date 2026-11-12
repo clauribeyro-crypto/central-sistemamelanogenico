@@ -94,7 +94,7 @@ def _campo_satisfacao(tema):
 SECOES_ANAMNESE = [
     {
         "titulo": "Dados pessoais",
-        "campos": ["idade", "data_nascimento", "telefone", "endereco", "profissao", "email", "peso", "altura"],
+        "campos": ["idade", "data_nascimento", "telefone", "endereco", "cep", "profissao", "email", "peso", "altura"],
         "satisfacao": None,
     },
     {
@@ -219,6 +219,11 @@ SECOES_ANAMNESE = [
         "campos": ["foto_rosto"],
         "satisfacao": None,
     },
+    {
+        "titulo": "Documentos",
+        "campos": ["foto_documento_rg", "foto_documento_cpf"],
+        "satisfacao": None,
+    },
 ]
 
 # Rótulo curto de cada nota de satisfação, pro resumo visual no topo da aba.
@@ -253,6 +258,7 @@ class Anamnese(ModeloDaOrganizacao):
     data_nascimento = models.DateField("data de nascimento", null=True, blank=True)
     telefone = _campo("telefone", max_length=20)
     endereco = _campo("endereço completo", max_length=255)
+    cep = _campo("CEP", max_length=9)
     profissao = _campo("profissão")
     email = models.EmailField("e-mail", blank=True)
     peso = models.DecimalField("peso (kg)", max_digits=5, decimal_places=1, null=True, blank=True)
@@ -449,6 +455,14 @@ class Anamnese(ModeloDaOrganizacao):
         "foto do rosto", upload_to="anamnese_fotos/%Y/%m/", blank=True, null=True
     )
 
+    # 17. Documentos
+    foto_documento_rg = models.ImageField(
+        "foto do RG (ou CNH)", upload_to="anamnese_documentos/%Y/%m/", blank=True, null=True
+    )
+    foto_documento_cpf = models.ImageField(
+        "foto do CPF", upload_to="anamnese_documentos/%Y/%m/", blank=True, null=True
+    )
+
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
@@ -478,7 +492,7 @@ class Anamnese(ModeloDaOrganizacao):
         """
         secoes = []
         for secao in SECOES_ANAMNESE:
-            if secao["titulo"] == "Foto":
+            if secao["titulo"] in ("Foto", "Documentos"):
                 continue
             itens = [
                 (self._meta.get_field(campo).verbose_name.capitalize(), valor)

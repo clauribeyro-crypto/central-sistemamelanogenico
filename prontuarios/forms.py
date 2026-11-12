@@ -125,6 +125,26 @@ class AnamneseForm(forms.ModelForm):
         }
 
 
+# Campos que viram obrigatórios só no preenchimento público (ver
+# AnamnesePublicaForm) — a edição interna (profissional na Ficha da Paciente)
+# continua livre pra salvar incompleto, igual sempre foi.
+_CAMPOS_OBRIGATORIOS_PUBLICO = ("telefone", "endereco", "cep", "foto_rosto")
+
+
+class AnamnesePublicaForm(AnamneseForm):
+    """
+    Mesmo formulário da anamnese, usado só no link público que a paciente
+    preenche sem login. Telefone, endereço completo, CEP e a foto do rosto
+    passam a ser obrigatórios aqui — sem eles a clínica não consegue enviar
+    os produtos da paciente nem confirmar quem preencheu.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for campo in _CAMPOS_OBRIGATORIOS_PUBLICO:
+            self.fields[campo].required = True
+
+
 class RegistroEvolucaoForm(forms.ModelForm):
     class Meta:
         model = RegistroEvolucao

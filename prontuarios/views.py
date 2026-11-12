@@ -11,7 +11,9 @@ from pacientes.models import Paciente
 from pacientes.views import _grafico_evolucao
 from programas.models import FotoEvolucao
 
-from .forms import AnamneseForm, AtendimentoForm, DocumentoForm, GravacaoConsultaForm, RegistroEvolucaoForm
+from .forms import (
+    AnamnesePublicaForm, AnamneseForm, AtendimentoForm, DocumentoForm, GravacaoConsultaForm, RegistroEvolucaoForm,
+)
 from .models import (
     SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, GravacaoConsulta, LinkAnamnese,
     LinkCheckin, RegistroEvolucao,
@@ -209,7 +211,7 @@ def anamnese_publica(request, token):
     instancia = Anamnese.objects.filter(paciente=paciente).first()
 
     if request.method == "POST":
-        form = AnamneseForm(request.POST, request.FILES, instance=instancia)
+        form = AnamnesePublicaForm(request.POST, request.FILES, instance=instancia)
         if form.is_valid():
             registro = form.save(commit=False)
             registro.organizacao = paciente.organizacao
@@ -218,7 +220,7 @@ def anamnese_publica(request, token):
             link.marcar_preenchido()
             return render(request, "prontuarios/anamnese_publica_sucesso.html", {"paciente": paciente})
     else:
-        form = AnamneseForm(instance=instancia)
+        form = AnamnesePublicaForm(instance=instancia)
 
     return render(request, "prontuarios/anamnese_publica.html", {
         "paciente": paciente, "form": form, "secoes": SECOES_ANAMNESE,
