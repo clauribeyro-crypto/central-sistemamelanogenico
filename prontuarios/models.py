@@ -221,7 +221,7 @@ SECOES_ANAMNESE = [
     },
     {
         "titulo": "Documentos",
-        "campos": ["foto_documento_rg", "foto_documento_cpf"],
+        "campos": ["numero_rg", "numero_cpf"],
         "satisfacao": None,
     },
 ]
@@ -456,12 +456,8 @@ class Anamnese(ModeloDaOrganizacao):
     )
 
     # 17. Documentos
-    foto_documento_rg = models.ImageField(
-        "foto do RG (ou CNH)", upload_to="anamnese_documentos/%Y/%m/", blank=True, null=True
-    )
-    foto_documento_cpf = models.ImageField(
-        "foto do CPF", upload_to="anamnese_documentos/%Y/%m/", blank=True, null=True
-    )
+    numero_rg = _campo("número do RG", max_length=20)
+    numero_cpf = _campo("número do CPF", max_length=20)
 
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -492,7 +488,7 @@ class Anamnese(ModeloDaOrganizacao):
         """
         secoes = []
         for secao in SECOES_ANAMNESE:
-            if secao["titulo"] in ("Foto", "Documentos"):
+            if secao["titulo"] == "Foto":
                 continue
             itens = [
                 (self._meta.get_field(campo).verbose_name.capitalize(), valor)

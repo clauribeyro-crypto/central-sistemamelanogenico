@@ -343,27 +343,8 @@
                             {% endfor %}
                         </div>
                     {% endif %}
-                    {% if anamnese.foto_rosto or anamnese.foto_documento_rg or anamnese.foto_documento_cpf %}
-                        <div style="margin-top:1rem; display:flex; gap:1rem; flex-wrap:wrap;">
-                            {% if anamnese.foto_rosto %}
-                                <div>
-                                    <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:0 0 .3rem;">Foto do rosto</p>
-                                    <a href="{{ anamnese.foto_rosto.url }}" target="_blank"><img src="{{ anamnese.foto_rosto.url }}" alt="Foto do rosto" style="max-width:140px; border-radius:8px;"></a>
-                                </div>
-                            {% endif %}
-                            {% if anamnese.foto_documento_rg %}
-                                <div>
-                                    <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:0 0 .3rem;">RG/CNH</p>
-                                    <a href="{{ anamnese.foto_documento_rg.url }}" target="_blank"><img src="{{ anamnese.foto_documento_rg.url }}" alt="Foto do RG" style="max-width:140px; border-radius:8px;"></a>
-                                </div>
-                            {% endif %}
-                            {% if anamnese.foto_documento_cpf %}
-                                <div>
-                                    <p style="font-size:.78rem; text-transform:uppercase; color:var(--text-muted); margin:0 0 .3rem;">CPF</p>
-                                    <a href="{{ anamnese.foto_documento_cpf.url }}" target="_blank"><img src="{{ anamnese.foto_documento_cpf.url }}" alt="Foto do CPF" style="max-width:140px; border-radius:8px;"></a>
-                                </div>
-                            {% endif %}
-                        </div>
+                    {% if anamnese.foto_rosto %}
+                        <p style="margin-top:1rem;"><a href="{{ anamnese.foto_rosto.url }}" target="_blank"><img src="{{ anamnese.foto_rosto.url }}" alt="Foto do rosto" style="max-width:140px; border-radius:8px;"></a></p>
                     {% endif %}
                     <div class="grid-2col" style="margin-top:1rem; align-items:start;">
                         {% for secao in anamnese.secoes_preenchidas %}

@@ -146,9 +146,8 @@ class AnamnesePublicaForm(AnamneseForm):
         # No celular, "capture" abre a câmera direto (traseira, por ser a
         # câmera principal) em vez da galeria de fotos — ajuda a padronizar
         # como a foto é tirada, sem travar o navegador numa câmera específica.
-        for campo in ("foto_rosto", "foto_documento_rg", "foto_documento_cpf"):
-            self.fields[campo].widget.attrs["capture"] = "environment"
-            self.fields[campo].widget.attrs["accept"] = "image/*"
+        self.fields["foto_rosto"].widget.attrs["capture"] = "environment"
+        self.fields["foto_rosto"].widget.attrs["accept"] = "image/*"
 
 
 class RegistroEvolucaoForm(forms.ModelForm):
