@@ -143,6 +143,12 @@ class AnamnesePublicaForm(AnamneseForm):
         super().__init__(*args, **kwargs)
         for campo in _CAMPOS_OBRIGATORIOS_PUBLICO:
             self.fields[campo].required = True
+        # No celular, "capture" abre a câmera direto (traseira, por ser a
+        # câmera principal) em vez da galeria de fotos — ajuda a padronizar
+        # como a foto é tirada, sem travar o navegador numa câmera específica.
+        for campo in ("foto_rosto", "foto_documento_rg", "foto_documento_cpf"):
+            self.fields[campo].widget.attrs["capture"] = "environment"
+            self.fields[campo].widget.attrs["accept"] = "image/*"
 
 
 class RegistroEvolucaoForm(forms.ModelForm):

@@ -54,9 +54,9 @@
         .campo:has(.erro) input, .campo:has(.erro) textarea, .campo:has(.erro) select {
             border-color: #8f2e45;
         }
-        .nota-endereco {
+        .nota {
             background: var(--accent-soft); color: var(--accent-soft-text); font-weight: 600;
-            font-size: .85rem; padding: .6rem .8rem; border-radius: 8px; margin: 0 0 .7rem;
+            font-size: .85rem; padding: .6rem .8rem; border-radius: 8px; margin: 0 0 .7rem; line-height: 1.5;
         }
     </style>
 </head>
@@ -78,7 +78,16 @@
                 <h2>{{ secao.titulo }}</h2>
                 {% for nome_campo in secao.campos %}
                     {% if nome_campo == "endereco" %}
-                        <p class="nota-endereco">📦 Esse vai ser o endereço (com CEP) pra onde a clínica vai enviar os seus produtos — capriche nos detalhes.</p>
+                        <p class="nota">📦 Esse vai ser o endereço (com CEP) pra onde a clínica vai enviar os seus produtos — capriche nos detalhes.</p>
+                    {% endif %}
+                    {% if nome_campo == "foto_rosto" %}
+                        <p class="nota">
+                            📸 Capricha na foto, assim dá pra ver bem as manchas:<br>
+                            • Tire de frente, mostrando o rosto inteiro, com boa luz (de preferência luz natural, sem flash)<br>
+                            • Fique sem maquiagem, se possível<br>
+                            • Procure um fundo liso, de preferência uma parede branca ou sem nada atrás<br>
+                            • Ao tocar no campo abaixo, seu celular já deve abrir a câmera direto
+                        </p>
                     {% endif %}
                     {% with bf=form|get_field:nome_campo %}
                         <div class="campo">
