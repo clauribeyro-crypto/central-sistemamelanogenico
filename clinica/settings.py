@@ -222,6 +222,14 @@ CLOUDINARY_STORAGE = {
 if CLOUDINARY_STORAGE["CLOUD_NAME"]:
     STORAGES["default"] = {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"}
 
+# O padrão do Django (2.5 MB) é pra todo o corpo da requisição multipart,
+# incluindo os arquivos enviados — bem pouco pra uma foto de câmera traseira
+# em resolução cheia (a anamnese pública chega a pedir 3: rosto, RG e CPF).
+# Sem isso, o envio simplesmente falha com 400 (Request Data Too Big) e
+# parece travado pra quem está preenchendo, sem nenhuma mensagem clara.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024  # 25 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024  # 25 MB
+
 # Análise de gravação de consulta por IA (prontuarios.services_ia): a OpenAI
 # transcreve o áudio, a Anthropic lê a transcrição e extrai as queixas da
 # paciente. Sem essas variáveis configuradas, o botão de análise avisa que
