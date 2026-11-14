@@ -232,6 +232,18 @@ def home(request):
         consultas_agendadas = [c for c in todas_consultas_agendadas_mes if c.total_recebido > 0]
         consultas_sem_recebimento = [c for c in todas_consultas_agendadas_mes if c.total_recebido <= 0]
         qtd_consultas_pagas = len(consultas_agendadas)
+        # Venda de produto é um negócio à parte do agendamento (não tem meta
+        # de quantidade/fechamento própria), mas o dinheiro que ela traz é
+        # caixa da mesma empresa — por isso já soma dentro de "faturado"
+        # (recebido_no_periodo não distingue a origem do recebimento). Essas
+        # duas linhas só dão visão de quanto disso é produto, pelo valor
+        # vendido (bruto) no mês — sem criar uma meta de produto separada.
+        vendas_produtos_mes = list(
+            Venda.objects.filter(organizacao=org, data__year=hoje.year, data__month=hoje.month)
+            .prefetch_related("itens")
+        )
+        qtd_vendas_produtos_mes = len(vendas_produtos_mes)
+        valor_vendas_produtos_mes = sum((v.valor_total for v in vendas_produtos_mes), Decimal("0.00"))
         faltam_faturamento = max(org.meta_faturamento_mensal - faturado, Decimal("0.00"))
         faltam_consultas = max(org.meta_consultas_mensal - qtd_consultas_pagas, 0)
         faltam_fechamentos = max(org.meta_fechamentos_mensal - qtd_fechamentos_pagos, 0)
@@ -259,6 +271,8 @@ def home(request):
             "total_vendas_mes": totais_mes_atual["total_geral"],
             "qtd_consultas_mes": totais_mes_atual["qtd_consultas"],
             "qtd_consultas_realizadas_mes": totais_mes_atual["qtd_consultas_realizadas"],
+            "qtd_vendas_produtos_mes": qtd_vendas_produtos_mes,
+            "valor_vendas_produtos_mes": valor_vendas_produtos_mes,
             # Parcelas futuras já cadastradas (ex.: tratamento em 3x, uma por
             # mês) — visão de quanto deve entrar em cada mês à frente, só do
             # que já foi programado manualmente em "Contas a receber".

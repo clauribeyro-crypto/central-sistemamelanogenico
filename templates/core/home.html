@@ -47,9 +47,21 @@
                     <div class="num">R$ {{ meta_mes.total_vendas_mes|floatformat:2 }}</div>
                     <div class="rotulo">Valor total vendido este mês (tratamentos + consultas)</div>
                 </div>
+                <a class="card stat" href="{% url 'estoque:painel' %}?aba=vendas" style="text-decoration:none;">
+                    <div class="num">{{ meta_mes.qtd_vendas_produtos_mes }}</div>
+                    <div class="rotulo">Compras de produto este mês (quantidade)</div>
+                </a>
+                <a class="card stat" href="{% url 'estoque:painel' %}?aba=vendas" style="text-decoration:none;">
+                    <div class="num">R$ {{ meta_mes.valor_vendas_produtos_mes|floatformat:2 }}</div>
+                    <div class="rotulo">Valor vendido em produtos este mês</div>
+                </a>
                 <div class="card stat">
                     <div class="num">R$ {{ meta_mes.faturado|floatformat:2 }}</div>
                     <div class="rotulo">Recebido este mês (só o que já caiu no caixa)</div>
+                    <div style="font-size:.78rem; color:var(--text-muted); margin-top:.3rem;">
+                        Já inclui o dinheiro recebido de venda de produto, não só tratamento/consulta — é tudo
+                        caixa da mesma empresa.
+                    </div>
                 </div>
                 <div class="card stat" style="background:#6366f111;">
                     <div class="num">R$ {{ meta_mes.faltam_faturamento|floatformat:2 }}</div>
