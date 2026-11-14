@@ -193,6 +193,65 @@ def relatorio(request):
     return render(request, "financeiro/relatorio.html", contexto)
 
 
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+def conferir_cartao(request):
+    """
+    Pra acertar, de uma vez só, o número de parcelas de recebimentos no
+    cartão lançados antes das taxas da maquininha serem cadastradas — sem
+    essa correção, eles ficam com líquido = bruto (parcelas=1/à vista),
+    mesmo quando a venda de verdade foi parcelada em mais vezes. Só a
+    paciente/a Cláudia sabe quantas parcelas cada venda antiga teve (o
+    sistema não guardava isso antes); ajustando aqui, taxa e líquido são
+    recalculados sozinhos ao salvar (ver Recebimento.save()).
+    """
+    org = organizacao_do_usuario(request)
+    hoje = datetime.date.today()
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        ano, mes = hoje.year, hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+
+    recebimentos_qs = Recebimento.objects.filter(
+        organizacao=org,
+        forma_pagamento__in=[Pagamento.FormaPagamento.CREDITO, Pagamento.FormaPagamento.DEBITO],
+        data__gte=data_inicio, data__lte=data_fim,
+    ).select_related("pagamento__paciente").order_by("data", "criado_em")
+
+    if request.method == "POST":
+        if not usuario_e_administrador(request):
+            messages.error(request, "Só administradores podem recalcular recebimentos.")
+            return redirect(f"{reverse('financeiro:conferir_cartao')}?ano={ano}&mes={mes}")
+        atualizados = 0
+        for recebimento in recebimentos_qs:
+            parcelas_novo = request.POST.get(f"parcelas_{recebimento.pk}")
+            if parcelas_novo and parcelas_novo.isdigit() and int(parcelas_novo) != recebimento.parcelas:
+                recebimento.parcelas = int(parcelas_novo)
+                recebimento.save()
+                atualizados += 1
+            elif recebimento.valor_liquido is None:
+                recebimento.save()
+                atualizados += 1
+        messages.success(
+            request,
+            f"{atualizados} recebimento{'s' if atualizados != 1 else ''} recalculado{'s' if atualizados != 1 else ''}."
+            if atualizados else "Nenhuma parcela foi alterada.",
+        )
+        return redirect(f"{reverse('financeiro:conferir_cartao')}?ano={ano}&mes={mes}")
+
+    return render(request, "financeiro/conferir_cartao.html", {
+        "ano": ano, "mes": mes, "meses": MESES, "anos": range(hoje.year - 2, hoje.year + 1),
+        "recebimentos": recebimentos_qs, "parcelas_opcoes": range(1, 13),
+        "pode_editar": usuario_e_administrador(request),
+    })
+
+
 def recebido_no_periodo(org, ano, mes):
     """
     Dinheiro que realmente caiu no caixa no mês — soma os recebimentos pela

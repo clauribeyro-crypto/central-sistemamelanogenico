@@ -82,6 +82,7 @@
                 "Bruto" é o que a paciente pagou; "Líquido" já desconta a taxa da maquininha cadastrada em
                 <a href="{% url 'financeiro:painel' %}?aba=geral">Financeiro → Geral</a> — é o líquido que entra
                 no seu caixa e no resultado do mês/ano.
+                <a href="{% url 'financeiro:conferir_cartao' %}">Conferir/corrigir parcelas no cartão ›</a>
             </p>
         {% else %}
             <p>Sem pagamentos recebidos no período.</p>
