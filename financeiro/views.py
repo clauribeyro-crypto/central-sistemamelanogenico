@@ -222,7 +222,22 @@ def conferir_cartao(request):
         organizacao=org,
         forma_pagamento__in=[Pagamento.FormaPagamento.CREDITO, Pagamento.FormaPagamento.DEBITO],
         data__gte=data_inicio, data__lte=data_fim,
-    ).select_related("pagamento__paciente").order_by("data", "criado_em")
+    ).select_related(
+        "pagamento__paciente", "pagamento__consulta__tipo_consulta",
+        "pagamento__acompanhamento__programa", "pagamento__venda",
+    ).order_by("data", "criado_em")
+    # Pra dar pra diferenciar as linhas quando a mesma paciente tem mais de
+    # uma venda no cartão no mês (ex.: um tratamento e uma compra de produto).
+    for recebimento in recebimentos_qs:
+        pagamento = recebimento.pagamento
+        if pagamento.consulta_id:
+            recebimento.origem = f"Consulta ({pagamento.consulta.tipo_consulta})"
+        elif pagamento.acompanhamento_id:
+            recebimento.origem = f"Tratamento ({pagamento.acompanhamento.programa.nome})"
+        elif pagamento.venda_id:
+            recebimento.origem = "Produto"
+        else:
+            recebimento.origem = "Avulso"
 
     if request.method == "POST":
         if not usuario_e_administrador(request):

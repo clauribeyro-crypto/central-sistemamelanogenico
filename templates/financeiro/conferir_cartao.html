@@ -35,13 +35,14 @@
                 {% csrf_token %}
                 <table>
                     <thead>
-                        <tr><th>Data</th><th>Paciente</th><th>Valor bruto</th><th>Forma</th><th>Parcelas</th><th>Taxa</th><th>Líquido</th></tr>
+                        <tr><th>Data</th><th>Paciente</th><th>Referente a</th><th>Valor bruto</th><th>Forma</th><th>Parcelas</th><th>Taxa</th><th>Líquido</th></tr>
                     </thead>
                     <tbody>
                     {% for r in recebimentos %}
                         <tr>
                             <td>{{ r.data|date:"d/m/Y" }}</td>
                             <td>{{ r.pagamento.paciente }}</td>
+                            <td>{{ r.origem }}</td>
                             <td>R$ {{ r.valor|floatformat:2 }}</td>
                             <td>{{ r.get_forma_pagamento_display }}</td>
                             <td>
