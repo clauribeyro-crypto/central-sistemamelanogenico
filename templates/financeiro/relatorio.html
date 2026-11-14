@@ -66,7 +66,7 @@
         <h2>Recebido por forma de pagamento</h2>
         {% if por_forma_pagamento %}
             <table>
-                <thead><tr><th>Forma</th><th>Total</th></tr></thead>
+                <thead><tr><th>Forma</th><th>Total vendido (bruto)</th></tr></thead>
                 <tbody>
                 {% for item in por_forma_pagamento %}
                     <tr>
@@ -76,6 +76,14 @@
                 {% endfor %}
                 </tbody>
             </table>
+            <p style="font-size:.82rem; color:var(--text-muted); margin-top:.6rem;">
+                Essa é a soma do valor vendido (o que a paciente pagou), antes do desconto da taxa da maquininha —
+                pra conferir com o extrato dela, compare o total de "Cartão de crédito"/"Cartão de débito" aqui
+                com o que realmente caiu na sua conta. A diferença é a taxa (ou antecipação), e pra ela contar
+                de verdade no seu caixa, lance-a como despesa em
+                <a href="{% url 'financeiro:painel' %}?aba=lancamentos">Financeiro → Lançamentos</a>
+                (categoria do tipo "Custo Variável", ex.: "Taxas da maquininha").
+            </p>
         {% else %}
             <p>Sem pagamentos recebidos no período.</p>
         {% endif %}

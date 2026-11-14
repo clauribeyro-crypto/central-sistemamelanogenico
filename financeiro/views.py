@@ -105,12 +105,17 @@ def relatorio(request):
     )
     total_pendente = sum((p.saldo_pendente for p in pagamentos_em_aberto), Decimal("0.00"))
 
-    por_forma_pagamento = (
-        recebimentos_no_periodo
-        .values("forma_pagamento")
-        .annotate(total=Sum("valor"))
-        .order_by("-total")
-    )
+    # "Recebido por forma de pagamento" é a visão que confere o total bruto
+    # vendido no cartão (ou em qualquer outra forma) num período — útil pra
+    # comparar com o extrato da maquininha e achar a diferença (taxa/
+    # antecipação). Troca o código salvo no banco (ex.: "CREDITO") pelo
+    # rótulo em português, que o template original só mostrava cru.
+    por_forma_pagamento = [
+        {"forma_pagamento": Pagamento.FormaPagamento(item["forma_pagamento"]).label, "total": item["total"]}
+        for item in (
+            recebimentos_no_periodo.values("forma_pagamento").annotate(total=Sum("valor")).order_by("-total")
+        )
+    ]
 
     por_profissional = (
         recebimentos_no_periodo.filter(pagamento__consulta__isnull=False)
