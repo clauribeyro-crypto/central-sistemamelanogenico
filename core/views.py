@@ -271,6 +271,12 @@ def home(request):
             "total_vendas_mes": totais_mes_atual["total_geral"],
             "qtd_consultas_mes": totais_mes_atual["qtd_consultas"],
             "qtd_consultas_realizadas_mes": totais_mes_atual["qtd_consultas_realizadas"],
+            # De onde vem o "Valor total vendido este mês" — cada tratamento
+            # fechado e cada consulta cobrada que compõem esse total, pra dar
+            # pra conferir item por item (mesmo padrão do detalhamento do
+            # "Recebido este mês" abaixo).
+            "detalhe_vendas_tratamentos_mes": totais_mes_atual["tratamentos"],
+            "detalhe_vendas_consultas_mes": totais_mes_atual["consultas"],
             "qtd_vendas_produtos_mes": qtd_vendas_produtos_mes,
             "valor_vendas_produtos_mes": valor_vendas_produtos_mes,
             # Parcelas futuras já cadastradas (ex.: tratamento em 3x, uma por

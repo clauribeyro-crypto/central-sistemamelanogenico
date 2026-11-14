@@ -69,6 +69,53 @@
                 </div>
             </div>
 
+            {% if meta_mes.detalhe_vendas_tratamentos_mes or meta_mes.detalhe_vendas_consultas_mes %}
+                <details style="margin-top:.6rem;">
+                    <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                        Ver de onde vêm os <span style="color:#2f8f5b; font-weight:700;">R$ {{ meta_mes.total_vendas_mes|floatformat:2 }}</span> vendidos este mês
+                    </summary>
+                    {% if meta_mes.detalhe_vendas_tratamentos_mes %}
+                        <p style="font-size:.78rem; color:var(--text-muted); margin:.5rem 0 .25rem; font-weight:600;">Tratamentos fechados este mês</p>
+                        <table>
+                            <thead><tr><th>Paciente</th><th>Programa</th><th>Início</th><th>Valor</th><th>Já recebido</th></tr></thead>
+                            <tbody>
+                            {% for t in meta_mes.detalhe_vendas_tratamentos_mes %}
+                                <tr>
+                                    <td><a href="{% url 'pacientes:ficha' t.paciente_id %}">{{ t.paciente }}</a></td>
+                                    <td>{{ t.programa }}</td>
+                                    <td>{{ t.data_inicio|date:"d/m/Y" }}</td>
+                                    <td>R$ {{ t.valor_liquido|floatformat:2 }}</td>
+                                    <td>R$ {{ t.total_recebido|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
+                    {% if meta_mes.detalhe_vendas_consultas_mes %}
+                        <p style="font-size:.78rem; color:var(--text-muted); margin:.75rem 0 .25rem; font-weight:600;">Consultas cobradas este mês</p>
+                        <table>
+                            <thead><tr><th>Paciente</th><th>Tipo</th><th>Data</th><th>Valor</th><th>Já recebido</th></tr></thead>
+                            <tbody>
+                            {% for c in meta_mes.detalhe_vendas_consultas_mes %}
+                                <tr>
+                                    <td><a href="{% url 'pacientes:ficha' c.paciente_id %}">{{ c.paciente }}</a></td>
+                                    <td>{{ c.tipo_consulta }}</td>
+                                    <td>{{ c.data_hora|date:"d/m/Y" }}</td>
+                                    <td>R$ {{ c.valor|floatformat:2 }}</td>
+                                    <td>R$ {{ c.total_recebido|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endif %}
+                    <p style="font-size:.78rem; color:var(--text-muted); margin-top:.5rem;">
+                        Esse total é o valor vendido/cobrado (não o recebido) — produto não entra aqui, já tem
+                        card próprio acima. Pra ver o dinheiro que realmente caiu no caixa, olha o card
+                        "Recebido este mês" ao lado (ele soma produto junto).
+                    </p>
+                </details>
+            {% endif %}
+
             <p style="font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin:1.1rem 0 .4rem; font-weight:600;">📅 Consultas</p>
             <div class="grid">
                 <div class="card stat">
