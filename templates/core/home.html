@@ -33,7 +33,15 @@
 
     {% if meta_mes %}
         <div class="card" style="border:2px solid #6366f1;">
-            <h2>🎯 Meta do mês — R$ {{ meta_mes.meta_faturamento|floatformat:0 }}</h2>
+            <h2 style="margin-bottom:0;">🎯 Meta do mês — R$ {{ meta_mes.meta_faturamento|floatformat:0 }}</h2>
+            <div style="background:#e5e7eb; border-radius:999px; height:10px; overflow:hidden; margin:.6rem 0;">
+                <div style="background:#6366f1; height:100%; width:{{ meta_mes.percentual_faturamento }}%;"></div>
+            </div>
+            <p style="font-size:.85rem; color:var(--text-muted); margin:0 0 1rem;">
+                {{ meta_mes.percentual_faturamento }}% da meta batida este mês.
+            </p>
+
+            <p style="font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin:0 0 .4rem; font-weight:600;">💰 Vendas e caixa</p>
             <div class="grid">
                 <div class="card stat">
                     <div class="num">R$ {{ meta_mes.total_vendas_mes|floatformat:2 }}</div>
@@ -47,33 +55,35 @@
                     <div class="num">R$ {{ meta_mes.faltam_faturamento|floatformat:2 }}</div>
                     <div class="rotulo">Falta receber para bater a meta</div>
                 </div>
+            </div>
+
+            <p style="font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin:1.1rem 0 .4rem; font-weight:600;">📅 Consultas</p>
+            <div class="grid">
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas_mes }}</div>
-                    <div class="rotulo">Consultas agendadas este mês (de diagnóstico, cobradas)</div>
+                    <div class="rotulo">Agendadas este mês (de diagnóstico, cobradas)</div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas_realizadas_mes }}</div>
-                    <div class="rotulo">Consultas já realizadas este mês</div>
+                    <div class="rotulo">Já realizadas este mês</div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
-                    <div class="rotulo">Consultas agendadas e pagas este mês (faltam {{ meta_mes.faltam_consultas }})</div>
+                    <div class="rotulo">Agendadas e pagas (meta) — faltam {{ meta_mes.faltam_consultas }}</div>
                     <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">
                         Conta pela data em que a consulta foi marcada no sistema, não pela data da consulta em
                         si — uma consulta marcada em setembro pra acontecer em outubro conta pra setembro.
                     </div>
                 </div>
+            </div>
+
+            <p style="font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin:1.1rem 0 .4rem; font-weight:600;">🧪 Tratamentos</p>
+            <div class="grid">
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_fechamentos }} / {{ meta_mes.meta_fechamentos }}</div>
-                    <div class="rotulo">Tratamentos já pagos este mês (faltam {{ meta_mes.faltam_fechamentos }})</div>
+                    <div class="rotulo">Já pagos este mês (meta) — faltam {{ meta_mes.faltam_fechamentos }}</div>
                 </div>
             </div>
-            <div style="background:#e5e7eb; border-radius:999px; height:10px; overflow:hidden; margin:.75rem 0;">
-                <div style="background:#6366f1; height:100%; width:{{ meta_mes.percentual_faturamento }}%;"></div>
-            </div>
-            <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
-                {{ meta_mes.percentual_faturamento }}% da meta batida este mês.
-            </p>
 
             {% if request.user.is_superuser and meta_mes.vendas_kit_mentora %}
                 <div class="card stat" style="margin-top:.75rem; background:#a855f711; border:1px solid #a855f733;">
