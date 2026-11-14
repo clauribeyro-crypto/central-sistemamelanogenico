@@ -23,7 +23,7 @@
 
     {% if recebimentos %}
         <table>
-            <thead><tr><th>Data</th><th>Valor</th><th>Forma</th><th>Observações</th><th></th></tr></thead>
+            <thead><tr><th>Data</th><th>Valor bruto</th><th>Forma</th><th>Parcelas</th><th>Taxa</th><th>Líquido</th><th>Observações</th><th></th></tr></thead>
             <tbody>
             {% for r in recebimentos %}
                 <tr>
@@ -40,6 +40,15 @@
                                 {% endfor %}
                             </select>
                         </td>
+                        <td>
+                            <select name="parcelas" style="font-size:.82rem; padding:.2rem;">
+                                {% for n in parcelas_opcoes %}
+                                    <option value="{{ n }}" {% if n == r.parcelas %}selected{% endif %}>{% if n > 1 %}{{ n }}x{% else %}À vista/1x{% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td style="font-size:.82rem; color:var(--text-muted); white-space:nowrap;">{{ r.taxa_percentual }}%</td>
+                        <td style="font-size:.82rem; white-space:nowrap;">R$ {{ r.valor_liquido|floatformat:2 }}</td>
                         <td><input type="text" name="observacoes" value="{{ r.observacoes }}" style="font-size:.82rem; padding:.2rem; width:100%;"></td>
                         <td style="white-space:nowrap;">
                             <button type="submit" name="acao" value="editar_recebimento" style="background:none; border:none; padding:0; cursor:pointer; font-size:.82rem; text-decoration:underline;">Salvar</button>
@@ -52,6 +61,10 @@
             {% endfor %}
             </tbody>
         </table>
+        <p style="font-size:.78rem; color:var(--text-muted);">
+            "Parcelas" só muda a taxa quando a forma é cartão (débito ou crédito) — configure as taxas em
+            <a href="{% url 'financeiro:painel' %}?aba=geral">Financeiro → Geral</a>.
+        </p>
     {% else %}
         <p style="color:var(--text-muted); font-size:.85rem;">Nenhum recebimento registrado ainda.</p>
     {% endif %}

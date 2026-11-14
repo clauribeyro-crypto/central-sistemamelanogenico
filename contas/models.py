@@ -37,6 +37,26 @@ class Organizacao(models.Model):
         help_text="Saldo em caixa antes do primeiro lançamento registrado no sistema — base pro saldo acumulado do Controle Financeiro.",
     )
 
+    # Taxas da maquininha de cartão, por forma de pagamento/parcelamento —
+    # chaves "DEBITO", "CREDITO_1" (à vista), "CREDITO_2" .. "CREDITO_12".
+    # Guardado como string (não float) pra não perder precisão decimal.
+    # Usado pra calcular o valor líquido de cada recebimento no cartão, sem
+    # precisar lançar a taxa à mão toda vez (ver Recebimento.save()).
+    taxas_maquininha = models.JSONField(default=dict, blank=True)
+
+    def taxa_maquininha(self, forma_pagamento, parcelas=1):
+        """Taxa (%) configurada pra essa forma de pagamento/parcelamento, ou 0 se não configurada."""
+        from decimal import Decimal
+
+        if forma_pagamento == "DEBITO":
+            chave = "DEBITO"
+        elif forma_pagamento == "CREDITO":
+            chave = f"CREDITO_{max(1, parcelas or 1)}"
+        else:
+            return Decimal("0.00")
+        valor = self.taxas_maquininha.get(chave)
+        return Decimal(str(valor)) if valor not in (None, "") else Decimal("0.00")
+
     modulo_leads_ativo = models.BooleanField(
         default=True, verbose_name="módulo CRM de leads ativo",
         help_text="Desmarque para esconder o CRM de leads do menu dessa organização.",

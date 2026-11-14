@@ -27,13 +27,23 @@ MESES = [
     (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro"),
 ]
 
+# Chaves do JSON Organizacao.taxas_maquininha, na ordem exibida no formulário
+# de configuração — ver Organizacao.taxa_maquininha() pra como são usadas.
+TAXAS_MAQUININHA_CAMPOS = [
+    ("DEBITO", "Débito"),
+    ("CREDITO_1", "Crédito à vista"),
+] + [(f"CREDITO_{n}", f"Crédito {n}x") for n in range(2, 13)]
+
 
 def _totais_periodo(org, data_inicio, data_fim, status=Lancamento.Status.REALIZADO):
     """
     Soma receitas/despesas no período: lançamentos manuais pelo grupo da
     categoria, mais os recebimentos das pacientes (só entram como receita
     realizada — a cobrança em aberto de uma paciente é "previsto" e é
-    tratada à parte, junto do saldo pendente dos pagamentos).
+    tratada à parte, junto do saldo pendente dos pagamentos). Usa o valor
+    líquido do recebimento (já descontada a taxa da maquininha, quando for
+    cartão) — é o que realmente cai no caixa, não o valor bruto cobrado da
+    paciente.
     """
     lancamentos = Lancamento.objects.filter(
         organizacao=org, status=status, data__gte=data_inicio, data__lte=data_fim
@@ -48,7 +58,7 @@ def _totais_periodo(org, data_inicio, data_fim, status=Lancamento.Status.REALIZA
     if status == Lancamento.Status.REALIZADO:
         receitas += Recebimento.objects.filter(
             organizacao=org, data__gte=data_inicio, data__lte=data_fim
-        ).aggregate(t=Sum("valor"))["t"] or Decimal("0.00")
+        ).aggregate(t=Sum("valor_liquido"))["t"] or Decimal("0.00")
 
     return {"receitas": receitas, "despesas": despesas, "resultado": receitas - despesas}
 
@@ -98,7 +108,11 @@ def relatorio(request):
     recebimentos_no_periodo = Recebimento.objects.filter(
         organizacao=org, data__gte=data_inicio, data__lte=data_fim,
     )
-    total_pago = recebimentos_no_periodo.aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
+    # "Recebido" é sempre o líquido (o que de fato cai no caixa, já descontada
+    # a taxa da maquininha) — o bruto (o que a paciente pagou) aparece à parte,
+    # pra quem quiser comparar.
+    total_pago = recebimentos_no_periodo.aggregate(total=Sum("valor_liquido"))["total"] or Decimal("0.00")
+    total_pago_bruto = recebimentos_no_periodo.aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
 
     pagamentos_em_aberto = pagamentos_vencendo_no_periodo.filter(
         status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL]
@@ -106,14 +120,20 @@ def relatorio(request):
     total_pendente = sum((p.saldo_pendente for p in pagamentos_em_aberto), Decimal("0.00"))
 
     # "Recebido por forma de pagamento" é a visão que confere o total bruto
-    # vendido no cartão (ou em qualquer outra forma) num período — útil pra
-    # comparar com o extrato da maquininha e achar a diferença (taxa/
-    # antecipação). Troca o código salvo no banco (ex.: "CREDITO") pelo
+    # vendido no cartão (ou em qualquer outra forma) num período, lado a lado
+    # com o líquido — útil pra comparar com o extrato da maquininha e achar a
+    # diferença (taxa). Troca o código salvo no banco (ex.: "CREDITO") pelo
     # rótulo em português, que o template original só mostrava cru.
     por_forma_pagamento = [
-        {"forma_pagamento": Pagamento.FormaPagamento(item["forma_pagamento"]).label, "total": item["total"]}
+        {
+            "forma_pagamento": Pagamento.FormaPagamento(item["forma_pagamento"]).label,
+            "total": item["total"],
+            "total_liquido": item["total_liquido"],
+        }
         for item in (
-            recebimentos_no_periodo.values("forma_pagamento").annotate(total=Sum("valor")).order_by("-total")
+            recebimentos_no_periodo.values("forma_pagamento")
+            .annotate(total=Sum("valor"), total_liquido=Sum("valor_liquido"))
+            .order_by("-total")
         )
     ]
 
@@ -162,6 +182,7 @@ def relatorio(request):
         "pagamentos": pagamentos.order_by("-data_vencimento"),
         "pendencias_de_outros_periodos": pendencias_de_outros_periodos,
         "total_pago": total_pago,
+        "total_pago_bruto": total_pago_bruto,
         "total_pendente": total_pendente,
         "por_forma_pagamento": por_forma_pagamento,
         "por_profissional": por_profissional,
@@ -183,13 +204,14 @@ def recebido_no_periodo(org, ano, mes):
     caixa de outubro (mês da consulta) em vez de no de setembro (mês em que
     o dinheiro realmente chegou). Esta função corrige isso pra quem precisa
     do valor real que entrou no caixa no período, tipo o card de meta do mês.
+    Soma o valor líquido (já descontada a taxa da maquininha), não o bruto.
     """
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)
     data_fim = datetime.date(ano, mes, ultimo_dia)
     return Recebimento.objects.filter(
         pagamento__organizacao=org, data__gte=data_inicio, data__lte=data_fim,
-    ).aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
+    ).aggregate(total=Sum("valor_liquido"))["total"] or Decimal("0.00")
 
 
 def detalhe_recebido_no_periodo(org, ano, mes):
@@ -451,6 +473,7 @@ def editar_pagamento(request, pk):
         "pagamento": pagamento,
         "recebimento_form": recebimento_form,
         "recebimentos": pagamento.recebimentos.all(),
+        "parcelas_opcoes": range(1, 13),
         "next": proximo,
     }
     return render(request, "financeiro/editar_pagamento.html", contexto)
@@ -637,6 +660,10 @@ def painel(request):
             "saldo_futuro_previsto": saldo_futuro_previsto,
             "grafico": grafico,
             "saldo_inicial_financeiro": org.saldo_inicial_financeiro,
+            "taxas_maquininha_campos": [
+                {"chave": chave, "rotulo": rotulo, "valor": org.taxas_maquininha.get(chave, "")}
+                for chave, rotulo in TAXAS_MAQUININHA_CAMPOS
+            ],
         })
 
     return render(request, "financeiro/painel.html", contexto)
@@ -660,6 +687,35 @@ def salvar_saldo_inicial(request):
     org.saldo_inicial_financeiro = valor
     org.save(update_fields=["saldo_inicial_financeiro"])
     messages.success(request, "Saldo inicial atualizado.")
+    return redirect(f"{reverse('financeiro:painel')}?aba=geral")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+@require_POST
+def salvar_taxas_maquininha(request):
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem alterar as taxas da maquininha.")
+        return redirect(f"{reverse('financeiro:painel')}?aba=geral")
+
+    taxas = {}
+    for chave, _rotulo in TAXAS_MAQUININHA_CAMPOS:
+        bruto = (request.POST.get(f"taxa_{chave}") or "").strip().replace(",", ".")
+        if bruto:
+            try:
+                taxas[chave] = str(Decimal(bruto))
+            except Exception:
+                messages.error(request, f"Taxa inválida em \"{chave}\" — nada foi salvo.")
+                return redirect(f"{reverse('financeiro:painel')}?aba=geral")
+
+    org.taxas_maquininha = taxas
+    org.save(update_fields=["taxas_maquininha"])
+    messages.success(
+        request,
+        "Taxas da maquininha atualizadas — valem pra recebimentos novos de cartão a partir de agora "
+        "(recebimentos já registrados mantêm a taxa que tinham quando foram salvos).",
+    )
     return redirect(f"{reverse('financeiro:painel')}?aba=geral")
 
 

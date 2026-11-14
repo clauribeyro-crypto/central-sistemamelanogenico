@@ -7,6 +7,7 @@ app_name = "financeiro"
 urlpatterns = [
     path("", views.painel, name="painel"),
     path("saldo-inicial/", views.salvar_saldo_inicial, name="salvar_saldo_inicial"),
+    path("taxas-maquininha/", views.salvar_taxas_maquininha, name="salvar_taxas_maquininha"),
     path("meta-mes/", views.salvar_meta_mes, name="salvar_meta_mes"),
     path("lancamentos/novo/", views.lancamento_criar, name="lancamento_criar"),
     path("extrato/importar/", views.extrato_importar, name="extrato_importar"),

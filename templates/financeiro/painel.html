@@ -310,6 +310,28 @@
                     <button type="submit" class="btn">Salvar</button>
                 </form>
             </div>
+
+            <div class="card">
+                <h2>Taxas da maquininha</h2>
+                <p style="font-size:.85rem; color:var(--text-muted);">
+                    Usadas pra calcular o valor líquido de cada recebimento no cartão (débito/crédito) — o que
+                    realmente cai no seu caixa, descontada a taxa. Em %, com vírgula ou ponto (ex.: 6,39).
+                    Mudar aqui não altera recebimentos já registrados, só os novos.
+                </p>
+                <form method="post" action="{% url 'financeiro:salvar_taxas_maquininha' %}">
+                    {% csrf_token %}
+                    <div class="grid" style="grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));">
+                        {% for campo in taxas_maquininha_campos %}
+                            <div>
+                                <label for="taxa-{{ campo.chave }}" style="font-size:.78rem;">{{ campo.rotulo }}</label>
+                                <input type="text" id="taxa-{{ campo.chave }}" name="taxa_{{ campo.chave }}"
+                                       value="{{ campo.valor }}" placeholder="0,00" style="width:100%;">
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="submit" class="btn" style="margin-top:1rem;">Salvar taxas</button>
+                </form>
+            </div>
         {% endif %}
     {% endif %}
 {% endblock %}

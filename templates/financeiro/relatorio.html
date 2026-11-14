@@ -29,7 +29,8 @@
     <div class="grid">
         <div class="card stat">
             <div class="num">R$ {{ total_pago|floatformat:2 }}</div>
-            <div>Total recebido no período</div>
+            <div>Total recebido no período (líquido)</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">Bruto: R$ {{ total_pago_bruto|floatformat:2 }}</div>
         </div>
         <div class="card stat">
             <div class="num">R$ {{ total_pendente|floatformat:2 }}</div>
@@ -66,23 +67,21 @@
         <h2>Recebido por forma de pagamento</h2>
         {% if por_forma_pagamento %}
             <table>
-                <thead><tr><th>Forma</th><th>Total vendido (bruto)</th></tr></thead>
+                <thead><tr><th>Forma</th><th>Total vendido (bruto)</th><th>Total líquido (caixa)</th></tr></thead>
                 <tbody>
                 {% for item in por_forma_pagamento %}
                     <tr>
                         <td>{{ item.forma_pagamento }}</td>
                         <td>R$ {{ item.total|floatformat:2 }}</td>
+                        <td>R$ {{ item.total_liquido|floatformat:2 }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
             <p style="font-size:.82rem; color:var(--text-muted); margin-top:.6rem;">
-                Essa é a soma do valor vendido (o que a paciente pagou), antes do desconto da taxa da maquininha —
-                pra conferir com o extrato dela, compare o total de "Cartão de crédito"/"Cartão de débito" aqui
-                com o que realmente caiu na sua conta. A diferença é a taxa (ou antecipação), e pra ela contar
-                de verdade no seu caixa, lance-a como despesa em
-                <a href="{% url 'financeiro:painel' %}?aba=lancamentos">Financeiro → Lançamentos</a>
-                (categoria do tipo "Custo Variável", ex.: "Taxas da maquininha").
+                "Bruto" é o que a paciente pagou; "Líquido" já desconta a taxa da maquininha cadastrada em
+                <a href="{% url 'financeiro:painel' %}?aba=geral">Financeiro → Geral</a> — é o líquido que entra
+                no seu caixa e no resultado do mês/ano.
             </p>
         {% else %}
             <p>Sem pagamentos recebidos no período.</p>
