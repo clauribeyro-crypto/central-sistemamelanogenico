@@ -1,6 +1,6 @@
 import calendar
 import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -15,9 +15,9 @@ from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuar
 from core.models import totais_mentoria_no_periodo, totais_vendas_kit_mentora_no_periodo
 from programas.models import Acompanhamento
 
-from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, RecebimentoForm
+from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, ParcelaPrevistaForm, RecebimentoForm
 from .importador_extrato import parse_extrato, sugerir_categoria
-from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, Recebimento
+from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, ParcelaPrevista, Recebimento
 
 SESSION_KEY_EXTRATO_PENDENTE = "extrato_importar_pendente"
 
@@ -428,6 +428,51 @@ def totais_fechamentos_mes(org, ano, mes):
     }
 
 
+def _somar_meses(data, meses):
+    """Soma N meses a uma data, ajustando o dia se o mês de chegada for mais curto (ex.: 31/01 + 1 mês -> 28 ou 29/02)."""
+    mes_total = data.month - 1 + meses
+    ano = data.year + mes_total // 12
+    mes = mes_total % 12 + 1
+    dia = min(data.day, calendar.monthrange(ano, mes)[1])
+    return datetime.date(ano, mes, dia)
+
+
+def previsao_parcelas_por_mes(org):
+    """
+    Agrupa por mês as parcelas futuras cadastradas (ParcelaPrevista) que
+    ainda não foram pagas, de cobranças ainda pendentes/parciais — pro card
+    de previsão de caixa da home. Separa quem já venceu ("atrasado") de quem
+    ainda vai vencer, mês a mês, na ordem em que os meses forem aparecendo.
+    """
+    hoje = datetime.date.today()
+    parcelas = (
+        ParcelaPrevista.objects.filter(
+            organizacao=org, data_pagamento__isnull=True,
+            pagamento__status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL],
+        )
+        .exclude(pagamento__acompanhamento__status=Acompanhamento.Status.CANCELADO)
+        .order_by("data_prevista")
+    )
+    nomes_meses = dict(MESES)
+    atrasado = Decimal("0.00")
+    por_mes = {}
+    ordem_meses = []
+    for p in parcelas:
+        if p.data_prevista < hoje:
+            atrasado += p.valor
+            continue
+        chave = (p.data_prevista.year, p.data_prevista.month)
+        if chave not in por_mes:
+            por_mes[chave] = Decimal("0.00")
+            ordem_meses.append(chave)
+        por_mes[chave] += p.valor
+    meses = [
+        {"rotulo": f"{nomes_meses[mes]}/{ano}", "valor": por_mes[(ano, mes)]}
+        for ano, mes in ordem_meses
+    ]
+    return {"atrasado": atrasado, "meses": meses}
+
+
 @login_required
 @modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def relatorio_fechamentos(request):
@@ -514,6 +559,56 @@ def editar_pagamento(request, pk):
             messages.success(request, "Recebimento excluído.")
             return redirect(url_desta_pagina)
 
+        elif acao == "adicionar_parcela_prevista":
+            parcela_form = ParcelaPrevistaForm(request.POST)
+            if parcela_form.is_valid():
+                parcela = parcela_form.save(commit=False)
+                parcela.organizacao = org
+                parcela.pagamento = pagamento
+                parcela.save()
+                messages.success(request, "Parcela prevista adicionada.")
+            else:
+                messages.error(request, "Não deu pra salvar a parcela prevista — confira os valores.")
+            return redirect(url_desta_pagina)
+
+        elif acao == "gerar_parcelas_previstas":
+            try:
+                quantidade = int(request.POST.get("quantidade", "0"))
+                valor_parcela = Decimal(request.POST.get("valor_parcela", "0").replace(",", "."))
+                primeira_data = datetime.datetime.strptime(
+                    request.POST.get("primeira_data", ""), "%Y-%m-%d"
+                ).date()
+            except (ValueError, TypeError, InvalidOperation):
+                messages.error(request, "Não deu pra gerar as parcelas — confira a quantidade, o valor e a data.")
+                return redirect(url_desta_pagina)
+            if quantidade < 1 or quantidade > 24 or valor_parcela <= 0:
+                messages.error(request, "Não deu pra gerar as parcelas — confira a quantidade, o valor e a data.")
+                return redirect(url_desta_pagina)
+            for n in range(quantidade):
+                ParcelaPrevista.objects.create(
+                    organizacao=org, pagamento=pagamento,
+                    data_prevista=_somar_meses(primeira_data, n), valor=valor_parcela,
+                )
+            messages.success(request, f"{quantidade} parcelas previstas geradas.")
+            return redirect(url_desta_pagina)
+
+        elif acao == "marcar_parcela_paga":
+            parcela = get_object_or_404(
+                ParcelaPrevista, pk=request.POST.get("parcela_id"), pagamento=pagamento, organizacao=org
+            )
+            parcela.data_pagamento = datetime.date.today()
+            parcela.save(update_fields=["data_pagamento"])
+            messages.success(request, "Parcela marcada como paga.")
+            return redirect(url_desta_pagina)
+
+        elif acao == "excluir_parcela_prevista":
+            parcela = get_object_or_404(
+                ParcelaPrevista, pk=request.POST.get("parcela_id"), pagamento=pagamento, organizacao=org
+            )
+            parcela.delete()
+            messages.success(request, "Parcela prevista excluída.")
+            return redirect(url_desta_pagina)
+
         elif acao == "cancelar_pagamento":
             # Pra uma venda/cobrança que não vai mais acontecer (ex.: tratamento
             # cancelado) sem apagar nenhum recebimento já registrado — diferente
@@ -548,6 +643,8 @@ def editar_pagamento(request, pk):
         "recebimento_form": recebimento_form,
         "recebimentos": pagamento.recebimentos.all(),
         "parcelas_opcoes": range(1, 13),
+        "parcelas_previstas": pagamento.parcelas_previstas.all(),
+        "parcela_prevista_form": ParcelaPrevistaForm(),
         "next": proximo,
     }
     return render(request, "financeiro/editar_pagamento.html", contexto)

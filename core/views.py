@@ -15,7 +15,8 @@ from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Venda
 from financeiro.models import Pagamento
 from financeiro.views import (
-    MESES, consultas_agendadas_no_mes, detalhe_recebido_no_periodo, recebido_no_periodo, totais_fechamentos_mes,
+    MESES, consultas_agendadas_no_mes, detalhe_recebido_no_periodo, previsao_parcelas_por_mes,
+    recebido_no_periodo, totais_fechamentos_mes,
 )
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
@@ -258,6 +259,10 @@ def home(request):
             "total_vendas_mes": totais_mes_atual["total_geral"],
             "qtd_consultas_mes": totais_mes_atual["qtd_consultas"],
             "qtd_consultas_realizadas_mes": totais_mes_atual["qtd_consultas_realizadas"],
+            # Parcelas futuras já cadastradas (ex.: tratamento em 3x, uma por
+            # mês) — visão de quanto deve entrar em cada mês à frente, só do
+            # que já foi programado manualmente em "Contas a receber".
+            "previsao_recebimentos": previsao_parcelas_por_mes(org),
         }
         if request.user.is_superuser:
             ultimo_dia_mes = calendar.monthrange(hoje.year, hoje.month)[1]

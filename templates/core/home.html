@@ -85,6 +85,28 @@
                 </div>
             </div>
 
+            {% if meta_mes.previsao_recebimentos.meses or meta_mes.previsao_recebimentos.atrasado %}
+                <p style="font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin:1.1rem 0 .4rem; font-weight:600;">📆 Previsão de recebimentos</p>
+                <p style="font-size:.78rem; color:var(--text-muted); margin:0 0 .5rem;">
+                    Parcelas futuras já cadastradas em cobranças parceladas (ex.: tratamento em 3x) — cadastre em
+                    "Contas a receber" → "Gerenciar" → "Previsão de parcelas futuras".
+                </p>
+                <div class="grid">
+                    {% if meta_mes.previsao_recebimentos.atrasado %}
+                        <div class="card stat" style="background:#8f2e4511;">
+                            <div class="num" style="color:#8f2e45;">R$ {{ meta_mes.previsao_recebimentos.atrasado|floatformat:2 }}</div>
+                            <div class="rotulo">Previsto e já vencido, ainda não marcado como pago</div>
+                        </div>
+                    {% endif %}
+                    {% for m in meta_mes.previsao_recebimentos.meses %}
+                        <div class="card stat">
+                            <div class="num">R$ {{ m.valor|floatformat:2 }}</div>
+                            <div class="rotulo">Previsto pra {{ m.rotulo }}</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             {% if request.user.is_superuser and meta_mes.vendas_kit_mentora %}
                 <div class="card stat" style="margin-top:.75rem; background:#a855f711; border:1px solid #a855f733;">
                     <div class="num">R$ {{ meta_mes.vendas_kit_mentora.total_pago|floatformat:2 }}</div>

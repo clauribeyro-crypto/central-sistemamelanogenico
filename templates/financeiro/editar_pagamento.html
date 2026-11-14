@@ -6,6 +6,87 @@
 
     {% include "financeiro/_recebimentos.html" %}
 
+    {% if pagamento.saldo_pendente > 0 %}
+    <div class="card">
+        <h2 style="margin-top:0;">Previsão de parcelas futuras</h2>
+        <p style="font-size:.85rem; color:var(--text-muted);">
+            Pra quando o restante vai entrar em mais de uma parcela (ex.: R$ 2.000 em novembro, R$ 2.000 em
+            dezembro). Isso não é um recebimento de verdade — é só a previsão que aparece no card "Previsão de
+            recebimentos" da home. Quando o dinheiro realmente cair, lança o recebimento lá em cima do jeito
+            normal, e marca a parcela correspondente aqui embaixo como paga.
+        </p>
+
+        {% if parcelas_previstas %}
+            <table>
+                <thead><tr><th>Previsto para</th><th>Valor</th><th>Situação</th><th></th></tr></thead>
+                <tbody>
+                {% for parcela in parcelas_previstas %}
+                    <tr>
+                        <td>
+                            {{ parcela.data_prevista|date:"d/m/Y" }}
+                            {% if parcela.atrasada %}<br><span class="badge badge-atrasado">Atrasada</span>{% endif %}
+                        </td>
+                        <td>R$ {{ parcela.valor|floatformat:2 }}</td>
+                        <td>{% if parcela.paga %}<span class="badge">Paga em {{ parcela.data_pagamento|date:"d/m/Y" }}</span>{% else %}<span class="badge badge-neutro">Prevista</span>{% endif %}</td>
+                        <td style="white-space:nowrap;">
+                            <form method="post" style="display:inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="parcela_id" value="{{ parcela.pk }}">
+                                <input type="hidden" name="next" value="{{ next }}">
+                                {% if not parcela.paga %}
+                                    <button type="submit" name="acao" value="marcar_parcela_paga" style="background:none; border:none; padding:0; cursor:pointer; font-size:.82rem; text-decoration:underline;">Marcar paga</button>
+                                {% endif %}
+                                <button type="submit" name="acao" value="excluir_parcela_prevista"
+                                        onclick="return confirm('Excluir esta previsão de R$ {{ parcela.valor|floatformat:2 }}?');"
+                                        style="color:#8f2e45; background:none; border:none; padding:0; margin-left:.5rem; cursor:pointer; font-size:.82rem; text-decoration:underline;">Excluir</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="color:var(--text-muted); font-size:.85rem;">Nenhuma parcela futura cadastrada ainda.</p>
+        {% endif %}
+
+        <h3 style="font-size:.9rem; margin:1.25rem 0 .5rem;">Adicionar uma parcela</h3>
+        <form method="post" class="acao" style="max-width:420px;">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="adicionar_parcela_prevista">
+            <input type="hidden" name="next" value="{{ next }}">
+            {% for field in parcela_prevista_form %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn btn-secondary" type="submit">Adicionar parcela</button>
+        </form>
+
+        <h3 style="font-size:.9rem; margin:1.25rem 0 .5rem;">Ou gerar várias parcelas iguais de uma vez</h3>
+        <form method="post" class="acao" style="max-width:420px;">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="gerar_parcelas_previstas">
+            <input type="hidden" name="next" value="{{ next }}">
+            <div>
+                <label for="gp-quantidade">Quantas parcelas</label>
+                <input type="number" id="gp-quantidade" name="quantidade" min="1" max="24" value="3" required>
+            </div>
+            <div>
+                <label for="gp-valor">Valor de cada uma</label>
+                <input type="number" id="gp-valor" name="valor_parcela" step="0.01" min="0.01" required>
+            </div>
+            <div>
+                <label for="gp-data">Data da 1ª parcela</label>
+                <input type="date" id="gp-data" name="primeira_data" required>
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">As outras caem no mesmo dia dos meses seguintes.</p>
+            </div>
+            <button class="btn btn-secondary" type="submit">Gerar parcelas</button>
+        </form>
+    </div>
+    {% endif %}
+
     <div class="card">
         <h2 style="margin-top:0;">Editar valor e vencimento</h2>
         <form method="post" class="acao">

@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django import forms
 
-from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, Recebimento
+from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, ParcelaPrevista, Recebimento
 
 
 class PagamentoForm(forms.ModelForm):
@@ -71,6 +71,23 @@ class RecebimentoForm(forms.ModelForm):
             raise forms.ValidationError(
                 f"Esse valor é maior que o saldo pendente (R$ {self.pagamento.saldo_pendente:.2f})."
             )
+        return valor
+
+
+class ParcelaPrevistaForm(forms.ModelForm):
+    data_prevista = forms.DateField(
+        label="Previsto para", widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d")
+    )
+
+    class Meta:
+        model = ParcelaPrevista
+        fields = ["valor", "data_prevista"]
+        labels = {"valor": "Valor da parcela"}
+
+    def clean_valor(self):
+        valor = self.cleaned_data["valor"]
+        if valor <= 0:
+            raise forms.ValidationError("O valor precisa ser maior que zero.")
         return valor
 
 
