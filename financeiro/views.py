@@ -539,8 +539,13 @@ def painel(request):
         # aparece em lugar nenhum até esse mês chegar, mesmo a cobrança já
         # existindo. Aqui entra todo Pendente/Parcial, não importa quando
         # vence — do mais atrasado ao que ainda nem venceu.
+        # Exclui cobrança de tratamento cancelado: cancelar o acompanhamento
+        # não mexe no pagamento vinculado (de propósito, pra não apagar valor
+        # já recebido) — mas se nada foi recebido, essa cobrança vira uma
+        # pendência fantasma, de um tratamento que não vai mais acontecer.
         pendentes = (
             Pagamento.objects.filter(organizacao=org, status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL])
+            .exclude(acompanhamento__status=Acompanhamento.Status.CANCELADO)
             .select_related("paciente", "consulta", "acompanhamento__programa", "venda")
             .order_by(F("data_vencimento").asc(nulls_last=True))
         )
@@ -583,9 +588,15 @@ def painel(request):
 
         # Só a pendência real de paciente (dinheiro que ainda vai entrar) —
         # sem misturar com "lançamentos previstos" do Financeiro geral, que
-        # é um conceito à parte e só confunde essa conta.
+        # é um conceito à parte e só confunde essa conta. Exclui cobrança de
+        # tratamento cancelado (ver comentário em "a_receber" logo acima).
         saldo_pendente_pacientes = sum(
-            (p.saldo_pendente for p in Pagamento.objects.filter(organizacao=org).exclude(status=Pagamento.Status.CANCELADO)),
+            (
+                p.saldo_pendente
+                for p in Pagamento.objects.filter(organizacao=org)
+                .exclude(status=Pagamento.Status.CANCELADO)
+                .exclude(acompanhamento__status=Acompanhamento.Status.CANCELADO)
+            ),
             Decimal("0.00"),
         )
         saldo_futuro_previsto = saldo_hoje + saldo_pendente_pacientes
