@@ -15,8 +15,8 @@ from contas.utils import organizacao_do_usuario, usuario_e_administrador
 from estoque.models import Venda
 from financeiro.models import Pagamento
 from financeiro.views import (
-    MESES, consultas_agendadas_no_mes, detalhe_recebido_no_periodo, previsao_parcelas_por_mes,
-    recebido_no_periodo, totais_fechamentos_mes,
+    MESES, consultas_agendadas_no_mes, consultas_mes_por_origem_agendamento, detalhe_recebido_no_periodo,
+    previsao_parcelas_por_mes, recebido_no_periodo, totais_fechamentos_mes,
 )
 from leads.forms import RegistroSocialSellingForm
 from leads.models import HistoricoLead, Lead, RegistroSocialSelling
@@ -263,7 +263,19 @@ def home(request):
             # mês) — visão de quanto deve entrar em cada mês à frente, só do
             # que já foi programado manualmente em "Contas a receber".
             "previsao_recebimentos": previsao_parcelas_por_mes(org),
+            # Quantos agendamentos de diagnóstico a SDR fez neste mês, não
+            # importa quando a consulta vai acontecer nem se já foi paga —
+            # é o volume de trabalho de agendamento puro (qtd_consultas, logo
+            # acima, já é só a fatia disso que também está paga).
+            "qtd_consultas_agendadas_no_mes": len(todas_consultas_agendadas_mes),
         }
+        # Das consultas que vão acontecer neste mês, quais já tinham sido
+        # agendadas num mês anterior — pra deixar claro quando o trabalho de
+        # agendamento de um mês só "fecha" (vira consulta de fato) no mês
+        # seguinte, em vez de ficar escondido dentro de um número só.
+        consultas_por_origem = consultas_mes_por_origem_agendamento(org, hoje.year, hoje.month)
+        contexto["meta_mes"]["qtd_consultas_agendadas_mes_anterior"] = len(consultas_por_origem["de_mes_anterior"])
+        contexto["meta_mes"]["detalhe_consultas_agendadas_mes_anterior"] = consultas_por_origem["de_mes_anterior"]
         if request.user.is_superuser:
             ultimo_dia_mes = calendar.monthrange(hoje.year, hoje.month)[1]
             inicio_mes = hoje.replace(day=1)

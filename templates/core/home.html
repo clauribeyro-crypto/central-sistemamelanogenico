@@ -61,11 +61,20 @@
             <div class="grid">
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas_mes }}</div>
-                    <div class="rotulo">Agendadas este mês (de diagnóstico, cobradas)</div>
+                    <div class="rotulo">Vão acontecer este mês (de diagnóstico, cobradas)</div>
+                    {% if meta_mes.qtd_consultas_agendadas_mes_anterior %}
+                        <div style="font-size:.78rem; color:#8a5a10; margin-top:.3rem;">
+                            {{ meta_mes.qtd_consultas_agendadas_mes_anterior }} dessas{% if meta_mes.qtd_consultas_agendadas_mes_anterior == 1 %} já tinha{% else %} já tinham{% endif %} sido agendada{{ meta_mes.qtd_consultas_agendadas_mes_anterior|pluralize }} num mês anterior ↓
+                        </div>
+                    {% endif %}
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas_realizadas_mes }}</div>
                     <div class="rotulo">Já realizadas este mês</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ meta_mes.qtd_consultas_agendadas_no_mes }}</div>
+                    <div class="rotulo">Agendamentos feitos este mês (não importa quando a consulta vai acontecer)</div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
@@ -76,6 +85,26 @@
                     </div>
                 </div>
             </div>
+
+            {% if meta_mes.detalhe_consultas_agendadas_mes_anterior %}
+                <details style="margin-top:.6rem;">
+                    <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                        Ver quais consultas deste mês foram agendadas num mês anterior
+                    </summary>
+                    <table style="margin-top:.5rem;">
+                        <thead><tr><th>Paciente</th><th>Agendada em</th><th>Vai acontecer em</th></tr></thead>
+                        <tbody>
+                        {% for c in meta_mes.detalhe_consultas_agendadas_mes_anterior %}
+                            <tr>
+                                <td><a href="{% url 'pacientes:ficha' c.paciente_id %}">{{ c.paciente }}</a></td>
+                                <td>{{ c.data_agendamento|date:"d/m/Y" }}</td>
+                                <td>{{ c.data_hora|date:"d/m/Y" }}</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </details>
+            {% endif %}
 
             <p style="font-size:.78rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin:1.1rem 0 .4rem; font-weight:600;">🧪 Tratamentos</p>
             <div class="grid">

@@ -360,6 +360,37 @@ def consultas_agendadas_no_mes(org, ano, mes):
     return consultas
 
 
+def consultas_mes_por_origem_agendamento(org, ano, mes):
+    """
+    Das consultas que VÃO ACONTECER neste mês (mesmo critério de
+    totais_fechamentos_mes — data_hora dentro do mês, de diagnóstico,
+    cobrada, não cancelada/reagendada), separa as que já tinham sido
+    agendadas num mês anterior das que foram agendadas neste mesmo mês —
+    pra deixar visível quando o agendamento feito pela SDR num mês só
+    "acontece" (vira consulta realizada) no mês seguinte. Usa a mesma
+    lógica de raiz de reagendamentos que consultas_agendadas_no_mes, pra
+    não contar remarcação como um novo agendamento.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    consultas = (
+        Consulta.objects.filter(
+            organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim, valor__gt=0,
+        ).exclude(status=Consulta.Status.CANCELADA)
+        .exclude(reagendamentos__isnull=False)
+        .select_related("paciente", "tipo_consulta").order_by("data_hora")
+    )
+    deste_mes, de_mes_anterior = [], []
+    for c in consultas:
+        raiz = c
+        while raiz.reagendada_de_id:
+            raiz = raiz.reagendada_de
+        c.data_agendamento = raiz.criado_em.date()
+        (deste_mes if data_inicio <= c.data_agendamento <= data_fim else de_mes_anterior).append(c)
+    return {"deste_mes": deste_mes, "de_mes_anterior": de_mes_anterior}
+
+
 def totais_fechamentos_mes(org, ano, mes):
     """
     Tratamentos/programas fechados (contratos assinados no período) e
