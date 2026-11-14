@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -530,6 +530,31 @@ def painel(request):
             "todos_periodos": todos_periodos,
             "total_receitas": total_receitas,
             "total_despesas": total_despesas,
+        })
+
+    elif aba == "a_receber":
+        # Visão dedicada de "quem ainda deve", sem filtro de período — o
+        # problema de confiar só no Relatório financeiro (filtrado por
+        # vencimento) é que uma pessoa que vai pagar só no mês que vem não
+        # aparece em lugar nenhum até esse mês chegar, mesmo a cobrança já
+        # existindo. Aqui entra todo Pendente/Parcial, não importa quando
+        # vence — do mais atrasado ao que ainda nem venceu.
+        pendentes = (
+            Pagamento.objects.filter(organizacao=org, status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL])
+            .select_related("paciente", "consulta", "acompanhamento__programa", "venda")
+            .order_by(F("data_vencimento").asc(nulls_last=True))
+        )
+
+        paciente_busca = request.GET.get("paciente", "").strip()
+        if paciente_busca:
+            pendentes = pendentes.filter(paciente__nome__icontains=paciente_busca)
+
+        pendentes = list(pendentes)
+        contexto.update({
+            "pendentes": pendentes,
+            "total_a_receber": sum((p.saldo_pendente for p in pendentes), Decimal("0.00")),
+            "paciente_busca": paciente_busca,
+            "hoje": hoje,
         })
 
     elif aba == "resumo_mensal":

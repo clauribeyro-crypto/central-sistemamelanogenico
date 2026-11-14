@@ -7,6 +7,7 @@
         <a class="{% if aba == 'geral' %}ativo{% endif %}" href="?aba=geral&ano={{ ano|stringformat:'d' }}&mes={{ mes }}">Geral</a>
         <a class="{% if aba == 'lancamentos' %}ativo{% endif %}" href="?aba=lancamentos&ano={{ ano|stringformat:'d' }}&mes={{ mes }}">Lançamentos</a>
         <a class="{% if aba == 'resumo_mensal' %}ativo{% endif %}" href="?aba=resumo_mensal&ano={{ ano|stringformat:'d' }}">Resumo Mensal</a>
+        <a class="{% if aba == 'a_receber' %}ativo{% endif %}" href="?aba=a_receber">Contas a receber</a>
         <a href="{% url 'financeiro:relatorio' %}">Relatório por paciente ›</a>
         <a href="{% url 'financeiro:relatorio_fechamentos' %}">Tratamentos fechados e consultas ›</a>
     </div>
@@ -123,6 +124,61 @@
             </table>
         </div>
 
+    {% elif aba == "a_receber" %}
+        <form class="filtro" method="get">
+            <input type="hidden" name="aba" value="a_receber">
+            <div>
+                <label for="paciente-receber">Buscar por paciente</label>
+                <input type="text" id="paciente-receber" name="paciente" value="{{ paciente_busca }}" placeholder="Nome da paciente">
+            </div>
+            <button type="submit">Filtrar</button>
+            {% if paciente_busca %}
+                <a href="{% url 'financeiro:painel' %}?aba=a_receber" class="btn btn-secondary" style="padding:.4rem .8rem; font-size:.85rem;">Limpar busca</a>
+            {% endif %}
+        </form>
+
+        <div class="card stat" style="max-width:280px;">
+            <div class="num">R$ {{ total_a_receber|floatformat:2 }}</div>
+            <div class="rotulo">Total a receber ({{ pendentes|length }} lançamento{{ pendentes|length|pluralize }})</div>
+        </div>
+
+        <div class="card">
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                Todo mundo que ainda deve algum valor, não importa quando vence — do mais atrasado até quem só vai pagar mês que vem.
+            </p>
+            <table>
+                <thead>
+                    <tr><th>Vencimento</th><th>Paciente</th><th>Referente a</th><th>Total</th><th>Recebido</th><th>Falta receber</th><th></th></tr>
+                </thead>
+                <tbody>
+                {% for p in pendentes %}
+                    <tr>
+                        <td>
+                            {{ p.data_vencimento|date:"d/m/Y"|default:"—" }}
+                            {% if p.data_vencimento and p.data_vencimento < hoje %}
+                                <br><span class="badge badge-atrasado">Atrasado</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.paciente }}</td>
+                        <td>
+                            {% if p.acompanhamento %}Tratamento: {{ p.acompanhamento.programa }}
+                            {% elif p.consulta %}Consulta
+                            {% elif p.venda %}Produtos
+                            {% elif p.servico %}{{ p.servico }}
+                            {% else %}—{% endif %}
+                        </td>
+                        <td>R$ {{ p.valor|floatformat:2 }}</td>
+                        <td>R$ {{ p.total_recebido|floatformat:2 }}</td>
+                        <td>R$ {{ p.saldo_pendente|floatformat:2 }}</td>
+                        <td><a href="{% url 'financeiro:editar_pagamento' p.pk %}?next={{ request.get_full_path|urlencode }}">Gerenciar ›</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7">Ninguém devendo no momento 🎉</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
     {% elif aba == "resumo_mensal" %}
         <form class="filtro" method="get">
             <input type="hidden" name="aba" value="resumo_mensal">
@@ -210,7 +266,7 @@
                 <div class="rotulo">Saldo futuro previsto</div>
                 <div style="font-size:.72rem; color:var(--text-muted); margin-top:.15rem;">
                     Saldo em caixa hoje (R$ {{ saldo_hoje|floatformat:2 }}) + o que ainda falta receber das pacientes (R$ {{ saldo_pendente_pacientes|floatformat:2 }}).
-                    <a href="{% url 'financeiro:relatorio' %}?inicio=2000-01-01&fim=2099-12-31">Ver quem ainda deve ›</a>
+                    <a href="{% url 'financeiro:painel' %}?aba=a_receber">Ver quem ainda deve ›</a>
                 </div>
             </div>
         </div>
