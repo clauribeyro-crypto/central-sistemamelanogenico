@@ -90,6 +90,31 @@
     </div>
 
     <div class="card">
+        <h2>Recebido por origem</h2>
+        {% if por_origem %}
+            <table>
+                <thead><tr><th>Origem</th><th>Total vendido (bruto)</th><th>Total líquido (caixa)</th></tr></thead>
+                <tbody>
+                {% for item in por_origem %}
+                    <tr>
+                        <td>{{ item.origem }}</td>
+                        <td>R$ {{ item.total|floatformat:2 }}</td>
+                        <td>R$ {{ item.total_liquido|floatformat:2 }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            <p style="font-size:.82rem; color:var(--text-muted); margin-top:.6rem;">
+                "Consulta" e "Tratamento" são o que a paciente pagou por um atendimento/programa; "Produto" é
+                venda de estoque; "Avulso" é um lançamento sem vínculo com nenhum dos três. Separa o total do
+                período por tipo, pra conferir pedaço por pedaço contra o extrato do banco.
+            </p>
+        {% else %}
+            <p>Sem pagamentos recebidos no período.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
         <h2>Recebido por profissional</h2>
         {% if por_profissional %}
             <table>

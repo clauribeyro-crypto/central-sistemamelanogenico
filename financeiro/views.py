@@ -144,6 +144,35 @@ def relatorio(request):
         .order_by("-total")
     )
 
+    # "Recebido por origem" separa quanto do caixa do período veio de
+    # consulta, de tratamento/programa ou de venda de produto — pra
+    # conferir contra o extrato do banco por partes (ex.: "quanto foi de
+    # produto nesse período?") em vez de só o total geral. Mesma lógica de
+    # origem usada em detalhe_recebido_no_periodo, mas somada por categoria
+    # em vez de listada linha a linha.
+    totais_por_origem = {
+        "Consulta": {"bruto": Decimal("0.00"), "liquido": Decimal("0.00")},
+        "Tratamento": {"bruto": Decimal("0.00"), "liquido": Decimal("0.00")},
+        "Produto": {"bruto": Decimal("0.00"), "liquido": Decimal("0.00")},
+        "Avulso": {"bruto": Decimal("0.00"), "liquido": Decimal("0.00")},
+    }
+    for r in recebimentos_no_periodo.select_related("pagamento__consulta", "pagamento__acompanhamento", "pagamento__venda"):
+        pagamento = r.pagamento
+        if pagamento.consulta_id:
+            chave = "Consulta"
+        elif pagamento.acompanhamento_id:
+            chave = "Tratamento"
+        elif pagamento.venda_id:
+            chave = "Produto"
+        else:
+            chave = "Avulso"
+        totais_por_origem[chave]["bruto"] += r.valor
+        totais_por_origem[chave]["liquido"] += r.valor_liquido
+    por_origem = [
+        {"origem": chave, "total": valores["bruto"], "total_liquido": valores["liquido"]}
+        for chave, valores in totais_por_origem.items() if valores["bruto"] > 0
+    ]
+
     # A tabela mostra tanto quem vence no período quanto quem recebeu algo
     # no período (mesmo com vencimento fora dele) — assim todo valor que
     # entra nos totais acima tem uma linha clicável pra conferir de onde veio.
@@ -185,6 +214,7 @@ def relatorio(request):
         "total_pago_bruto": total_pago_bruto,
         "total_pendente": total_pendente,
         "por_forma_pagamento": por_forma_pagamento,
+        "por_origem": por_origem,
         "por_profissional": por_profissional,
     }
     if request.user.is_superuser:
