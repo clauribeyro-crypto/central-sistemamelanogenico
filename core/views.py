@@ -251,6 +251,13 @@ def home(request):
             "qtd_fechamentos": qtd_fechamentos_pagos,
             "faltam_fechamentos": faltam_fechamentos,
             "detalhe_recebimentos": detalhe_recebido_no_periodo(org, hoje.year, hoje.month),
+            # Visão geral do mês (valor vendido e consultas), pra não precisar
+            # ir no Financeiro só pra ver esses números — mesma fonte da
+            # Financeiro → "Relatório por paciente" → "Tratamentos fechados e
+            # consultas", pra não ter dois números diferentes pra mesma coisa.
+            "total_vendas_mes": totais_mes_atual["total_geral"],
+            "qtd_consultas_mes": totais_mes_atual["qtd_consultas"],
+            "qtd_consultas_realizadas_mes": totais_mes_atual["qtd_consultas_realizadas"],
         }
         if request.user.is_superuser:
             ultimo_dia_mes = calendar.monthrange(hoje.year, hoje.month)[1]

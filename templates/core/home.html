@@ -36,12 +36,24 @@
             <h2>🎯 Meta do mês — R$ {{ meta_mes.meta_faturamento|floatformat:0 }}</h2>
             <div class="grid">
                 <div class="card stat">
+                    <div class="num">R$ {{ meta_mes.total_vendas_mes|floatformat:2 }}</div>
+                    <div class="rotulo">Valor total vendido este mês (tratamentos + consultas)</div>
+                </div>
+                <div class="card stat">
                     <div class="num">R$ {{ meta_mes.faturado|floatformat:2 }}</div>
                     <div class="rotulo">Recebido este mês (só o que já caiu no caixa)</div>
                 </div>
                 <div class="card stat" style="background:#6366f111;">
                     <div class="num">R$ {{ meta_mes.faltam_faturamento|floatformat:2 }}</div>
                     <div class="rotulo">Falta receber para bater a meta</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ meta_mes.qtd_consultas_mes }}</div>
+                    <div class="rotulo">Consultas agendadas este mês (de diagnóstico, cobradas)</div>
+                </div>
+                <div class="card stat">
+                    <div class="num">{{ meta_mes.qtd_consultas_realizadas_mes }}</div>
+                    <div class="rotulo">Consultas já realizadas este mês</div>
                 </div>
                 <div class="card stat">
                     <div class="num">{{ meta_mes.qtd_consultas }} / {{ meta_mes.meta_consultas }}</div>
