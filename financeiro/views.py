@@ -16,7 +16,7 @@ from core.models import totais_mentoria_no_periodo, totais_vendas_kit_mentora_no
 from programas.models import Acompanhamento
 
 from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, ParcelaPrevistaForm, RecebimentoForm
-from .importador_extrato import parse_extrato, sugerir_categoria
+from .importador_extrato import extrair_creditos_colados, parse_extrato, sugerir_categoria
 from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, ParcelaPrevista, Recebimento
 
 SESSION_KEY_EXTRATO_PENDENTE = "extrato_importar_pendente"
@@ -1159,6 +1159,83 @@ def extrato_importar_revisar(request):
         linha["categoria_selecionada_id"] = linha["sugestao"].pk if linha["sugestao"] else ""
 
     return render(request, "financeiro/extrato_importar_revisar.html", {"banco": banco, "linhas": linhas})
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+def conciliar_extrato(request):
+    """
+    Ferramenta só de conferência, não grava nada no sistema: cola o texto do
+    extrato do banco (copiado de um PDF ou da tela do internet banking) e
+    compara cada Pix recebido com os Recebimentos já lançados, pra achar o
+    que caiu na conta mas ainda não foi registrado em nenhuma paciente —
+    um raio-x pra guiar o que falta lançar manualmente depois (em "Contas a
+    receber" → "Gerenciar" → "Registrar recebimento", do jeito normal).
+    Repasse de maquininha (MT) só é listado à parte, sem tentar casar
+    automaticamente — a data do repasse não é a da venda, então um "não
+    achei" ali não quer dizer nada sozinho.
+    """
+    org = organizacao_do_usuario(request)
+    hoje = datetime.date.today()
+    texto = ""
+    ano = hoje.year
+    resultado = None
+
+    if request.method == "POST":
+        texto = request.POST.get("texto", "")
+        try:
+            ano = int(request.POST.get("ano", hoje.year))
+        except ValueError:
+            ano = hoje.year
+
+        creditos = extrair_creditos_colados(texto, ano)
+        if not creditos:
+            messages.error(
+                request,
+                "Não consegui achar nenhum crédito nesse texto — confira se colou o trecho certo do extrato "
+                "(precisa ter linhas como \"03/11 PIX RECEB.OUTRA IF 100,00C\").",
+            )
+        else:
+            pix_diretos = [c for c in creditos if "MT" not in c["tipo"]]
+            maquininha = [c for c in creditos if "MT" in c["tipo"]]
+
+            datas = [c["data"] for c in creditos]
+            margem = datetime.timedelta(days=3)
+            candidatos = list(
+                Recebimento.objects.filter(
+                    organizacao=org, forma_pagamento=Pagamento.FormaPagamento.PIX,
+                    data__gte=min(datas) - margem, data__lte=max(datas) + margem,
+                ).select_related("pagamento__paciente")
+            )
+            usados = set()
+            linhas_pix = []
+            for credito in sorted(pix_diretos, key=lambda c: c["data"]):
+                encontrado = None
+                for r in candidatos:
+                    if r.pk in usados:
+                        continue
+                    if r.valor == credito["valor"] and abs((r.data - credito["data"]).days) <= 3:
+                        encontrado = r
+                        break
+                if encontrado:
+                    usados.add(encontrado.pk)
+                linhas_pix.append({
+                    "data": credito["data"], "nome": credito["nome"], "valor": credito["valor"],
+                    "recebimento": encontrado,
+                })
+
+            nao_achados = [linha for linha in linhas_pix if not linha["recebimento"]]
+            resultado = {
+                "linhas_pix": linhas_pix,
+                "qtd_pix": len(linhas_pix),
+                "qtd_achados": len(linhas_pix) - len(nao_achados),
+                "nao_achados": nao_achados,
+                "total_nao_achado": sum((linha["valor"] for linha in nao_achados), Decimal("0.00")),
+                "maquininha": sorted(maquininha, key=lambda c: c["data"]),
+                "total_maquininha": sum((c["valor"] for c in maquininha), Decimal("0.00")),
+            }
+
+    return render(request, "financeiro/conciliar_extrato.html", {"texto": texto, "ano": ano, "resultado": resultado})
 
 
 @login_required

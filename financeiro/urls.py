@@ -13,6 +13,7 @@ urlpatterns = [
     path("lancamentos/novo/", views.lancamento_criar, name="lancamento_criar"),
     path("extrato/importar/", views.extrato_importar, name="extrato_importar"),
     path("extrato/importar/revisar/", views.extrato_importar_revisar, name="extrato_importar_revisar"),
+    path("extrato/conciliar/", views.conciliar_extrato, name="conciliar_extrato"),
     path("lancamentos/<int:pk>/editar/", views.lancamento_editar, name="lancamento_editar"),
     path("lancamentos/<int:pk>/excluir/", views.lancamento_excluir, name="lancamento_excluir"),
     path("bancos/novo/", views.banco_criar, name="banco_criar"),

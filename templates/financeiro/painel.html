@@ -10,6 +10,7 @@
         <a class="{% if aba == 'a_receber' %}ativo{% endif %}" href="?aba=a_receber">Contas a receber</a>
         <a href="{% url 'financeiro:relatorio' %}">Relatório por paciente ›</a>
         <a href="{% url 'financeiro:relatorio_fechamentos' %}">Tratamentos fechados e consultas ›</a>
+        <a href="{% url 'financeiro:conciliar_extrato' %}">Conciliar extrato ›</a>
     </div>
 
     {% if aba == "lancamentos" %}
