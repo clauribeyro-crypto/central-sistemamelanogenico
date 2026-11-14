@@ -143,6 +143,13 @@
             <div class="rotulo">Total a receber ({{ pendentes|length }} lançamento{{ pendentes|length|pluralize }})</div>
         </div>
 
+        {% if pode_editar and pendentes %}
+            <form method="post" action="{% url 'financeiro:registrar_recebimentos_lote' %}" id="form-lote-recebimento">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            </form>
+        {% endif %}
+
         <div class="card">
             <p style="font-size:.85rem; color:var(--text-muted);">
                 Todo mundo que ainda deve algum valor, não importa quando vence — do mais atrasado até quem só vai pagar mês que vem.
@@ -152,11 +159,17 @@
             </p>
             <table>
                 <thead>
-                    <tr><th>Vencimento</th><th>Paciente</th><th>Referente a</th><th>Total</th><th>Recebido</th><th>Falta receber</th><th></th></tr>
+                    <tr>
+                        {% if pode_editar and pendentes %}<th></th>{% endif %}
+                        <th>Vencimento</th><th>Paciente</th><th>Referente a</th><th>Total</th><th>Recebido</th><th>Falta receber</th><th></th>
+                    </tr>
                 </thead>
                 <tbody>
                 {% for p in pendentes %}
                     <tr>
+                        {% if pode_editar and pendentes %}
+                            <td><input type="checkbox" name="pagamento_id" value="{{ p.pk }}" form="form-lote-recebimento"></td>
+                        {% endif %}
                         <td>
                             {{ p.data_vencimento|date:"d/m/Y"|default:"—" }}
                             {% if p.data_vencimento and p.data_vencimento < hoje %}
@@ -191,6 +204,36 @@
                 {% endfor %}
                 </tbody>
             </table>
+
+            {% if pode_editar and pendentes %}
+                <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--borda, #e5e7eb);">
+                    <h3 style="font-size:.9rem; margin:0 0 .5rem;">Marcar selecionadas como pagas</h3>
+                    <p style="font-size:.78rem; color:var(--text-muted); margin:0 0 .5rem;">
+                        Marca as cobranças selecionadas na coluna acima (☑) como totalmente pagas — cada uma
+                        recebe um recebimento no valor do saldo que falta dela, na mesma data e forma de
+                        pagamento escolhidas abaixo. Use só quando tiver certeza que todas já foram pagas de
+                        verdade por fora do sistema.
+                    </p>
+                    <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
+                        <div>
+                            <label for="lote-data">Data do pagamento</label>
+                            <input type="date" id="lote-data" name="data" form="form-lote-recebimento" value="{{ hoje|date:'Y-m-d' }}" required>
+                        </div>
+                        <div>
+                            <label for="lote-forma">Forma de pagamento</label>
+                            <select id="lote-forma" name="forma_pagamento" form="form-lote-recebimento">
+                                {% for valor_opcao, rotulo_opcao in formas_pagamento %}
+                                    <option value="{{ valor_opcao }}">{{ rotulo_opcao }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" form="form-lote-recebimento" class="btn"
+                                onclick="return confirm('Marcar todas as cobranças selecionadas como pagas? Isso lança um recebimento pra cada uma. Confira a lista antes de confirmar.');">
+                            Marcar selecionadas como pagas
+                        </button>
+                    </div>
+                </div>
+            {% endif %}
         </div>
 
     {% elif aba == "resumo_mensal" %}

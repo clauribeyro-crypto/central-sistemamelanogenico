@@ -22,4 +22,5 @@ urlpatterns = [
     path("relatorio/fechamentos/", views.relatorio_fechamentos, name="relatorio_fechamentos"),
     path("pagamentos/<int:pk>/editar/", views.editar_pagamento, name="editar_pagamento"),
     path("pagamentos/<int:pk>/excluir/", views.excluir_pagamento, name="excluir_pagamento"),
+    path("pagamentos/lote/", views.registrar_recebimentos_lote, name="registrar_recebimentos_lote"),
 ]

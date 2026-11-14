@@ -731,6 +731,65 @@ def excluir_pagamento(request, pk):
 
 @login_required
 @modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+@require_POST
+def registrar_recebimentos_lote(request):
+    """
+    Marca várias cobranças pendentes/parciais como totalmente pagas de uma
+    vez, todas na mesma data e forma de pagamento — pra quando várias
+    pacientes já pagaram de verdade só que ninguém lançou no sistema ainda
+    (ex.: um grupo de consultas de um mês que a SDR esqueceu). Cada uma
+    recebe um Recebimento no valor do seu próprio saldo pendente (não um
+    valor fixo pra todas), então quita exatamente o que falta de cada —
+    sem mexer em quem já estiver com status diferente de Pendente/Parcial.
+    Só administrador pode usar (mesmo controle de "pode_editar" das outras
+    ações em lote desta tela).
+    """
+    org = organizacao_do_usuario(request)
+    destino = _redirecionar_com_seguranca(request, reverse("financeiro:painel") + "?aba=a_receber")
+
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem marcar cobranças como pagas em lote.")
+        return destino
+
+    ids = request.POST.getlist("pagamento_id")
+    if not ids:
+        messages.error(request, "Selecione pelo menos uma cobrança pra marcar como paga.")
+        return destino
+
+    try:
+        data = datetime.date.fromisoformat(request.POST.get("data", ""))
+    except ValueError:
+        messages.error(request, "Escolha uma data válida pra marcar os pagamentos.")
+        return destino
+
+    forma_pagamento = request.POST.get("forma_pagamento", "")
+    if forma_pagamento not in dict(Pagamento.FormaPagamento.choices):
+        messages.error(request, "Escolha uma forma de pagamento válida.")
+        return destino
+
+    pagamentos = Pagamento.objects.filter(
+        organizacao=org, pk__in=ids, status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL],
+    )
+    qtd = 0
+    for pagamento in pagamentos:
+        saldo = pagamento.saldo_pendente
+        if saldo <= 0:
+            continue
+        Recebimento.objects.create(
+            organizacao=org, pagamento=pagamento, valor=saldo, forma_pagamento=forma_pagamento, data=data,
+        )
+        pagamento.recalcular_status()
+        qtd += 1
+
+    if qtd:
+        messages.success(request, f"{qtd} cobrança(s) marcada(s) como paga(s) em {data:%d/%m/%Y}.")
+    else:
+        messages.info(request, "Nenhuma cobrança válida foi selecionada (pode já ter sido paga ou cancelada).")
+    return destino
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
 def painel(request):
     """Controle Financeiro: painel com abas Geral (dashboard), Lançamentos e Resumo Mensal."""
     org = organizacao_do_usuario(request)
@@ -827,6 +886,7 @@ def painel(request):
             "total_a_receber": sum((p.saldo_pendente for p in pendentes), Decimal("0.00")),
             "paciente_busca": paciente_busca,
             "hoje": hoje,
+            "formas_pagamento": Pagamento.FormaPagamento.choices,
         })
 
     elif aba == "resumo_mensal":
