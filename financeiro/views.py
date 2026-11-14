@@ -16,7 +16,7 @@ from core.models import totais_mentoria_no_periodo, totais_vendas_kit_mentora_no
 from programas.models import Acompanhamento
 
 from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, ParcelaPrevistaForm, RecebimentoForm
-from .importador_extrato import extrair_creditos_colados, parse_extrato, sugerir_categoria
+from .importador_extrato import extrair_creditos_colados, extrair_texto_pdf, parse_extrato, sugerir_categoria
 from .models import Banco, CategoriaFinanceira, Lancamento, Pagamento, ParcelaPrevista, Recebimento
 
 SESSION_KEY_EXTRATO_PENDENTE = "extrato_importar_pendente"
@@ -1173,7 +1173,9 @@ def conciliar_extrato(request):
     receber" → "Gerenciar" → "Registrar recebimento", do jeito normal).
     Repasse de maquininha (MT) só é listado à parte, sem tentar casar
     automaticamente — a data do repasse não é a da venda, então um "não
-    achei" ali não quer dizer nada sozinho.
+    achei" ali não quer dizer nada sozinho. Aceita o texto colado na mão OU
+    o PDF do extrato direto (o texto é extraído dele automaticamente) — os
+    dois caem no mesmo "texto" pra conferência.
     """
     org = organizacao_do_usuario(request)
     hoje = datetime.date.today()
@@ -1188,13 +1190,24 @@ def conciliar_extrato(request):
         except ValueError:
             ano = hoje.year
 
-        creditos = extrair_creditos_colados(texto, ano)
+        arquivo_pdf = request.FILES.get("arquivo_pdf")
+        if arquivo_pdf:
+            try:
+                texto = extrair_texto_pdf(arquivo_pdf.read())
+            except ValueError as erro:
+                messages.error(request, f"Não consegui ler o PDF: {erro}")
+                texto = ""
+
+        creditos = extrair_creditos_colados(texto, ano) if texto else []
         if not creditos:
-            messages.error(
-                request,
-                "Não consegui achar nenhum crédito nesse texto — confira se colou o trecho certo do extrato "
-                "(precisa ter linhas como \"03/11 PIX RECEB.OUTRA IF 100,00C\").",
-            )
+            if texto:
+                messages.error(
+                    request,
+                    "Não consegui achar nenhum crédito nesse texto — confira se é o trecho certo do extrato "
+                    "(precisa ter linhas como \"03/11 PIX RECEB.OUTRA IF 100,00C\").",
+                )
+            elif not arquivo_pdf:
+                messages.error(request, "Cola o texto do extrato ou escolhe um arquivo PDF.")
         else:
             pix_diretos = [c for c in creditos if "MT" not in c["tipo"]]
             maquininha = [c for c in creditos if "MT" in c["tipo"]]

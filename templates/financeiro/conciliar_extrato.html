@@ -4,21 +4,21 @@
     <p><a href="{% url 'financeiro:relatorio' %}">← Voltar pro Relatório por paciente</a></p>
     <h1>Conciliar extrato</h1>
     <p style="color:var(--text-muted); font-size:.9rem;">
-        Cola aqui o texto do extrato do seu banco (pode copiar direto do PDF ou da tela do internet banking) e
-        compara cada Pix recebido com o que já está lançado no sistema. <strong>Isso não grava nada</strong> — é
-        só pra te mostrar o que já bateu e o que ainda não foi encontrado, pra você saber o que falta lançar
-        (do jeito normal, em "Contas a receber" → "Gerenciar" → "Registrar recebimento").
+        Sobe o PDF do extrato do seu banco (o mesmo que você baixa do internet banking) e compara cada Pix
+        recebido com o que já está lançado no sistema. <strong>Isso não grava nada</strong> — é só pra te mostrar
+        o que já bateu e o que ainda não foi encontrado, pra você saber o que falta lançar (do jeito normal, em
+        "Contas a receber" → "Gerenciar" → "Registrar recebimento").
     </p>
 
     <div class="card">
-        <form method="post" class="acao">
+        <form method="post" class="acao" enctype="multipart/form-data">
             {% csrf_token %}
             <div>
-                <label for="texto-extrato">Texto do extrato</label>
-                <textarea id="texto-extrato" name="texto" rows="14" style="width:100%; font-family:monospace; font-size:.82rem;" placeholder="Cole aqui o texto do extrato, por exemplo:&#10;03/11 PIX RECEB.OUTRA IF 100,00C&#10;Recebimento Pix&#10;JULIANA SILVA DIAS MENDONCA&#10;...">{{ texto }}</textarea>
+                <label for="arquivo-pdf-extrato">PDF do extrato</label>
+                <input type="file" id="arquivo-pdf-extrato" name="arquivo_pdf" accept="application/pdf">
                 <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">
-                    Só precisa das linhas de MOVIMENTAÇÃO do extrato (data, tipo, valor) — não precisa limpar nada,
-                    pode colar o extrato inteiro que a ferramenta ignora o que não for transação.
+                    Sobe o PDF direto do seu banco. Se o PDF for uma foto/escaneado (sem texto de verdade), não
+                    vai funcionar — nesse caso usa a caixa de colar texto abaixo.
                 </p>
             </div>
             <div style="max-width:160px;">
@@ -29,6 +29,21 @@
                 </p>
             </div>
             <button class="btn" type="submit">Conferir</button>
+
+            <details style="margin-top:1rem;">
+                <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                    Ou, se preferir, cola o texto do extrato em vez de subir o PDF
+                </summary>
+                <div style="margin-top:.5rem;">
+                    <label for="texto-extrato">Texto do extrato</label>
+                    <textarea id="texto-extrato" name="texto" rows="14" style="width:100%; font-family:monospace; font-size:.82rem;" placeholder="Cole aqui o texto do extrato, por exemplo:&#10;03/11 PIX RECEB.OUTRA IF 100,00C&#10;Recebimento Pix&#10;JULIANA SILVA DIAS MENDONCA&#10;...">{{ texto }}</textarea>
+                    <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">
+                        Só precisa das linhas de MOVIMENTAÇÃO do extrato (data, tipo, valor) — não precisa limpar
+                        nada, pode colar o extrato inteiro que a ferramenta ignora o que não for transação. Se
+                        você subir um PDF acima, o texto colado aqui é ignorado.
+                    </p>
+                </div>
+            </details>
         </form>
     </div>
 

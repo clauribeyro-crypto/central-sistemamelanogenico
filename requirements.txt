@@ -9,3 +9,4 @@ django-cloudinary-storage==0.3.0
 anthropic==2.3.0
 openai==3.40.0
 requests==2.34.2
+pypdf==7.1.0

@@ -146,8 +146,26 @@ def parse_extrato(nome_arquivo, conteudo):
 # quem pagou, CPF/CNPJ mascarado, "DOC.: Pix") até a próxima transação. Só
 # interessa achar os créditos (dinheiro que entrou) e, se der, o nome de quem
 # pagou — não tenta entender todo tipo de lançamento do extrato.
-_LINHA_TRANSACAO_RE = re.compile(r"^(\d{2}/\d{2})\s+(.+?)\s+([\d.,]+)\s*([CD])\*?\s*$")
+_LINHA_TRANSACAO_RE = re.compile(r"^(\d{2}/\d{2})\s*(.+?)\s+([\d.,]+)\s*([CD])\*?\s*$")
 _LINHA_IGNORAR_RE = re.compile(r"^(doc\.?:|recebimento pix|transfer[eê]ncia pix|pagamento pix|\*{2,}\.|rem\.:|fav\.:)", re.IGNORECASE)
+
+
+def extrair_texto_pdf(conteudo):
+    """
+    Extrai o texto de um PDF de extrato (ex.: exportado do internet banking
+    ou enviado por e-mail), página por página, pra passar pro
+    extrair_creditos_colados — evita a pessoa ter que copiar e colar o texto
+    na mão. Só funciona com PDF que tem texto de verdade (a maioria dos
+    extratos bancários é assim); um PDF escaneado como imagem não tem texto
+    pra extrair, e isso vira um ValueError claro em vez de devolver vazio.
+    """
+    from pypdf import PdfReader
+
+    leitor = PdfReader(io.BytesIO(conteudo))
+    texto = "\n".join((pagina.extract_text() or "") for pagina in leitor.pages)
+    if not texto.strip():
+        raise ValueError("não consegui ler texto desse PDF (pode ser um PDF escaneado, sem texto de verdade).")
+    return texto
 
 
 def extrair_creditos_colados(texto, ano):
