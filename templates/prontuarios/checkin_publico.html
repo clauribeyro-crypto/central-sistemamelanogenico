@@ -49,8 +49,75 @@
 </head>
 <body>
     <div class="topo">
-        <h1>Check-in diário</h1>
-        <p>Olá, {{ paciente.nome }}! Conte como está seu dia hoje — pode deixar em branco o que não souber. Pode preencher de novo a qualquer hora, todo envio novo fica registrado.</p>
+        <h1>Olá, {{ paciente.nome }}!</h1>
+        <p>Aqui você encontra sua modulação, os achados da sua primeira consulta e o seu check-in diário.</p>
+    </div>
+
+    <div style="max-width:640px; margin:0 auto; padding:0 1.2rem;">
+        {% if paciente.achados_primeira_consulta %}
+            <div class="card">
+                <h2>Achados da sua primeira consulta</h2>
+                <p style="white-space:pre-line;">{{ paciente.achados_primeira_consulta }}</p>
+            </div>
+        {% endif %}
+
+        {% if modulacoes %}
+            <div class="card">
+                <h2>Sua modulação</h2>
+                <ul style="list-style:none; padding:0; margin:0;">
+                    {% for m in modulacoes %}
+                        <li style="padding:.5rem 0; {% if not forloop.last %}border-bottom:1px solid #ece6f5;{% endif %}">
+                            <a href="{{ m.arquivo.url }}" target="_blank" style="color:var(--accent-soft-text); font-weight:600;">⬇ {{ m.nome }}</a>
+                            <div style="font-size:.78rem; color:var(--text-muted);">{{ m.criado_em|date:"d/m/Y" }}</div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        {% if grafico_evolucao.pontos|length > 1 or tem_fotos %}
+            <div class="card">
+                <h2>Sua evolução</h2>
+                {% if grafico_evolucao.pontos|length > 1 %}
+                    <p style="font-size:.78rem; color:var(--text-muted); margin:0 0 .5rem;">Em todas as linhas, quanto mais alto, melhor.</p>
+                    <svg viewBox="0 0 {{ grafico_evolucao.largura }} {{ grafico_evolucao.altura }}" style="width:100%; max-width:640px; height:auto;">
+                        {% for tick in grafico_evolucao.eixo_y %}
+                            <line x1="{{ grafico_evolucao.margem_esquerda }}" y1="{{ tick.y }}" x2="{{ grafico_evolucao.largura }}" y2="{{ tick.y }}" stroke="#ece6f5" stroke-width="1" />
+                            <text x="{{ grafico_evolucao.margem_esquerda|add:'-6' }}" y="{{ tick.y }}" text-anchor="end" dominant-baseline="middle" font-size="10" fill="#766f85">{{ tick.valor }}</text>
+                        {% endfor %}
+                        {% for linha in grafico_evolucao.linhas %}
+                            <polyline points="{{ linha.points }}" fill="none" stroke="{{ linha.cor }}" stroke-width="2" />
+                        {% endfor %}
+                        {% for tick in grafico_evolucao.eixo_x %}
+                            <text x="{{ tick.x }}" y="{{ grafico_evolucao.altura|add:'-6' }}" text-anchor="{% if forloop.first %}start{% elif forloop.last %}end{% else %}middle{% endif %}" font-size="10" fill="#766f85">{% if tick.rotulo %}{{ tick.rotulo }}{% else %}{{ tick.data|date:"d/m" }}{% endif %}</text>
+                        {% endfor %}
+                    </svg>
+                {% endif %}
+                {% if tem_fotos %}
+                    <p style="font-size:.78rem; color:var(--text-muted); margin:1rem 0 .5rem;">Fotos</p>
+                    {% for linha in grade_fotos %}
+                        {% if linha.tem_foto %}
+                            <p style="font-size:.85rem; font-weight:600; margin:.6rem 0 .3rem;">{{ linha.angulo_label }}</p>
+                            <div style="display:flex; gap:.5rem; flex-wrap:wrap;">
+                                {% for col in linha.colunas %}
+                                    {% if col.foto %}
+                                        <a href="{{ col.foto.imagem.url }}" target="_blank" style="text-align:center;">
+                                            <img src="{{ col.foto.imagem.url }}" alt="{{ col.momento_label }}" style="width:90px; height:90px; object-fit:cover; border-radius:8px;">
+                                            <div style="font-size:.72rem; color:var(--text-muted);">{{ col.momento_label }}</div>
+                                        </a>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="topo" style="padding-top:.5rem;">
+        <h2>Check-in diário</h2>
+        <p>Conte como está seu dia hoje — pode deixar em branco o que não souber. Pode preencher de novo a qualquer hora, todo envio novo fica registrado.</p>
     </div>
     <form method="post">
         {% csrf_token %}
@@ -84,5 +151,15 @@
         {% endfor %}
         <button class="btn-enviar" type="submit">Enviar check-in</button>
     </form>
+    <script>
+        // Apertar Enter num campo de texto no meio do formulário não deve
+        // enviar o check-in inteiro sem querer — só o botão "Enviar
+        // check-in" no fim deve enviar.
+        document.querySelector("form").addEventListener("keydown", function (ev) {
+            if (ev.key === "Enter" && ev.target.tagName === "INPUT") {
+                ev.preventDefault();
+            }
+        });
+    </script>
 </body>
 </html>

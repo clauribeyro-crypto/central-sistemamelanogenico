@@ -15,10 +15,22 @@
         <button type="submit">Filtrar</button>
     </form>
 
+    <form class="filtro" method="get" style="margin-top:-.5rem;">
+        <div>
+            <label for="paciente">Ou buscar por paciente (mostra todos os lançamentos dela, de qualquer período)</label>
+            <input type="text" id="paciente" name="paciente" value="{{ paciente_busca }}" placeholder="Nome da paciente" style="min-width:260px;">
+        </div>
+        <button type="submit">Buscar</button>
+        {% if paciente_busca %}
+            <a href="{% url 'financeiro:relatorio' %}" class="btn btn-secondary" style="padding:.4rem .8rem; font-size:.85rem;">Limpar busca</a>
+        {% endif %}
+    </form>
+
     <div class="grid">
         <div class="card stat">
             <div class="num">R$ {{ total_pago|floatformat:2 }}</div>
-            <div>Total recebido no período</div>
+            <div>Total recebido no período (líquido)</div>
+            <div style="font-size:.78rem; color:var(--text-muted); margin-top:.15rem;">Bruto: R$ {{ total_pago_bruto|floatformat:2 }}</div>
         </div>
         <div class="card stat">
             <div class="num">R$ {{ total_pendente|floatformat:2 }}</div>
@@ -26,20 +38,52 @@
         </div>
     </div>
 
+    {% if vendas_kit_mentora %}
+        <div class="card stat" style="background:#a855f711; border:1px solid #a855f733;">
+            <div class="num">R$ {{ vendas_kit_mentora.total_pago|floatformat:2 }}</div>
+            <div>
+                Recebido de vendas de kit pras mentoradas no período
+                (vendido: R$ {{ vendas_kit_mentora.total_vendido|floatformat:2 }} em
+                {{ vendas_kit_mentora.qtd }} venda{{ vendas_kit_mentora.qtd|pluralize }})
+                — receita à parte, não incluída nos totais acima.
+                <a href="{% url 'core:vendas_kit_mentoradas' %}">Ver detalhes ›</a>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if mentoria %}
+        <div class="card stat" style="background:#0ea5e911; border:1px solid #0ea5e933;">
+            <div class="num">R$ {{ mentoria.total_recebido|floatformat:2 }}</div>
+            <div>
+                Recebido de mentoria no período
+                ({{ mentoria.qtd }} parcela{{ mentoria.qtd|pluralize }} paga{{ mentoria.qtd|pluralize }})
+                — receita à parte, não incluída nos totais acima.
+                <a href="{% url 'core:pagamentos_mentoria' %}">Ver detalhes ›</a>
+            </div>
+        </div>
+    {% endif %}
+
     <div class="card">
         <h2>Recebido por forma de pagamento</h2>
         {% if por_forma_pagamento %}
             <table>
-                <thead><tr><th>Forma</th><th>Total</th></tr></thead>
+                <thead><tr><th>Forma</th><th>Total vendido (bruto)</th><th>Total líquido (caixa)</th></tr></thead>
                 <tbody>
                 {% for item in por_forma_pagamento %}
                     <tr>
                         <td>{{ item.forma_pagamento }}</td>
                         <td>R$ {{ item.total|floatformat:2 }}</td>
+                        <td>R$ {{ item.total_liquido|floatformat:2 }}</td>
                     </tr>
                 {% endfor %}
                 </tbody>
             </table>
+            <p style="font-size:.82rem; color:var(--text-muted); margin-top:.6rem;">
+                "Bruto" é o que a paciente pagou; "Líquido" já desconta a taxa da maquininha cadastrada em
+                <a href="{% url 'financeiro:painel' %}?aba=geral">Financeiro → Geral</a> — é o líquido que entra
+                no seu caixa e no resultado do mês/ano.
+                <a href="{% url 'financeiro:conferir_cartao' %}">Conferir/corrigir parcelas no cartão ›</a>
+            </p>
         {% else %}
             <p>Sem pagamentos recebidos no período.</p>
         {% endif %}
@@ -64,8 +108,45 @@
         {% endif %}
     </div>
 
+    {% if pendencias_de_outros_periodos %}
+        <div class="card" style="background:#f59e0b11; border:1px solid #f59e0b33;">
+            <h2 style="margin-top:0;">Pendências de outros períodos ({{ pendencias_de_outros_periodos|length }})</h2>
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                Saldo ainda a receber de lançamentos que venceram antes ou depois do período filtrado acima —
+                ex.: um tratamento fechado num mês, com parcelas combinadas pra acertar depois.
+            </p>
+            <table>
+                <thead>
+                    <tr><th>Vencimento</th><th>Paciente</th><th>Total</th><th>Recebido</th><th>Pendente</th><th>Status</th><th></th></tr>
+                </thead>
+                <tbody>
+                {% for p in pendencias_de_outros_periodos %}
+                    <tr>
+                        <td>{{ p.data_vencimento|date:"d/m/Y"|default:"—" }}</td>
+                        <td>{{ p.paciente }}</td>
+                        <td>R$ {{ p.valor|floatformat:2 }}</td>
+                        <td>R$ {{ p.total_recebido|floatformat:2 }}</td>
+                        <td>R$ {{ p.saldo_pendente|floatformat:2 }}</td>
+                        <td>
+                            {% if p.status == p.Status.PARCIAL %}<span class="badge badge-parcial">Parcial</span>
+                            {% else %}<span class="badge badge-neutro">Pendente</span>{% endif %}
+                        </td>
+                        <td><a href="{% url 'financeiro:editar_pagamento' p.pk %}?next={{ request.get_full_path|urlencode }}">Gerenciar ›</a></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% endif %}
+
     <div class="card">
-        <h2>Lançamentos no período</h2>
+        <h2>
+            {% if paciente_busca %}
+                Lançamentos de "{{ paciente_busca }}" (todos os períodos)
+            {% else %}
+                Lançamentos no período
+            {% endif %}
+        </h2>
         <table>
             <thead>
                 <tr><th>Vencimento</th><th>Paciente</th><th>Total</th><th>Recebido</th><th>Pendente</th><th>Status</th><th></th></tr>

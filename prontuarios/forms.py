@@ -3,7 +3,10 @@ from django import forms
 from agenda.models import Consulta
 from profissionais.models import Profissional
 
-from .models import SATISFACOES, SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, RegistroEvolucao
+from .models import (
+    SATISFACOES, SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, GravacaoConsulta,
+    RegistroEvolucao,
+)
 
 
 class DecimalVirgulaField(forms.DecimalField):
@@ -122,6 +125,31 @@ class AnamneseForm(forms.ModelForm):
         }
 
 
+# Campos que viram obrigatórios só no preenchimento público (ver
+# AnamnesePublicaForm) — a edição interna (profissional na Ficha da Paciente)
+# continua livre pra salvar incompleto, igual sempre foi.
+_CAMPOS_OBRIGATORIOS_PUBLICO = ("telefone", "endereco", "cep", "foto_rosto")
+
+
+class AnamnesePublicaForm(AnamneseForm):
+    """
+    Mesmo formulário da anamnese, usado só no link público que a paciente
+    preenche sem login. Telefone, endereço completo, CEP e a foto do rosto
+    passam a ser obrigatórios aqui — sem eles a clínica não consegue enviar
+    os produtos da paciente nem confirmar quem preencheu.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for campo in _CAMPOS_OBRIGATORIOS_PUBLICO:
+            self.fields[campo].required = True
+        # No celular, "capture" abre a câmera direto (traseira, por ser a
+        # câmera principal) em vez da galeria de fotos — ajuda a padronizar
+        # como a foto é tirada, sem travar o navegador numa câmera específica.
+        self.fields["foto_rosto"].widget.attrs["capture"] = "environment"
+        self.fields["foto_rosto"].widget.attrs["accept"] = "image/*"
+
+
 class RegistroEvolucaoForm(forms.ModelForm):
     class Meta:
         model = RegistroEvolucao
@@ -144,3 +172,18 @@ class DocumentoForm(forms.ModelForm):
         model = Documento
         fields = ["nome", "tipo", "arquivo", "observacoes"]
         widgets = {"observacoes": forms.Textarea(attrs={"rows": 2})}
+
+
+class GravacaoConsultaForm(forms.ModelForm):
+    class Meta:
+        model = GravacaoConsulta
+        fields = ["data", "consulta", "link_drive", "arquivo_audio"]
+        widgets = {"data": forms.DateInput(attrs={"type": "date"})}
+
+    def __init__(self, *args, paciente=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["consulta"].required = False
+        self.fields["consulta"].queryset = (
+            Consulta.objects.filter(paciente=paciente).order_by("-data_hora")
+            if paciente else Consulta.objects.none()
+        )

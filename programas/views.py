@@ -119,6 +119,10 @@ ACOES_STATUS = {
     ),
     "renovar": (Acompanhamento.Status.RENOVADO, "Acompanhamento marcado como renovado."),
     "migrar": (Acompanhamento.Status.MIGRADO, "Acompanhamento marcado como migrado para outro programa."),
+    "cancelar": (
+        Acompanhamento.Status.CANCELADO,
+        "Acompanhamento cancelado — qualquer valor já recebido continua registrado no financeiro.",
+    ),
 }
 
 

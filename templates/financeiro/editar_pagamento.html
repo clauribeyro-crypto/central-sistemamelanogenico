@@ -25,6 +25,28 @@
     </div>
 
     <div class="card">
+        <h2 style="margin-top:0;">{% if pagamento.status == "CANCELADO" %}Cobrança cancelada{% else %}Cancelar cobrança{% endif %}</h2>
+        {% if pagamento.status == "CANCELADO" %}
+            <p style="color:var(--text-muted);">Esse lançamento está cancelado — não conta como pendente em nenhum relatório. Qualquer recebimento já registrado continua aqui embaixo.</p>
+            <form method="post" action="{% url 'financeiro:editar_pagamento' pagamento.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="reativar_pagamento">
+                <input type="hidden" name="next" value="{{ next }}">
+                <button class="btn btn-secondary" type="submit">Reativar cobrança</button>
+            </form>
+        {% else %}
+            <p style="color:var(--text-muted);">Pra uma venda/tratamento que não vai mais acontecer (ex.: paciente desistiu) — tira esse valor de "a receber" sem apagar nenhum recebimento já registrado. Diferente de excluir, dá pra desfazer depois.</p>
+            <form method="post" action="{% url 'financeiro:editar_pagamento' pagamento.pk %}"
+                  onsubmit="return confirm('Cancelar esta cobrança de R$ {{ pagamento.valor|floatformat:2 }}? Ela para de contar como pendente no financeiro — qualquer valor já recebido continua registrado.');">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="cancelar_pagamento">
+                <input type="hidden" name="next" value="{{ next }}">
+                <button class="btn btn-secondary" type="submit">Cancelar cobrança</button>
+            </form>
+        {% endif %}
+    </div>
+
+    <div class="card">
         <h2 style="margin-top:0;">Excluir lançamento</h2>
         <p style="color:var(--text-muted);">Remove este lançamento e todos os recebimentos vinculados a ele (útil para testes ou consultas canceladas por engano). Essa ação não pode ser desfeita.</p>
         <form method="post" action="{% url 'financeiro:excluir_pagamento' pagamento.pk %}"

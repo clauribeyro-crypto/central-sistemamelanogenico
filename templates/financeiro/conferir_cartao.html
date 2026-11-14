@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Conferir cartão · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'financeiro:relatorio' %}">← Voltar pro Relatório financeiro</a></p>
+    <h1>Conferir recebimentos no cartão</h1>
+    <p style="color:var(--text-muted); font-size:.9rem;">
+        Ajuste as parcelas de cada recebimento (comparando com o extrato da maquininha) e salve — a taxa e o
+        valor líquido são recalculados sozinhos, usando as taxas cadastradas em
+        <a href="{% url 'financeiro:painel' %}?aba=geral">Financeiro → Geral</a>. Um recebimento que já estiver
+        certo não precisa de nada — só mexe no que estiver errado.
+    </p>
+
+    <form class="filtro" method="get">
+        <div>
+            <label for="mes-cartao">Mês</label>
+            <select id="mes-cartao" name="mes" onchange="this.form.submit()">
+                {% for numero, nome in meses %}
+                    <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ano-cartao">Ano</label>
+            <select id="ano-cartao" name="ano" onchange="this.form.submit()">
+                {% for a in anos %}
+                    <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+
+    <div class="card">
+        {% if recebimentos %}
+            <form method="post">
+                {% csrf_token %}
+                <table>
+                    <thead>
+                        <tr><th>Data</th><th>Paciente</th><th>Valor bruto</th><th>Forma</th><th>Parcelas</th><th>Taxa</th><th>Líquido</th></tr>
+                    </thead>
+                    <tbody>
+                    {% for r in recebimentos %}
+                        <tr>
+                            <td>{{ r.data|date:"d/m/Y" }}</td>
+                            <td>{{ r.pagamento.paciente }}</td>
+                            <td>R$ {{ r.valor|floatformat:2 }}</td>
+                            <td>{{ r.get_forma_pagamento_display }}</td>
+                            <td>
+                                {% if pode_editar %}
+                                    <select name="parcelas_{{ r.pk }}" style="font-size:.85rem; padding:.2rem;">
+                                        {% for n in parcelas_opcoes %}
+                                            <option value="{{ n }}" {% if n == r.parcelas %}selected{% endif %}>{% if n > 1 %}{{ n }}x{% else %}À vista/1x{% endif %}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% else %}
+                                    {{ r.parcelas }}x
+                                {% endif %}
+                            </td>
+                            <td>{{ r.taxa_percentual }}%</td>
+                            <td>R$ {{ r.valor_liquido|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% if pode_editar %}
+                    <button class="btn" type="submit" style="margin-top:1rem;">Recalcular</button>
+                {% endif %}
+            </form>
+        {% else %}
+            <p>Nenhum recebimento no cartão (débito/crédito) nesse mês.</p>
+        {% endif %}
+    </div>
+{% endblock %}

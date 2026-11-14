@@ -94,7 +94,7 @@ def _campo_satisfacao(tema):
 SECOES_ANAMNESE = [
     {
         "titulo": "Dados pessoais",
-        "campos": ["idade", "data_nascimento", "telefone", "endereco", "profissao", "email", "peso", "altura"],
+        "campos": ["idade", "data_nascimento", "telefone", "endereco", "cep", "profissao", "email", "peso", "altura"],
         "satisfacao": None,
     },
     {
@@ -219,6 +219,11 @@ SECOES_ANAMNESE = [
         "campos": ["foto_rosto"],
         "satisfacao": None,
     },
+    {
+        "titulo": "Documentos",
+        "campos": ["numero_rg", "numero_cpf"],
+        "satisfacao": None,
+    },
 ]
 
 # Rótulo curto de cada nota de satisfação, pro resumo visual no topo da aba.
@@ -253,6 +258,7 @@ class Anamnese(ModeloDaOrganizacao):
     data_nascimento = models.DateField("data de nascimento", null=True, blank=True)
     telefone = _campo("telefone", max_length=20)
     endereco = _campo("endereço completo", max_length=255)
+    cep = _campo("CEP", max_length=9)
     profissao = _campo("profissão")
     email = models.EmailField("e-mail", blank=True)
     peso = models.DecimalField("peso (kg)", max_digits=5, decimal_places=1, null=True, blank=True)
@@ -448,6 +454,10 @@ class Anamnese(ModeloDaOrganizacao):
     foto_rosto = models.ImageField(
         "foto do rosto", upload_to="anamnese_fotos/%Y/%m/", blank=True, null=True
     )
+
+    # 17. Documentos
+    numero_rg = _campo("número do RG", max_length=20)
+    numero_cpf = _campo("número do CPF", max_length=20)
 
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -746,11 +756,18 @@ class LinkCheckin(models.Model):
 
 
 class Documento(ModeloDaOrganizacao):
-    """Exame, laudo ou outro documento anexado à paciente (não ligado a um acompanhamento específico)."""
+    """
+    Exame, laudo ou outro documento anexado à paciente (não ligado a um
+    acompanhamento específico). Tipo "Modulação" é especial: esses arquivos
+    aparecem pra paciente baixar no link público dela (ver
+    prontuarios.views.checkin_publico) — os outros tipos continuam
+    só internos à equipe.
+    """
 
     class Tipo(models.TextChoices):
         EXAME = "EXAME", "Exame"
         DOCUMENTO = "DOCUMENTO", "Documento"
+        MODULACAO = "MODULACAO", "Modulação"
         OUTRO = "OUTRO", "Outro"
 
     paciente = models.ForeignKey(Paciente, on_delete=models.PROTECT, related_name="documentos")
@@ -770,3 +787,57 @@ class Documento(ModeloDaOrganizacao):
 
     def __str__(self):
         return f"{self.nome} ({self.get_tipo_display()}) — {self.paciente}"
+
+
+class GravacaoConsulta(ModeloDaOrganizacao):
+    """
+    Gravação de uma consulta online (feita fora do sistema, ex.: Google Meet
+    gravado direto no Drive) — o link fica só como referência pra abrir a
+    gravação completa; a análise por IA (transcrição + queixas) precisa do
+    arquivo de áudio de verdade, enviado separadamente, porque o Drive não
+    libera download automático de arquivo grande por link (ver
+    webhook_importar_lead pra um caso parecido de "link não é a mesma coisa
+    que o conteúdo").
+    """
+
+    class Status(models.TextChoices):
+        PENDENTE = "PENDENTE", "Aguardando análise"
+        PROCESSANDO = "PROCESSANDO", "Processando"
+        CONCLUIDA = "CONCLUIDA", "Concluída"
+        ERRO = "ERRO", "Erro ao processar"
+
+    paciente = models.ForeignKey(Paciente, on_delete=models.CASCADE, related_name="gravacoes_consulta")
+    consulta = models.ForeignKey(
+        Consulta, on_delete=models.SET_NULL, related_name="gravacoes", blank=True, null=True,
+        help_text="Consulta a que essa gravação pertence, se houver uma marcada no sistema.",
+    )
+    data = models.DateField(default=timezone.localdate)
+    link_drive = models.URLField(
+        "link da gravação (Drive)", blank=True,
+        help_text="Só pra abrir a gravação completa depois — a análise por IA usa o áudio enviado abaixo, não esse link.",
+    )
+    arquivo_audio = models.FileField(
+        "áudio pra análise", upload_to="gravacoes_consulta/%Y/%m/", storage=_storage_documento,
+        blank=True, null=True,
+        help_text="O áudio da consulta (de preferência só o áudio, não o vídeo inteiro — arquivo bem menor).",
+    )
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDENTE)
+    transcricao = models.TextField(blank=True)
+    dores_identificadas = models.TextField(
+        "queixas identificadas pela IA", blank=True,
+        help_text="Gerado automaticamente a partir da transcrição — sempre conferir com a gravação original antes de usar clinicamente.",
+    )
+    erro_detalhe = models.TextField(blank=True)
+    enviado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, blank=True, null=True
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "gravação de consulta"
+        verbose_name_plural = "gravações de consulta"
+        ordering = ["-data", "-criado_em"]
+
+    def __str__(self):
+        return f"Gravação de {self.paciente} em {self.data:%d/%m/%Y}"

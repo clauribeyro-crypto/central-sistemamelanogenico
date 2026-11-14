@@ -14,6 +14,15 @@ class PacienteRapidoForm(forms.ModelForm):
         fields = ["nome", "telefone", "cidade"]
 
 
+class AchadosPrimeiraConsultaForm(forms.ModelForm):
+    """Separado da anamnese de propósito — isso é o que a clínica escreve, não o que a paciente respondeu."""
+
+    class Meta:
+        model = Paciente
+        fields = ["achados_primeira_consulta"]
+        widgets = {"achados_primeira_consulta": forms.Textarea(attrs={"rows": 5})}
+
+
 class IniciarProtocoloForm(forms.Form):
     programa = forms.ModelChoiceField(queryset=Programa.objects.none(), label="Programa")
     data_inicio = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"))
@@ -23,6 +32,15 @@ class IniciarProtocoloForm(forms.Form):
     )
     desconto = forms.DecimalField(max_digits=10, decimal_places=2, required=False, initial=0)
     forma_pagamento = forms.CharField(max_length=100, required=False)
+    ja_paga_em_outro_lancamento = forms.BooleanField(
+        label="Já foi paga em outro lançamento (não gerar cobrança nova)", required=False,
+        help_text=(
+            "Marque pra paciente que já pagou antes de o protocolo ser iniciado aqui no sistema "
+            "(ex.: pagou direto com você, por fora do fluxo normal). Não cria um lançamento novo no "
+            "Financeiro — depois é só ir no lançamento que já existe e vincular ao tratamento, em "
+            "\"Editar valor e vencimento\" › \"Tratamento/programa vinculado\"."
+        ),
+    )
     valor_recebido_agora = forms.DecimalField(
         label="Valor já recebido", max_digits=10, decimal_places=2, required=False, min_value=0,
         help_text=(

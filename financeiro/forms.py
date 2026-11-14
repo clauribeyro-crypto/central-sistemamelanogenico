@@ -50,8 +50,10 @@ class RecebimentoForm(forms.ModelForm):
 
     class Meta:
         model = Recebimento
-        fields = ["valor", "forma_pagamento", "data", "observacoes"]
+        fields = ["valor", "forma_pagamento", "parcelas", "data", "observacoes"]
+        labels = {"parcelas": "Parcelas (se cartão de crédito)"}
         widgets = {
+            "parcelas": forms.Select(choices=[(n, f"{n}x" if n > 1 else "À vista/1x") for n in range(1, 13)]),
             "observacoes": forms.TextInput(attrs={"placeholder": "Opcional — ex.: entrada, sinal, restante"}),
         }
 

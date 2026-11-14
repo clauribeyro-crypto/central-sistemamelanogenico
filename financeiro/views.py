@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 
 from agenda.models import Consulta
 from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
+from core.models import totais_mentoria_no_periodo, totais_vendas_kit_mentora_no_periodo
 from programas.models import Acompanhamento
 
 from .forms import BancoForm, CategoriaFinanceiraForm, LancamentoForm, PagamentoForm, RecebimentoForm
@@ -26,13 +27,23 @@ MESES = [
     (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro"),
 ]
 
+# Chaves do JSON Organizacao.taxas_maquininha, na ordem exibida no formulário
+# de configuração — ver Organizacao.taxa_maquininha() pra como são usadas.
+TAXAS_MAQUININHA_CAMPOS = [
+    ("DEBITO", "Débito"),
+    ("CREDITO_1", "Crédito à vista"),
+] + [(f"CREDITO_{n}", f"Crédito {n}x") for n in range(2, 13)]
+
 
 def _totais_periodo(org, data_inicio, data_fim, status=Lancamento.Status.REALIZADO):
     """
     Soma receitas/despesas no período: lançamentos manuais pelo grupo da
     categoria, mais os recebimentos das pacientes (só entram como receita
     realizada — a cobrança em aberto de uma paciente é "previsto" e é
-    tratada à parte, junto do saldo pendente dos pagamentos).
+    tratada à parte, junto do saldo pendente dos pagamentos). Usa o valor
+    líquido do recebimento (já descontada a taxa da maquininha, quando for
+    cartão) — é o que realmente cai no caixa, não o valor bruto cobrado da
+    paciente.
     """
     lancamentos = Lancamento.objects.filter(
         organizacao=org, status=status, data__gte=data_inicio, data__lte=data_fim
@@ -47,7 +58,7 @@ def _totais_periodo(org, data_inicio, data_fim, status=Lancamento.Status.REALIZA
     if status == Lancamento.Status.REALIZADO:
         receitas += Recebimento.objects.filter(
             organizacao=org, data__gte=data_inicio, data__lte=data_fim
-        ).aggregate(t=Sum("valor"))["t"] or Decimal("0.00")
+        ).aggregate(t=Sum("valor_liquido"))["t"] or Decimal("0.00")
 
     return {"receitas": receitas, "despesas": despesas, "resultado": receitas - despesas}
 
@@ -97,19 +108,34 @@ def relatorio(request):
     recebimentos_no_periodo = Recebimento.objects.filter(
         organizacao=org, data__gte=data_inicio, data__lte=data_fim,
     )
-    total_pago = recebimentos_no_periodo.aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
+    # "Recebido" é sempre o líquido (o que de fato cai no caixa, já descontada
+    # a taxa da maquininha) — o bruto (o que a paciente pagou) aparece à parte,
+    # pra quem quiser comparar.
+    total_pago = recebimentos_no_periodo.aggregate(total=Sum("valor_liquido"))["total"] or Decimal("0.00")
+    total_pago_bruto = recebimentos_no_periodo.aggregate(total=Sum("valor"))["total"] or Decimal("0.00")
 
     pagamentos_em_aberto = pagamentos_vencendo_no_periodo.filter(
         status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL]
     )
     total_pendente = sum((p.saldo_pendente for p in pagamentos_em_aberto), Decimal("0.00"))
 
-    por_forma_pagamento = (
-        recebimentos_no_periodo
-        .values("forma_pagamento")
-        .annotate(total=Sum("valor"))
-        .order_by("-total")
-    )
+    # "Recebido por forma de pagamento" é a visão que confere o total bruto
+    # vendido no cartão (ou em qualquer outra forma) num período, lado a lado
+    # com o líquido — útil pra comparar com o extrato da maquininha e achar a
+    # diferença (taxa). Troca o código salvo no banco (ex.: "CREDITO") pelo
+    # rótulo em português, que o template original só mostrava cru.
+    por_forma_pagamento = [
+        {
+            "forma_pagamento": Pagamento.FormaPagamento(item["forma_pagamento"]).label,
+            "total": item["total"],
+            "total_liquido": item["total_liquido"],
+        }
+        for item in (
+            recebimentos_no_periodo.values("forma_pagamento")
+            .annotate(total=Sum("valor"), total_liquido=Sum("valor_liquido"))
+            .order_by("-total")
+        )
+    ]
 
     por_profissional = (
         recebimentos_no_periodo.filter(pagamento__consulta__isnull=False)
@@ -128,16 +154,195 @@ def relatorio(request):
         .distinct()
     )
 
+    # Buscar por paciente ignora o período — é pra achar um lançamento
+    # específico (ex.: um recebimento lançado com a data errada, que por
+    # isso nem aparece no período certo) sem precisar adivinhar o filtro.
+    paciente_busca = request.GET.get("paciente", "").strip()
+    if paciente_busca:
+        pagamentos = Pagamento.objects.filter(organizacao=org, paciente__nome__icontains=paciente_busca)
+
+    # Pendências de fora do período: um lançamento que venceu num mês
+    # anterior (ex.: tratamento fechado em outubro, com saldo ainda a
+    # receber) nunca aparece na tabela acima enquanto nada for recebido
+    # dele dentro do período selecionado — mas ainda é dinheiro em aberto
+    # que a clínica precisa cobrar/acertar, então mostra à parte, com a
+    # data de vencimento original pra saber há quanto tempo está parado.
+    pendencias_de_outros_periodos = (
+        Pagamento.objects.filter(organizacao=org, status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL])
+        .exclude(pk__in=pagamentos_vencendo_no_periodo.values_list("pk", flat=True))
+        .order_by("data_vencimento")
+    )
+    if paciente_busca:
+        pendencias_de_outros_periodos = pendencias_de_outros_periodos.filter(paciente__nome__icontains=paciente_busca)
+
     contexto = {
         "data_inicio": data_inicio,
         "data_fim": data_fim,
+        "paciente_busca": paciente_busca,
         "pagamentos": pagamentos.order_by("-data_vencimento"),
+        "pendencias_de_outros_periodos": pendencias_de_outros_periodos,
         "total_pago": total_pago,
+        "total_pago_bruto": total_pago_bruto,
         "total_pendente": total_pendente,
         "por_forma_pagamento": por_forma_pagamento,
         "por_profissional": por_profissional,
     }
+    if request.user.is_superuser:
+        contexto["vendas_kit_mentora"] = totais_vendas_kit_mentora_no_periodo(org, data_inicio, data_fim)
+        contexto["mentoria"] = totais_mentoria_no_periodo(org, data_inicio, data_fim)
     return render(request, "financeiro/relatorio.html", contexto)
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+def conferir_cartao(request):
+    """
+    Pra acertar, de uma vez só, o número de parcelas de recebimentos no
+    cartão lançados antes das taxas da maquininha serem cadastradas — sem
+    essa correção, eles ficam com líquido = bruto (parcelas=1/à vista),
+    mesmo quando a venda de verdade foi parcelada em mais vezes. Só a
+    paciente/a Cláudia sabe quantas parcelas cada venda antiga teve (o
+    sistema não guardava isso antes); ajustando aqui, taxa e líquido são
+    recalculados sozinhos ao salvar (ver Recebimento.save()).
+    """
+    org = organizacao_do_usuario(request)
+    hoje = datetime.date.today()
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+        mes = int(request.GET.get("mes", hoje.month))
+    except ValueError:
+        ano, mes = hoje.year, hoje.month
+    if mes < 1 or mes > 12:
+        mes = hoje.month
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+
+    recebimentos_qs = Recebimento.objects.filter(
+        organizacao=org,
+        forma_pagamento__in=[Pagamento.FormaPagamento.CREDITO, Pagamento.FormaPagamento.DEBITO],
+        data__gte=data_inicio, data__lte=data_fim,
+    ).select_related("pagamento__paciente").order_by("data", "criado_em")
+
+    if request.method == "POST":
+        if not usuario_e_administrador(request):
+            messages.error(request, "Só administradores podem recalcular recebimentos.")
+            return redirect(f"{reverse('financeiro:conferir_cartao')}?ano={ano}&mes={mes}")
+        atualizados = 0
+        for recebimento in recebimentos_qs:
+            parcelas_novo = request.POST.get(f"parcelas_{recebimento.pk}")
+            if parcelas_novo and parcelas_novo.isdigit() and int(parcelas_novo) != recebimento.parcelas:
+                recebimento.parcelas = int(parcelas_novo)
+                recebimento.save()
+                atualizados += 1
+            elif recebimento.valor_liquido is None:
+                recebimento.save()
+                atualizados += 1
+        messages.success(
+            request,
+            f"{atualizados} recebimento{'s' if atualizados != 1 else ''} recalculado{'s' if atualizados != 1 else ''}."
+            if atualizados else "Nenhuma parcela foi alterada.",
+        )
+        return redirect(f"{reverse('financeiro:conferir_cartao')}?ano={ano}&mes={mes}")
+
+    return render(request, "financeiro/conferir_cartao.html", {
+        "ano": ano, "mes": mes, "meses": MESES, "anos": range(hoje.year - 2, hoje.year + 1),
+        "recebimentos": recebimentos_qs, "parcelas_opcoes": range(1, 13),
+        "pode_editar": usuario_e_administrador(request),
+    })
+
+
+def recebido_no_periodo(org, ano, mes):
+    """
+    Dinheiro que realmente caiu no caixa no mês — soma os recebimentos pela
+    data em que cada um foi recebido, não pela data da consulta/tratamento a
+    que o lançamento pertence. É diferente de "total_recebido_geral" (ver
+    totais_fechamentos_mes): aquele soma, para as consultas/tratamentos *do
+    mês*, tudo que já foi recebido deles *a qualquer momento* — então um
+    sinal pago em setembro pra reservar uma consulta de outubro entra no
+    caixa de outubro (mês da consulta) em vez de no de setembro (mês em que
+    o dinheiro realmente chegou). Esta função corrige isso pra quem precisa
+    do valor real que entrou no caixa no período, tipo o card de meta do mês.
+    Soma o valor líquido (já descontada a taxa da maquininha), não o bruto.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    return Recebimento.objects.filter(
+        pagamento__organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+    ).aggregate(total=Sum("valor_liquido"))["total"] or Decimal("0.00")
+
+
+def detalhe_recebido_no_periodo(org, ano, mes):
+    """
+    Lista cada recebimento que compõe recebido_no_periodo, com a origem
+    (consulta/tratamento/produto/avulso) — pra dar pra conferir exatamente
+    de onde vem o valor quando o número do caixa não bater com o esperado.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    recebimentos = list(
+        Recebimento.objects.filter(
+            pagamento__organizacao=org, data__gte=data_inicio, data__lte=data_fim,
+        ).select_related(
+            "pagamento__paciente", "pagamento__consulta__tipo_consulta",
+            "pagamento__acompanhamento__programa", "pagamento__venda",
+        ).order_by("-data", "-criado_em")
+    )
+    for recebimento in recebimentos:
+        pagamento = recebimento.pagamento
+        if pagamento.consulta_id:
+            recebimento.origem = f"Consulta ({pagamento.consulta.tipo_consulta})"
+        elif pagamento.acompanhamento_id:
+            recebimento.origem = f"Tratamento ({pagamento.acompanhamento.programa.nome})"
+        elif pagamento.venda_id:
+            recebimento.origem = "Produto"
+        else:
+            recebimento.origem = "Avulso"
+    return recebimentos
+
+
+def consultas_agendadas_no_mes(org, ano, mes):
+    """
+    Consultas de diagnóstico (tipo_consulta.conta_para_fechamento=True) cobradas
+    *criadas* (agendadas no sistema) no mês — diferente das "consultas cobradas
+    no mês" de totais_fechamentos_mes, que conta pela data da consulta em si.
+    Uma consulta marcada em setembro pra acontecer em outubro, com sinal pago
+    em setembro, deve contar pra meta de agendamento de setembro (é quando a
+    SDR fez o trabalho), não pra de outubro — é essa a meta de "consultas por
+    mês" da organização. Só entra consulta de diagnóstico (a meta é de
+    agendamento de consulta de diagnóstico, não de qualquer tipo de consulta
+    cobrada) — um outro tipo de consulta marcado com valor não deve contar.
+
+    Remarcar (ver agenda.views.remarcar_consulta) cria uma consulta nova, com
+    criado_em de hoje — usar esse criado_em direto faria uma remarcação mudar
+    o mês em que o agendamento conta, mesmo sem nenhum trabalho novo de
+    agendamento ter sido feito. Por isso sobe a cadeia de reagendada_de até a
+    consulta raiz (a primeira, nunca remarcada) e usa o criado_em dela: uma
+    consulta remarcada continua contando pro mês em que foi agendada a
+    primeira vez, não pro mês da remarcação.
+    """
+    ultimo_dia = calendar.monthrange(ano, mes)[1]
+    data_inicio = datetime.date(ano, mes, 1)
+    data_fim = datetime.date(ano, mes, ultimo_dia)
+    candidatas = (
+        Consulta.objects.filter(organizacao=org, valor__gt=0, tipo_consulta__conta_para_fechamento=True)
+        .exclude(status__in=[Consulta.Status.CANCELADA, Consulta.Status.REAGENDADA])
+        .select_related("paciente", "tipo_consulta")
+    )
+    consultas = []
+    for c in candidatas:
+        raiz = c
+        while raiz.reagendada_de_id:
+            raiz = raiz.reagendada_de
+        if data_inicio <= raiz.criado_em.date() <= data_fim:
+            consultas.append(c)
+    consultas.sort(key=lambda c: c.criado_em)
+    for c in consultas:
+        pagamento = c.pagamento_vinculado()
+        c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
+    return consultas
 
 
 def totais_fechamentos_mes(org, ano, mes):
@@ -147,6 +352,13 @@ def totais_fechamentos_mes(org, ano, mes):
     diferentes. Reaproveitado pelo relatório de fechamentos e pelo card
     de meta mensal da home, pra não calcular esse número de dois jeitos
     diferentes em dois lugares.
+
+    Os valores "recebido" daqui (total_recebido_tratamentos/consultas/geral)
+    somam, pra cada tratamento/consulta *deste mês*, tudo que já foi
+    recebido dele a qualquer momento — bom pra saber "quanto já foi
+    cobrado desse mês", mas não equivale a "quanto caiu no caixa neste
+    mês" quando tem pagamento parcelado atravessando meses (ver
+    recebido_no_periodo, que soma pela data de cada recebimento).
     """
     ultimo_dia = calendar.monthrange(ano, mes)[1]
     data_inicio = datetime.date(ano, mes, 1)
@@ -155,7 +367,7 @@ def totais_fechamentos_mes(org, ano, mes):
     tratamentos = list(
         Acompanhamento.objects.filter(
             organizacao=org, data_inicio__gte=data_inicio, data_inicio__lte=data_fim,
-        ).select_related("paciente", "programa").order_by("data_inicio")
+        ).exclude(status=Acompanhamento.Status.CANCELADO).select_related("paciente", "programa").order_by("data_inicio")
     )
     for t in tratamentos:
         # O valor de verdade é o do pagamento vinculado — é ele que pode ter
@@ -172,13 +384,19 @@ def totais_fechamentos_mes(org, ano, mes):
         Consulta.objects.filter(
             organizacao=org, data_hora__date__gte=data_inicio, data_hora__date__lte=data_fim, valor__gt=0,
         ).exclude(status=Consulta.Status.CANCELADA)
+        .exclude(reagendamentos__isnull=False)
         .select_related("paciente", "tipo_consulta", "profissional").order_by("data_hora")
     )
     for c in consultas:
-        pagamento = c.pagamentos.first()
+        pagamento = c.pagamento_vinculado()
         c.total_recebido = pagamento.total_recebido if pagamento else Decimal("0.00")
     total_consultas = sum((c.valor for c in consultas), Decimal("0.00"))
     total_recebido_consultas = sum((c.total_recebido for c in consultas), Decimal("0.00"))
+    # "Cobradas" (acima) é tudo que tem valor lançado, incluindo agendada,
+    # reagendada etc. — pra saber quantas de fato aconteceram, conta só as
+    # REALIZADA dentro dessa mesma lista (é o número que bate com o controle
+    # manual da Cláudia, que só contabiliza consulta que rolou de verdade).
+    qtd_consultas_realizadas = sum(1 for c in consultas if c.status == Consulta.Status.REALIZADA)
 
     return {
         "tratamentos": tratamentos,
@@ -187,6 +405,7 @@ def totais_fechamentos_mes(org, ano, mes):
         "total_recebido_tratamentos": total_recebido_tratamentos,
         "consultas": consultas,
         "qtd_consultas": len(consultas),
+        "qtd_consultas_realizadas": qtd_consultas_realizadas,
         "total_consultas": total_consultas,
         "total_recebido_consultas": total_recebido_consultas,
         "total_geral": total_tratamentos + total_consultas,
@@ -260,12 +479,47 @@ def editar_pagamento(request, pk):
                 messages.success(request, "Recebimento registrado.")
                 return redirect(url_desta_pagina)
 
+        elif acao == "editar_recebimento":
+            recebimento = get_object_or_404(
+                Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
+            )
+            form_recebimento_editar = RecebimentoForm(request.POST, instance=recebimento)
+            if form_recebimento_editar.is_valid():
+                form_recebimento_editar.save()
+                messages.success(request, "Recebimento atualizado.")
+            else:
+                messages.error(request, "Não deu pra salvar o recebimento — confira os valores.")
+            return redirect(url_desta_pagina)
+
         elif acao == "excluir_recebimento":
             recebimento = get_object_or_404(
                 Recebimento, pk=request.POST.get("recebimento_id"), pagamento=pagamento, organizacao=org
             )
             recebimento.delete()
             messages.success(request, "Recebimento excluído.")
+            return redirect(url_desta_pagina)
+
+        elif acao == "cancelar_pagamento":
+            # Pra uma venda/cobrança que não vai mais acontecer (ex.: tratamento
+            # cancelado) sem apagar nenhum recebimento já registrado — diferente
+            # de "Excluir lançamento", que some com tudo. recalcular_status()
+            # nunca mexe sozinho num lançamento já cancelado (ver o método), por
+            # isso esse status só muda por ação manual como essa.
+            pagamento.status = Pagamento.Status.CANCELADO
+            pagamento.save(update_fields=["status", "atualizado_em"])
+            messages.success(request, "Cobrança cancelada — não conta mais como pendente no financeiro.")
+            return redirect(url_desta_pagina)
+
+        elif acao == "reativar_pagamento":
+            # recalcular_status() ignora o lançamento enquanto o status for
+            # Cancelado (de propósito — ver o método) — por isso muda pra
+            # Pendente primeiro, e só depois deixa o recálculo normal decidir
+            # o status certo (Pendente/Parcial/Pago) a partir dos recebimentos
+            # que já existirem.
+            pagamento.status = Pagamento.Status.PENDENTE
+            pagamento.save(update_fields=["status", "atualizado_em"])
+            pagamento.recalcular_status()
+            messages.success(request, "Cobrança reativada.")
             return redirect(url_desta_pagina)
 
     if form is None:
@@ -278,6 +532,7 @@ def editar_pagamento(request, pk):
         "pagamento": pagamento,
         "recebimento_form": recebimento_form,
         "recebimentos": pagamento.recebimentos.all(),
+        "parcelas_opcoes": range(1, 13),
         "next": proximo,
     }
     return render(request, "financeiro/editar_pagamento.html", contexto)
@@ -289,6 +544,13 @@ def editar_pagamento(request, pk):
 def excluir_pagamento(request, pk):
     org = organizacao_do_usuario(request)
     pagamento = get_object_or_404(Pagamento, pk=pk, organizacao=org)
+    if pagamento.total_recebido > 0:
+        messages.error(
+            request,
+            "Esse lançamento já tem recebimento registrado — excluir apagaria esse valor do seu caixa. "
+            "Use \"Cancelar cobrança\" em vez disso.",
+        )
+        return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
     pagamento.delete()
     messages.success(request, "Lançamento excluído.")
     return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
@@ -364,6 +626,36 @@ def painel(request):
             "total_despesas": total_despesas,
         })
 
+    elif aba == "a_receber":
+        # Visão dedicada de "quem ainda deve", sem filtro de período — o
+        # problema de confiar só no Relatório financeiro (filtrado por
+        # vencimento) é que uma pessoa que vai pagar só no mês que vem não
+        # aparece em lugar nenhum até esse mês chegar, mesmo a cobrança já
+        # existindo. Aqui entra todo Pendente/Parcial, não importa quando
+        # vence — do mais atrasado ao que ainda nem venceu.
+        # Exclui cobrança de tratamento cancelado: cancelar o acompanhamento
+        # não mexe no pagamento vinculado (de propósito, pra não apagar valor
+        # já recebido) — mas se nada foi recebido, essa cobrança vira uma
+        # pendência fantasma, de um tratamento que não vai mais acontecer.
+        pendentes = (
+            Pagamento.objects.filter(organizacao=org, status__in=[Pagamento.Status.PENDENTE, Pagamento.Status.PARCIAL])
+            .exclude(acompanhamento__status=Acompanhamento.Status.CANCELADO)
+            .select_related("paciente", "consulta", "acompanhamento__programa", "venda")
+            .order_by(F("data_vencimento").asc(nulls_last=True))
+        )
+
+        paciente_busca = request.GET.get("paciente", "").strip()
+        if paciente_busca:
+            pendentes = pendentes.filter(paciente__nome__icontains=paciente_busca)
+
+        pendentes = list(pendentes)
+        contexto.update({
+            "pendentes": pendentes,
+            "total_a_receber": sum((p.saldo_pendente for p in pendentes), Decimal("0.00")),
+            "paciente_busca": paciente_busca,
+            "hoje": hoje,
+        })
+
     elif aba == "resumo_mensal":
         saldo = _saldo_ate(org, datetime.date(ano, 1, 1) - datetime.timedelta(days=1))
         linhas = []
@@ -390,9 +682,15 @@ def painel(request):
 
         # Só a pendência real de paciente (dinheiro que ainda vai entrar) —
         # sem misturar com "lançamentos previstos" do Financeiro geral, que
-        # é um conceito à parte e só confunde essa conta.
+        # é um conceito à parte e só confunde essa conta. Exclui cobrança de
+        # tratamento cancelado (ver comentário em "a_receber" logo acima).
         saldo_pendente_pacientes = sum(
-            (p.saldo_pendente for p in Pagamento.objects.filter(organizacao=org).exclude(status=Pagamento.Status.CANCELADO)),
+            (
+                p.saldo_pendente
+                for p in Pagamento.objects.filter(organizacao=org)
+                .exclude(status=Pagamento.Status.CANCELADO)
+                .exclude(acompanhamento__status=Acompanhamento.Status.CANCELADO)
+            ),
             Decimal("0.00"),
         )
         saldo_futuro_previsto = saldo_hoje + saldo_pendente_pacientes
@@ -421,6 +719,10 @@ def painel(request):
             "saldo_futuro_previsto": saldo_futuro_previsto,
             "grafico": grafico,
             "saldo_inicial_financeiro": org.saldo_inicial_financeiro,
+            "taxas_maquininha_campos": [
+                {"chave": chave, "rotulo": rotulo, "valor": org.taxas_maquininha.get(chave, "")}
+                for chave, rotulo in TAXAS_MAQUININHA_CAMPOS
+            ],
         })
 
     return render(request, "financeiro/painel.html", contexto)
@@ -444,6 +746,35 @@ def salvar_saldo_inicial(request):
     org.saldo_inicial_financeiro = valor
     org.save(update_fields=["saldo_inicial_financeiro"])
     messages.success(request, "Saldo inicial atualizado.")
+    return redirect(f"{reverse('financeiro:painel')}?aba=geral")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_financeiro_ativo", "Controle Financeiro")
+@require_POST
+def salvar_taxas_maquininha(request):
+    org = organizacao_do_usuario(request)
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só administradores podem alterar as taxas da maquininha.")
+        return redirect(f"{reverse('financeiro:painel')}?aba=geral")
+
+    taxas = {}
+    for chave, _rotulo in TAXAS_MAQUININHA_CAMPOS:
+        bruto = (request.POST.get(f"taxa_{chave}") or "").strip().replace(",", ".")
+        if bruto:
+            try:
+                taxas[chave] = str(Decimal(bruto))
+            except Exception:
+                messages.error(request, f"Taxa inválida em \"{chave}\" — nada foi salvo.")
+                return redirect(f"{reverse('financeiro:painel')}?aba=geral")
+
+    org.taxas_maquininha = taxas
+    org.save(update_fields=["taxas_maquininha"])
+    messages.success(
+        request,
+        "Taxas da maquininha atualizadas — valem pra recebimentos novos de cartão a partir de agora "
+        "(recebimentos já registrados mantêm a taxa que tinham quando foram salvos).",
+    )
     return redirect(f"{reverse('financeiro:painel')}?aba=geral")
 
 

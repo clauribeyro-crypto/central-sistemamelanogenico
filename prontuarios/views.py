@@ -6,14 +6,19 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from contas.utils import organizacao_do_usuario, usuario_e_administrador
+from contas.utils import modulo_ativo_obrigatorio, organizacao_do_usuario, usuario_e_administrador
 from pacientes.models import Paciente
+from pacientes.views import _grafico_evolucao
+from programas.models import FotoEvolucao
 
-from .forms import AnamneseForm, AtendimentoForm, DocumentoForm, RegistroEvolucaoForm
+from .forms import (
+    AnamnesePublicaForm, AnamneseForm, AtendimentoForm, DocumentoForm, GravacaoConsultaForm, RegistroEvolucaoForm,
+)
 from .models import (
-    SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, LinkAnamnese,
+    SECOES_ANAMNESE, SECOES_CHECKIN, Anamnese, Atendimento, Documento, GravacaoConsulta, LinkAnamnese,
     LinkCheckin, RegistroEvolucao,
 )
+from .services_ia import ServicoIAIndisponivel, processar_gravacao
 
 
 @login_required
@@ -206,7 +211,7 @@ def anamnese_publica(request, token):
     instancia = Anamnese.objects.filter(paciente=paciente).first()
 
     if request.method == "POST":
-        form = AnamneseForm(request.POST, request.FILES, instance=instancia)
+        form = AnamnesePublicaForm(request.POST, request.FILES, instance=instancia)
         if form.is_valid():
             registro = form.save(commit=False)
             registro.organizacao = paciente.organizacao
@@ -215,7 +220,7 @@ def anamnese_publica(request, token):
             link.marcar_preenchido()
             return render(request, "prontuarios/anamnese_publica_sucesso.html", {"paciente": paciente})
     else:
-        form = AnamneseForm(instance=instancia)
+        form = AnamnesePublicaForm(instance=instancia)
 
     return render(request, "prontuarios/anamnese_publica.html", {
         "paciente": paciente, "form": form, "secoes": SECOES_ANAMNESE,
@@ -309,8 +314,44 @@ def checkin_publico(request, token):
     else:
         form = RegistroEvolucaoForm()
 
+    # Modulações que a clínica fez upload pra essa paciente baixar (ver
+    # Documento.Tipo.MODULACAO) — só esse tipo aparece aqui, os outros
+    # (exame, documento, outro) continuam só internos à equipe.
+    modulacoes = Documento.objects.filter(paciente=paciente, tipo=Documento.Tipo.MODULACAO).order_by("-criado_em")
+
+    registros = list(paciente.registros_evolucao.order_by("-criado_em"))
+    anamnese_da_paciente = Anamnese.objects.filter(paciente=paciente).first()
+    grafico_evolucao = _grafico_evolucao(list(reversed(registros)), anamnese=anamnese_da_paciente)
+
+    # Fotos de evolução de qualquer acompanhamento da paciente (não só o
+    # atual) — a grade mostra a mais recente de cada ângulo/momento, igual
+    # já é feito na aba interna "Fotos" da ficha.
+    fotos = list(
+        FotoEvolucao.objects.filter(acompanhamento__paciente=paciente)
+        .order_by("angulo", "momento", "-criado_em")
+    )
+    mais_recente_por_combo = {}
+    for f in fotos:
+        chave = (f.angulo, f.momento)
+        if chave not in mais_recente_por_combo:
+            mais_recente_por_combo[chave] = f
+    grade_fotos = []
+    for angulo, angulo_label in FotoEvolucao.Angulo.choices:
+        colunas = [
+            {"momento": momento, "momento_label": momento_label, "foto": mais_recente_por_combo.get((angulo, momento))}
+            for momento, momento_label in FotoEvolucao.Momento.choices
+        ]
+        grade_fotos.append({
+            "angulo": angulo, "angulo_label": angulo_label, "colunas": colunas,
+            "tem_foto": any(c["foto"] for c in colunas),
+        })
+
     return render(request, "prontuarios/checkin_publico.html", {
         "paciente": paciente, "form": form, "secoes": SECOES_CHECKIN,
+        "modulacoes": modulacoes,
+        "grafico_evolucao": grafico_evolucao,
+        "grade_fotos": grade_fotos,
+        "tem_fotos": bool(fotos),
     })
 
 
@@ -347,3 +388,64 @@ def documento_excluir(request, pk):
     documento.delete()
     messages.success(request, "Documento excluído.")
     return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=documentos")
+
+
+@login_required
+@modulo_ativo_obrigatorio("modulo_gravacao_ia_ativo", "Gravação de consulta com IA")
+def gravacao_criar(request, paciente_pk):
+    org = organizacao_do_usuario(request)
+    paciente = get_object_or_404(Paciente, pk=paciente_pk, organizacao=org)
+    if request.method == "POST":
+        form = GravacaoConsultaForm(request.POST, request.FILES, paciente=paciente)
+        if form.is_valid():
+            gravacao = form.save(commit=False)
+            gravacao.organizacao = org
+            gravacao.paciente = paciente
+            gravacao.enviado_por = request.user
+            gravacao.save()
+            messages.success(request, "Gravação registrada.")
+        else:
+            messages.error(request, "Não deu pra registrar a gravação — confira o formulário.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=gravacoes")
+
+
+@login_required
+@require_POST
+@modulo_ativo_obrigatorio("modulo_gravacao_ia_ativo", "Gravação de consulta com IA")
+def gravacao_processar(request, pk):
+    """Dispara a transcrição + análise por IA — roda na hora (sem fila em segundo plano), pode demorar um pouco."""
+    org = organizacao_do_usuario(request)
+    gravacao = get_object_or_404(
+        GravacaoConsulta.objects.select_related("paciente"), pk=pk, organizacao=org
+    )
+    paciente = gravacao.paciente
+    if not gravacao.arquivo_audio:
+        messages.error(request, "Essa gravação não tem áudio enviado — a análise por IA precisa do arquivo, não só do link.")
+        return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=gravacoes")
+
+    try:
+        processar_gravacao(gravacao)
+        messages.success(request, "Gravação analisada — confira a transcrição e as queixas identificadas abaixo.")
+    except ServicoIAIndisponivel as exc:
+        messages.error(request, str(exc))
+    except Exception:
+        messages.error(request, "Não deu pra analisar essa gravação — veja o detalhe do erro na própria gravação.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=gravacoes")
+
+
+@login_required
+@require_POST
+@modulo_ativo_obrigatorio("modulo_gravacao_ia_ativo", "Gravação de consulta com IA")
+def gravacao_excluir(request, pk):
+    """Excluir uma gravação já enviada exige administrador — anexar uma nova é livre."""
+    org = organizacao_do_usuario(request)
+    gravacao = get_object_or_404(
+        GravacaoConsulta.objects.select_related("paciente"), pk=pk, organizacao=org
+    )
+    paciente = gravacao.paciente
+    if not usuario_e_administrador(request):
+        messages.error(request, "Só um administrador da clínica pode excluir uma gravação.")
+        return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=gravacoes")
+    gravacao.delete()
+    messages.success(request, "Gravação excluída.")
+    return redirect(f"{reverse('pacientes:ficha', args=[paciente.pk])}?aba=gravacoes")
