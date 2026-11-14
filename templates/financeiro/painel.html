@@ -170,7 +170,17 @@
                         <td>R$ {{ p.valor|floatformat:2 }}</td>
                         <td>R$ {{ p.total_recebido|floatformat:2 }}</td>
                         <td>R$ {{ p.saldo_pendente|floatformat:2 }}</td>
-                        <td><a href="{% url 'financeiro:editar_pagamento' p.pk %}?next={{ request.get_full_path|urlencode }}">Gerenciar ›</a></td>
+                        <td style="white-space:nowrap;">
+                            <a href="{% url 'financeiro:editar_pagamento' p.pk %}?next={{ request.get_full_path|urlencode }}">Gerenciar ›</a>
+                            {% if pode_editar and p.total_recebido == 0 %}
+                                <form method="post" action="{% url 'financeiro:excluir_pagamento' p.pk %}" style="display:inline;"
+                                      onsubmit="return confirm('Excluir essa cobrança de {{ p.paciente|escapejs }} (R$ {{ p.valor|floatformat:2 }})? Só use se já souber que o pagamento foi feito/conferido por fora e não precisa mais aparecer aqui — essa ação não pode ser desfeita.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" style="background:none; border:none; color:var(--text-muted); cursor:pointer; padding:0; margin-left:.5rem; text-decoration:underline; font-size:.85rem;">Excluir</button>
+                                </form>
+                            {% endif %}
+                        </td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="7">Ninguém devendo no momento 🎉</td></tr>

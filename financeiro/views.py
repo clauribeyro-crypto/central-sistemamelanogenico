@@ -457,6 +457,13 @@ def editar_pagamento(request, pk):
 def excluir_pagamento(request, pk):
     org = organizacao_do_usuario(request)
     pagamento = get_object_or_404(Pagamento, pk=pk, organizacao=org)
+    if pagamento.total_recebido > 0:
+        messages.error(
+            request,
+            "Esse lançamento já tem recebimento registrado — excluir apagaria esse valor do seu caixa. "
+            "Use \"Cancelar cobrança\" em vez disso.",
+        )
+        return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
     pagamento.delete()
     messages.success(request, "Lançamento excluído.")
     return _redirecionar_com_seguranca(request, reverse("financeiro:relatorio"))
