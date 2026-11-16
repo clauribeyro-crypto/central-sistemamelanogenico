@@ -58,6 +58,12 @@
                     <input type="hidden" name="acao" value="cancelar_consulta">
                     <button class="btn btn-secondary" type="submit">Cancelar consulta</button>
                 </form>
+            {% elif consulta.status == "REALIZADA" %}
+                <form method="post" onsubmit="return confirm('Corrigir: {{ consulta.paciente|escapejs }} pagou mas não fez essa consulta de verdade (ou desistiu antes)? Isso tira da contagem de consultas realizadas, mas o pagamento já feito continua registrado.');">
+                    {% csrf_token %}
+                    <input type="hidden" name="acao" value="corrigir_nao_compareceu">
+                    <button class="btn btn-secondary" type="submit">Corrigir: não compareceu</button>
+                </form>
             {% endif %}
             <form method="post" onsubmit="return confirm('Excluir esta consulta{% if pagamento %} e o lançamento financeiro vinculado (R$ {{ pagamento.valor|floatformat:2 }}, {{ pagamento.get_status_display }}){% endif %}? Essa ação não pode ser desfeita.');">
                 {% csrf_token %}

@@ -61,6 +61,11 @@ class VendaForm(forms.ModelForm):
         ),
         widget=forms.NumberInput(attrs={"min": 0, "step": "0.01", "inputmode": "decimal"}),
     )
+    parcelas_cartao = forms.TypedChoiceField(
+        label="Parcelas (se cartão)", choices=[(n, f"{n}x" if n > 1 else "À vista/1x") for n in range(1, 13)],
+        coerce=int, initial=1, required=False,
+        help_text="Só importa quando a forma de pagamento é cartão — define a taxa da maquininha usada no valor líquido.",
+    )
 
     class Meta:
         model = Venda

@@ -32,4 +32,7 @@ urlpatterns = [
     path("checkin/publico/<uuid:token>/", views.checkin_publico, name="checkin_publico"),
     path("pacientes/<int:paciente_pk>/documentos/novo/", views.documento_criar, name="documento_criar"),
     path("documentos/<int:pk>/excluir/", views.documento_excluir, name="documento_excluir"),
+    path("pacientes/<int:paciente_pk>/gravacoes/nova/", views.gravacao_criar, name="gravacao_criar"),
+    path("gravacoes/<int:pk>/processar/", views.gravacao_processar, name="gravacao_processar"),
+    path("gravacoes/<int:pk>/excluir/", views.gravacao_excluir, name="gravacao_excluir"),
 ]

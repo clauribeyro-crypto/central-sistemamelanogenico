@@ -1,3 +1,4 @@
-<div class="bloco-bloqueio" data-bloqueio-id="{{ bloqueio.pk }}" title="Clique para excluir este bloqueio">
+{% load l10n %}
+<div class="bloco-bloqueio" data-bloqueio-id="{{ bloqueio.pk|unlocalize }}" title="Clique para excluir este bloqueio">
     {{ bloqueio.get_motivo_display }} · {{ bloqueio.profissional }}{% if bloqueio.observacoes %}<br>{{ bloqueio.observacoes }}{% endif %}
 </div>

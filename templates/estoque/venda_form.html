@@ -97,6 +97,11 @@
                 <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">{{ form.valor_recebido_agora.help_text }}</p>
                 {% for error in form.valor_recebido_agora.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
             </div>
+            <div id="campo-parcelas-cartao">
+                <label for="{{ form.parcelas_cartao.id_for_label }}">{{ form.parcelas_cartao.label }}</label>
+                {{ form.parcelas_cartao }}
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">{{ form.parcelas_cartao.help_text }}</p>
+            </div>
 
             <button class="btn" type="submit">Registrar venda</button>
         </form>
@@ -136,6 +141,12 @@
             var campoDesconto = document.getElementById("{{ form.desconto.id_for_label }}");
             var elementoValorComDesconto = document.getElementById("valor-com-desconto");
 
+            var campoParcelasCartao = document.getElementById("campo-parcelas-cartao");
+
+            function atualizarVisibilidadeParcelas() {
+                campoParcelasCartao.style.display = campoForma.value === "CARTAO" ? "" : "none";
+            }
+
             function atualizarValores() {
                 var total = 0;
                 document.querySelectorAll(".linha-item").forEach(function (linha) {
@@ -169,8 +180,10 @@
                 campo.addEventListener("input", atualizarValores);
             });
             campoForma.addEventListener("change", atualizarValores);
+            campoForma.addEventListener("change", atualizarVisibilidadeParcelas);
             campoDesconto.addEventListener("input", atualizarValores);
             atualizarValores();
+            atualizarVisibilidadeParcelas();
 
             // ---- Nova paciente (cadastro rápido sem sair da tela) ----
             var csrf = document.querySelector('#form-venda [name=csrfmiddlewaretoken]').value;
