@@ -612,6 +612,7 @@ def iniciar_protocolo(request, pk):
                 Recebimento.objects.create(
                     organizacao=org, pagamento=pagamento, valor=valor_recebido,
                     forma_pagamento=form.cleaned_data["forma_recebimento"],
+                    parcelas=form.cleaned_data.get("parcelas_cartao") or 1,
                     data=form.cleaned_data["data_inicio"],
                 )
             if ja_paga:

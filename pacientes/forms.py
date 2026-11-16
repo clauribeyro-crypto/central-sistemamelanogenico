@@ -53,6 +53,11 @@ class IniciarProtocoloForm(forms.Form):
         label="Forma do valor já recebido",
         choices=[("", "---------")] + list(Pagamento.FormaPagamento.choices), required=False,
     )
+    parcelas_cartao = forms.TypedChoiceField(
+        label="Parcelas (se cartão de crédito)", choices=[(n, f"{n}x" if n > 1 else "À vista/1x") for n in range(1, 13)],
+        coerce=int, initial=1, required=False,
+        help_text="Só importa quando a forma do valor já recebido é cartão de crédito — define a taxa da maquininha usada no valor líquido.",
+    )
     observacoes = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
 
     def __init__(self, *args, organizacao=None, **kwargs):
