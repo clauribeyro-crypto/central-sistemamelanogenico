@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Relatório diário da equipe · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'leads:painel_marketing' %}">← Marketing</a></p>
+    <h1>📋 Relatório diário da equipe</h1>
+    <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
+        Dia a dia, quanto cada pessoa fez de cada tipo de contato — direto do histórico do CRM, sem
+        precisar preencher nada à parte. Uma linha só aparece quando teve alguma atividade naquele dia.
+        Cada coluna conta <strong>leads diferentes</strong>, não mensagens — se ela mandar duas mensagens
+        pro mesmo lead no mesmo dia e na mesma etapa, conta só 1.
+    </p>
+
+    <form class="filtro no-print" method="get">
+        <div>
+            <label for="mes">Mês</label>
+            <select id="mes" name="mes">
+                {% for numero, nome in meses %}
+                    <option value="{{ numero }}" {% if numero == mes %}selected{% endif %}>{{ nome }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="ano">Ano</label>
+            <select id="ano" name="ano">
+                {% for a in anos %}
+                    <option value="{{ a|stringformat:'d' }}" {% if a == ano %}selected{% endif %}>{{ a|stringformat:'d' }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="dia">Dia</label>
+            <select id="dia" name="dia">
+                <option value="">Todos</option>
+                {% for d in dias_do_mes %}
+                    <option value="{{ d }}" {% if d == dia %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label for="pessoa">Pessoa</label>
+            <select id="pessoa" name="pessoa">
+                <option value="">Todas</option>
+                {% for pessoa in pessoas %}
+                    <option value="{{ pessoa.pk }}" {% if pessoa_id == pessoa.pk %}selected{% endif %}>{{ pessoa }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <h2 style="margin-bottom:.5rem;">
+        {% if dia %}{{ dia }} de {% endif %}{{ mes_nome }}/{{ ano|stringformat:'d' }}
+    </h2>
+
+    <div class="grid" style="margin-bottom:1rem;">
+        <div class="card stat">
+            <div class="num">{{ total_contatados_geral }}</div>
+            <div class="rotulo">Total de leads chamados no período</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ total_movimentacoes_geral }}</div>
+            <div class="rotulo">Total de movimentações no período (somando todas as etapas)</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ total_responderam_geral }}</div>
+            <div class="rotulo">Total de leads com quem ela conversou (responderam)</div>
+        </div>
+        <div class="card stat">
+            <div class="num">{{ total_agendamentos }}</div>
+            <div class="rotulo">Total de agendamentos no período</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Pessoa</th>
+                    <th>Total de leads contatados</th>
+                    {% for chave, rotulo, tipos, etapa in colunas %}
+                        <th>{{ rotulo }}</th>
+                    {% endfor %}
+                    <th>Agendamentos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas %}
+                    <tr>
+                        <td>{{ linha.data|date:"d/m/Y" }}</td>
+                        <td>{{ linha.pessoa }}</td>
+                        <td style="font-weight:600;">{{ linha.total_contatados }}</td>
+                        {% for valor in linha.valores %}
+                            <td>{{ valor }}</td>
+                        {% endfor %}
+                        <td style="font-weight:600;">{{ linha.agendamentos }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="{{ colunas|length|add:4 }}">Nenhuma atividade registrada no período.</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:600;">
+                    <td colspan="2">Total</td>
+                    <td>{{ total_contatados_geral }}</td>
+                    {% for total in totais_colunas %}
+                        <td>{{ total }}</td>
+                    {% endfor %}
+                    <td>{{ total_agendamentos }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+{% endblock %}

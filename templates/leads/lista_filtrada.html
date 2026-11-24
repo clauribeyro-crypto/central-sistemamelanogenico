@@ -50,7 +50,7 @@
                 <tbody>
                 {% for lead in leads %}
                     <tr>
-                        <td><a href="{% url 'leads:detalhe' lead.pk %}">{{ lead.nome }}</a></td>
+                        <td><a href="{% url 'leads:detalhe' lead.pk %}?proximo={{ request.get_full_path|urlencode }}">{{ lead.nome }}</a></td>
                         <td>{{ lead.whatsapp }}</td>
                         <td>{{ lead.origem }}</td>
                         <td>{{ lead.responsavel|default:"—" }}</td>

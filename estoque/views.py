@@ -262,6 +262,7 @@ def venda_criar(request):
                             organizacao=org, pagamento=pagamento, valor=valor_recebido,
                             data=venda.data,
                             forma_pagamento=MAPA_FORMA_PAGAMENTO_FINANCEIRO[venda.forma_pagamento],
+                            parcelas=form.cleaned_data.get("parcelas_cartao") or 1,
                         )
 
                 if estoques_negativos:

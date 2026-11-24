@@ -139,6 +139,79 @@ def parse_extrato(nome_arquivo, conteudo):
     return parse_csv(conteudo)
 
 
+# --- Texto colado (extrato copiado de um PDF/internet banking) -------------
+# Formato específico do "HISTÓRICO DE MOVIMENTAÇÃO" do Sicoob (e parecido com
+# o de outros bancos): uma linha "DD/MM <TIPO> VALOR,00C" ou "...D" (crédito/
+# débito), seguida de 1-4 linhas de detalhe (ex.: "Recebimento Pix", nome de
+# quem pagou, CPF/CNPJ mascarado, "DOC.: Pix") até a próxima transação. Só
+# interessa achar os créditos (dinheiro que entrou) e, se der, o nome de quem
+# pagou — não tenta entender todo tipo de lançamento do extrato.
+_LINHA_TRANSACAO_RE = re.compile(r"^(\d{2}/\d{2})\s*(.+?)\s+([\d.,]+)\s*([CD])\*?\s*$")
+_LINHA_IGNORAR_RE = re.compile(r"^(doc\.?:|recebimento pix|transfer[eê]ncia pix|pagamento pix|\*{2,}\.|rem\.:|fav\.:)", re.IGNORECASE)
+
+
+def extrair_texto_pdf(conteudo):
+    """
+    Extrai o texto de um PDF de extrato (ex.: exportado do internet banking
+    ou enviado por e-mail), página por página, pra passar pro
+    extrair_creditos_colados — evita a pessoa ter que copiar e colar o texto
+    na mão. Só funciona com PDF que tem texto de verdade (a maioria dos
+    extratos bancários é assim); um PDF escaneado como imagem não tem texto
+    pra extrair, e isso vira um ValueError claro em vez de devolver vazio.
+    """
+    from pypdf import PdfReader
+
+    leitor = PdfReader(io.BytesIO(conteudo))
+    texto = "\n".join((pagina.extract_text() or "") for pagina in leitor.pages)
+    if not texto.strip():
+        raise ValueError("não consegui ler texto desse PDF (pode ser um PDF escaneado, sem texto de verdade).")
+    return texto
+
+
+def extrair_creditos_colados(texto, ano):
+    """
+    Varre um texto colado (copiado do extrato em PDF ou da tela do banco) e
+    devolve só as linhas de CRÉDITO (dinheiro que entrou), cada uma com data,
+    valor, o "tipo" cru da linha (pra separar Pix direto de repasse de
+    maquininha) e, quando dá pra achar, o nome de quem pagou (a primeira
+    linha de detalhe que não é claramente um rótulo/documento/CPF mascarado).
+    Ignora "SALDO ANTERIOR"/"SALDO DO DIA" (não são transações).
+    """
+    linhas = [l.strip() for l in texto.splitlines()]
+    creditos = []
+    for indice, linha in enumerate(linhas):
+        m = _LINHA_TRANSACAO_RE.match(linha)
+        if not m:
+            continue
+        data_str, tipo, valor_str, sinal = m.groups()
+        tipo = tipo.strip()
+        if "SALDO" in tipo.upper() or sinal != "C":
+            continue
+        try:
+            dia, mes = int(data_str[:2]), int(data_str[3:5])
+            data = datetime.date(ano, mes, dia)
+        except ValueError:
+            continue
+        try:
+            valor = _parse_valor_brl(valor_str)
+        except (ValueError, InvalidOperation):
+            continue
+
+        nome = ""
+        for prox in linhas[indice + 1:indice + 6]:
+            if not prox:
+                continue
+            if _LINHA_TRANSACAO_RE.match(prox):
+                break
+            if _LINHA_IGNORAR_RE.match(prox):
+                continue
+            nome = prox
+            break
+
+        creditos.append({"data": data, "valor": valor, "tipo": tipo.upper(), "nome": nome})
+    return creditos
+
+
 # --- Sugestão de categoria --------------------------------------------------
 # Só uma ajuda pra não ter que escolher a categoria de cada linha do zero —
 # casa palavras comuns de extrato bancário com o *nome* das categorias que a

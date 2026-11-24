@@ -228,10 +228,25 @@ class Recebimento(ModeloDaOrganizacao):
     """
 
     pagamento = models.ForeignKey(Pagamento, on_delete=models.CASCADE, related_name="recebimentos")
-    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    valor = models.DecimalField("valor bruto", max_digits=10, decimal_places=2)
     forma_pagamento = models.CharField(max_length=20, choices=Pagamento.FormaPagamento.choices)
+    parcelas = models.PositiveSmallIntegerField(
+        default=1,
+        help_text="Só importa pra cartão de crédito — define qual taxa da maquininha é usada pro valor líquido.",
+    )
     data = models.DateField(default=timezone.localdate)
     observacoes = models.CharField(max_length=255, blank=True)
+
+    # Calculados automaticamente a partir das taxas da maquininha cadastradas
+    # em Organização (ver Organizacao.taxa_maquininha) — guardados aqui, e
+    # não recalculados depois, pra manter o histórico caso a taxa mude.
+    taxa_percentual = models.DecimalField(
+        "taxa da maquininha (%)", max_digits=5, decimal_places=2, default=Decimal("0.00")
+    )
+    valor_liquido = models.DecimalField(
+        "valor líquido", max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="O que realmente cai no caixa, já descontada a taxa da maquininha.",
+    )
 
     criado_em = models.DateTimeField(auto_now_add=True)
 
@@ -242,3 +257,50 @@ class Recebimento(ModeloDaOrganizacao):
 
     def __str__(self):
         return f"R$ {self.valor} ({self.get_forma_pagamento_display()}) em {self.data:%d/%m/%Y}"
+
+    def save(self, *args, **kwargs):
+        if self.forma_pagamento not in (Pagamento.FormaPagamento.CREDITO, Pagamento.FormaPagamento.DEBITO):
+            self.parcelas = 1
+        self.taxa_percentual = self.pagamento.organizacao.taxa_maquininha(self.forma_pagamento, self.parcelas)
+        self.valor_liquido = (self.valor * (Decimal("100") - self.taxa_percentual) / Decimal("100")).quantize(Decimal("0.01"))
+        super().save(*args, **kwargs)
+
+
+class ParcelaPrevista(ModeloDaOrganizacao):
+    """
+    Uma parcela futura (ainda só prevista) do saldo pendente de uma cobrança
+    parcelada — ex.: tratamento pago em 3x, uma por mês, pra dar visão de
+    quanto deve entrar em cada mês antes de acontecer. Deixar "data_pagamento"
+    em branco lança a parcela como previsão (entra no card de previsão por mês
+    da home); preencher marca que esse valor já entrou de fato. Não é a mesma
+    coisa que Recebimento — é só a expectativa cadastrada manualmente; o
+    recebimento de verdade continua sendo lançado do jeito normal quando o
+    dinheiro realmente cai, e a previsão correspondente é marcada como paga
+    à parte (os dois não se mexem sozinhos, porque nem sempre batem exatamente).
+    """
+
+    pagamento = models.ForeignKey(Pagamento, on_delete=models.CASCADE, related_name="parcelas_previstas")
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    data_prevista = models.DateField(help_text="Quando você espera que esse valor entre.")
+    data_pagamento = models.DateField(
+        null=True, blank=True,
+        help_text="Preencha quando o valor realmente entrar. Deixe em branco enquanto for só previsão.",
+    )
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "parcela prevista"
+        verbose_name_plural = "parcelas previstas"
+        ordering = ["data_prevista"]
+
+    def __str__(self):
+        status = "paga" if self.data_pagamento else "prevista"
+        return f"R$ {self.valor} ({status}) para {self.data_prevista:%d/%m/%Y}"
+
+    @property
+    def paga(self):
+        return self.data_pagamento is not None
+
+    @property
+    def atrasada(self):
+        return not self.paga and self.data_prevista < timezone.localdate()

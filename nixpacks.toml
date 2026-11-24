@@ -9,4 +9,4 @@ nixPkgs = ["python311"]
 cmds = ["python -m pip install --upgrade pip", "python -m pip install -r requirements.txt"]
 
 [start]
-cmd = "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python -m gunicorn clinica.wsgi --bind 0.0.0.0:$PORT --workers 2"
+cmd = "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python -m gunicorn clinica.wsgi --bind 0.0.0.0:$PORT --workers 2 --access-logfile - --error-logfile - --access-logformat '%(t)s \"%(r)s\" %(s)s %(b)s'"

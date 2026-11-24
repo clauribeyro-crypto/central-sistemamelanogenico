@@ -1,7 +1,38 @@
 {% extends "base.html" %}
 {% block title %}{{ lead.nome }} · CRM · Sistema da Clínica{% endblock %}
 {% block content %}
-    <p><a href="{% url 'leads:kanban' %}">← Voltar ao CRM</a></p>
+    <p><a href="{{ url_voltar }}">← Voltar ao CRM</a></p>
+
+    {% if dados_formulario or lead.respostas_formulario_manual %}
+        <div class="card" style="border:2px solid var(--primary, #6366f1);">
+            <h2 style="margin-top:0;">📋 Respostas do formulário</h2>
+            <p style="font-size:.85rem; color:var(--text-muted);">
+                O que ela respondeu no formulário/quiz de origem — já vem aqui antes de chamar, sem precisar abrir a planilha.
+            </p>
+            {% if dados_formulario %}
+                <table style="width:100%; border-collapse:collapse;">
+                    {% for rotulo, valor in dados_formulario %}
+                        <tr>
+                            <td style="padding:.35rem .5rem .35rem 0; white-space:nowrap; vertical-align:top; color:var(--text-muted);">{{ rotulo }}</td>
+                            <td style="padding:.35rem 0;">{{ valor }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% endif %}
+            {% if lead.respostas_formulario_manual %}
+                <p style="white-space:pre-line; margin-bottom:0;">{{ lead.respostas_formulario_manual }}</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="card">
+            <h2 style="margin-top:0;">📋 Respostas do formulário</h2>
+            <p style="font-size:.85rem; color:var(--text-muted); margin-bottom:0;">
+                Essa lead ainda não tem respostas de quiz/formulário salvas.
+                <a href="{% url 'leads:editar_lead' lead.pk %}">Colar as respostas</a> se ela veio de um
+                quiz/planilha externa e foi cadastrada à mão.
+            </p>
+        </div>
+    {% endif %}
 
     <div class="card">
         <h1 style="margin-top:0;">{{ lead.nome }}</h1>
@@ -34,23 +65,6 @@
             </p>
         {% endif %}
     </div>
-
-    {% if dados_formulario %}
-        <div class="card">
-            <h2>Respostas do formulário</h2>
-            <p style="font-size:.85rem; color:var(--text-muted);">
-                O que ela respondeu no formulário/quiz de origem — sem precisar abrir a planilha.
-            </p>
-            <table style="width:100%; border-collapse:collapse;">
-                {% for rotulo, valor in dados_formulario %}
-                    <tr>
-                        <td style="padding:.35rem .5rem .35rem 0; white-space:nowrap; vertical-align:top; color:var(--text-muted);">{{ rotulo }}</td>
-                        <td style="padding:.35rem 0;">{{ valor }}</td>
-                    </tr>
-                {% endfor %}
-            </table>
-        </div>
-    {% endif %}
 
     {% if pausa_ativa %}
         <div class="card" style="border:2px solid #f59e0b;">
@@ -119,6 +133,11 @@
                 {% endif %}
                 <a class="btn btn-danger" href="{% url 'leads:perder' lead.pk %}">✖ Marcar como perdida</a>
             </div>
+            <form method="post" action="{% url 'leads:converter_em_paciente' lead.pk %}" style="margin-top:.75rem;"
+                  onsubmit="return confirm('Criar a ficha de {{ lead.nome|escapejs }} como paciente, sem agendar consulta de diagnóstico? Use isso só pra quem já é cliente de antes e não precisa passar pelo Fábio de novo.');">
+                {% csrf_token %}
+                <button class="btn btn-secondary" type="submit">🔁 Já é cliente — converter em paciente (sem consulta)</button>
+            </form>
         </div>
     {% else %}
         <div class="card">
@@ -130,6 +149,27 @@
             {% endif %}
         </div>
     {% endif %}
+
+    <div class="card">
+        <h2>Ficha de paciente vinculada</h2>
+        {% if lead.paciente %}
+            <p>Vinculada a <a href="{% url 'pacientes:ficha' lead.paciente.pk %}">{{ lead.paciente.nome }}</a>.
+            Se estiver errado (ficha duplicada, vínculo que não pegou certo), escolha a ficha certa abaixo.</p>
+        {% else %}
+            <p style="color:var(--text-muted);">Essa lead ainda não está vinculada a nenhuma ficha de paciente —
+            por isso ela não aparece como "fechou" nos relatórios de Marketing, mesmo que o tratamento já exista.</p>
+        {% endif %}
+        <form method="post" action="{% url 'leads:vincular_paciente_existente' lead.pk %}" style="display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;">
+            {% csrf_token %}
+            <select name="paciente_id" required>
+                <option value="">Escolha a paciente…</option>
+                {% for p in pacientes_da_org %}
+                    <option value="{{ p.pk }}" {% if lead.paciente_id == p.pk %}selected{% endif %}>{{ p.nome }}{% if p.telefone %} — {{ p.telefone }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-secondary" type="submit">🔗 Vincular a esta ficha</button>
+        </form>
+    </div>
 
     <div class="card">
         <h2>Excluir lead</h2>

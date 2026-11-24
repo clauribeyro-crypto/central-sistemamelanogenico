@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block title %}Pagamentos de mentoria · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'core:painel_mentoradas' %}">← Painel de mentoradas</a></p>
+    <h1>🤝 Pagamentos de mentoria</h1>
+    <p style="font-size:.9rem; color:var(--text-muted); margin-top:-.5rem;">
+        Controle do contrato de mentoria de cada mentorada — o valor total combinado, o que já entrou e o que
+        falta, já que cada uma paga aos poucos conforme bate as próprias metas. Só você vê essa página.
+    </p>
+
+    {% if contratos %}
+        {% for contrato in contratos %}
+            <div class="card">
+                <h2 style="margin-top:0; display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.5rem;">
+                    <span>{{ contrato.mentorada.nome }}</span>
+                    <span style="font-size:.85rem; font-weight:normal; color:var(--text-muted);">
+                        Mentoria iniciada em {{ contrato.data_inicio|date:"d/m/Y" }}
+                    </span>
+                </h2>
+                <div class="grid">
+                    <div class="card stat">
+                        <div class="num">R$ {{ contrato.valor_total|floatformat:2 }}</div>
+                        <div class="rotulo">Valor total combinado</div>
+                    </div>
+                    <div class="card stat">
+                        <div class="num">R$ {{ contrato.total_pago|floatformat:2 }}</div>
+                        <div class="rotulo">Já recebido</div>
+                    </div>
+                    <div class="card stat" style="background:#8a5a1011;">
+                        <div class="num">R$ {{ contrato.saldo_pendente|floatformat:2 }}</div>
+                        <div class="rotulo">Falta pra terminar de pagar a mentoria</div>
+                    </div>
+                </div>
+                {% if contrato.observacoes %}
+                    <p style="font-size:.85rem; color:var(--text-muted);">{{ contrato.observacoes }}</p>
+                {% endif %}
+
+                {% if contrato.parcelas_ordenadas %}
+                    <table style="margin-top:.75rem;">
+                        <thead>
+                            <tr><th>Status</th><th>Prevista</th><th>Paga em</th><th>Valor</th><th>Observações</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            {% for p in contrato.parcelas_ordenadas %}
+                                <tr{% if p.atrasada %} style="color:#8a5a10;"{% endif %}>
+                                    <td>
+                                        {% if p.paga %}<span class="badge">Paga</span>
+                                        {% elif p.atrasada %}<span class="badge badge-parcial">Atrasada</span>
+                                        {% else %}<span class="badge badge-neutro">Prevista</span>{% endif %}
+                                    </td>
+                                    <td colspan="4">
+                                        <form method="post" action="{% url 'core:pagamentos_mentoria_parcela_editar' p.pk %}"
+                                              style="display:flex; gap:.4rem; flex-wrap:wrap; align-items:center;">
+                                            {% csrf_token %}
+                                            <span>Prevista:</span>
+                                            <input type="date" name="data_prevista" value="{{ p.data_prevista|date:'Y-m-d' }}"
+                                                   style="font-size:.82rem; padding:.2rem;">
+                                            <span>Paga em:</span>
+                                            <input type="date" name="data_pagamento" value="{{ p.data_pagamento|date:'Y-m-d' }}"
+                                                   style="font-size:.82rem; padding:.2rem;">
+                                            <span>Valor:</span>
+                                            <input type="number" step="0.01" min="0" name="valor" value="{{ p.valor|stringformat:'.2f' }}"
+                                                   style="width:6rem; font-size:.82rem; padding:.2rem;">
+                                            <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem;" type="submit">Salvar</button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        <form method="post" action="{% url 'core:pagamentos_mentoria_parcela_excluir' p.pk %}"
+                                              onsubmit="return confirm('Excluir essa parcela de R$ {{ p.valor }} de {{ contrato.mentorada.nome|escapejs }}?');">
+                                            {% csrf_token %}
+                                            <button class="btn btn-secondary" style="padding:.3rem .6rem; font-size:.8rem; color:#8f2e45;" type="submit">Excluir</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="font-size:.85rem; color:var(--text-muted);">Nenhuma parcela registrada ainda.</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>Nenhum contrato de mentoria registrado ainda.</p>
+    {% endif %}
+
+    <div class="card">
+        <h2 style="margin-top:0;">Registrar parcela</h2>
+        {% if contratos %}
+            <form method="post" class="acao">
+                {% csrf_token %}
+                <input type="hidden" name="acao" value="nova_parcela">
+                {% for field in form_parcela %}
+                    <div>
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
+                        {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                    </div>
+                {% endfor %}
+                <button class="btn" type="submit">Registrar parcela</button>
+            </form>
+        {% else %}
+            <p style="font-size:.85rem; color:var(--text-muted);">Registre um contrato de mentoria abaixo primeiro.</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0;">Registrar contrato de mentoria</h2>
+        <form method="post" class="acao">
+            {% csrf_token %}
+            <input type="hidden" name="acao" value="novo_contrato">
+            {% for field in form_contrato %}
+                <div>
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<p style="font-size:.78rem; color:var(--text-muted);">{{ field.help_text }}</p>{% endif %}
+                    {% for error in field.errors %}<p style="color:#8f2e45;font-size:.8rem;">{{ error }}</p>{% endfor %}
+                </div>
+            {% endfor %}
+            <button class="btn" type="submit">Registrar contrato</button>
+        </form>
+    </div>
+{% endblock %}

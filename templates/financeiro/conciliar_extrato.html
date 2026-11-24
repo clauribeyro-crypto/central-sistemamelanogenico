@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Conciliar extrato · Sistema da Clínica{% endblock %}
+{% block content %}
+    <p><a href="{% url 'financeiro:relatorio' %}">← Voltar pro Relatório por paciente</a></p>
+    <h1>Conciliar extrato</h1>
+    <p style="color:var(--text-muted); font-size:.9rem;">
+        Sobe o PDF do extrato do seu banco (o mesmo que você baixa do internet banking) e compara cada Pix
+        recebido com o que já está lançado no sistema. <strong>Isso não grava nada</strong> — é só pra te mostrar
+        o que já bateu e o que ainda não foi encontrado, pra você saber o que falta lançar (do jeito normal, em
+        "Contas a receber" → "Gerenciar" → "Registrar recebimento").
+    </p>
+
+    <div class="card">
+        <form method="post" class="acao" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div>
+                <label for="arquivo-pdf-extrato">PDF do extrato</label>
+                <input type="file" id="arquivo-pdf-extrato" name="arquivo_pdf" accept="application/pdf">
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">
+                    Sobe o PDF direto do seu banco. Se o PDF for uma foto/escaneado (sem texto de verdade), não
+                    vai funcionar — nesse caso usa a caixa de colar texto abaixo.
+                </p>
+            </div>
+            <div style="max-width:160px;">
+                <label for="ano-extrato">Ano das datas do extrato</label>
+                <input type="number" id="ano-extrato" name="ano" value="{{ ano }}" min="2020" max="2100" required>
+                <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">
+                    O extrato só mostra dia/mês (ex.: "03/11") — o sistema precisa que você confirme o ano.
+                </p>
+            </div>
+            <button class="btn" type="submit">Conferir</button>
+
+            <details style="margin-top:1rem;">
+                <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                    Ou, se preferir, cola o texto do extrato em vez de subir o PDF
+                </summary>
+                <div style="margin-top:.5rem;">
+                    <label for="texto-extrato">Texto do extrato</label>
+                    <textarea id="texto-extrato" name="texto" rows="14" style="width:100%; font-family:monospace; font-size:.82rem;" placeholder="Cole aqui o texto do extrato, por exemplo:&#10;03/11 PIX RECEB.OUTRA IF 100,00C&#10;Recebimento Pix&#10;JULIANA SILVA DIAS MENDONCA&#10;...">{{ texto }}</textarea>
+                    <p style="font-size:.78rem; color:var(--text-muted); margin-top:.25rem;">
+                        Só precisa das linhas de MOVIMENTAÇÃO do extrato (data, tipo, valor) — não precisa limpar
+                        nada, pode colar o extrato inteiro que a ferramenta ignora o que não for transação. Se
+                        você subir um PDF acima, o texto colado aqui é ignorado.
+                    </p>
+                </div>
+            </details>
+        </form>
+    </div>
+
+    {% if resultado %}
+        <div class="grid">
+            <div class="card stat">
+                <div class="num">{{ resultado.qtd_achados }} / {{ resultado.qtd_pix }}</div>
+                <div class="rotulo">Pix do extrato que já achei lançado no sistema</div>
+            </div>
+            <div class="card stat" style="background:#f59e0b11;">
+                <div class="num">R$ {{ resultado.total_nao_achado|floatformat:2 }}</div>
+                <div class="rotulo">Valor dos que não achei — provavelmente falta lançar</div>
+            </div>
+            <div class="card stat">
+                <div class="num">R$ {{ resultado.total_maquininha|floatformat:2 }}</div>
+                <div class="rotulo">Repasses da maquininha no extrato (não comparados)</div>
+            </div>
+        </div>
+
+        {% if resultado.nao_achados %}
+            <div class="card" style="background:#f59e0b11; border:1px solid #f59e0b33;">
+                <h2 style="margin-top:0;">Não achei no sistema — confere se falta lançar ({{ resultado.nao_achados|length }})</h2>
+                <table>
+                    <thead><tr><th>Data</th><th>Nome no extrato</th><th>Valor</th></tr></thead>
+                    <tbody>
+                    {% for linha in resultado.nao_achados %}
+                        <tr>
+                            <td>{{ linha.data|date:"d/m/Y" }}</td>
+                            <td>{{ linha.nome|default:"—" }}</td>
+                            <td>R$ {{ linha.valor|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                <p style="font-size:.82rem; color:var(--text-muted); margin-top:.6rem;">
+                    Pode ser um Pix de alguém que ainda não tem cadastro de venda/cobrança no sistema, ou que foi
+                    lançado com uma data ou valor um pouco diferente. Acha a paciente em
+                    <a href="{% url 'financeiro:painel' %}?aba=a_receber">Contas a receber</a> (ou cadastra a
+                    venda, se for o caso) e registra o recebimento com a data certa.
+                </p>
+            </div>
+        {% else %}
+            <div class="card" style="background:#2f8f5b11; border:1px solid #2f8f5b33;">
+                <p style="margin:0;">Todos os Pix diretos desse extrato já foram encontrados no sistema. 🎉</p>
+            </div>
+        {% endif %}
+
+        <details style="margin-top:.75rem;">
+            <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                Ver todos os Pix do extrato, achados e não achados
+            </summary>
+            <table style="margin-top:.5rem;">
+                <thead><tr><th>Data</th><th>Nome no extrato</th><th>Valor</th><th>Situação</th></tr></thead>
+                <tbody>
+                {% for linha in resultado.linhas_pix %}
+                    <tr>
+                        <td>{{ linha.data|date:"d/m/Y" }}</td>
+                        <td>{{ linha.nome|default:"—" }}</td>
+                        <td>R$ {{ linha.valor|floatformat:2 }}</td>
+                        <td>
+                            {% if linha.recebimento %}
+                                <span class="badge">Achei — {{ linha.recebimento.pagamento.paciente }} ({{ linha.recebimento.data|date:"d/m" }})</span>
+                            {% else %}
+                                <span class="badge badge-atrasado">Não achei</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </details>
+
+        {% if resultado.maquininha %}
+            <details style="margin-top:.75rem;">
+                <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
+                    Ver repasses da maquininha no extrato ({{ resultado.maquininha|length }})
+                </summary>
+                <p style="font-size:.78rem; color:var(--text-muted); margin:.4rem 0;">
+                    Esses não são comparados automaticamente — a data do repasse não é a data da venda no
+                    cartão, então não dá pra casar um por um aqui. Use
+                    <a href="{% url 'financeiro:conferir_cartao' %}">Conferir/corrigir parcelas no cartão ›</a>
+                    pra essa conferência.
+                </p>
+                <table style="margin-top:.5rem;">
+                    <thead><tr><th>Data</th><th>Valor</th></tr></thead>
+                    <tbody>
+                    {% for c in resultado.maquininha %}
+                        <tr><td>{{ c.data|date:"d/m/Y" }}</td><td>R$ {{ c.valor|floatformat:2 }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </details>
+        {% endif %}
+    {% endif %}
+{% endblock %}

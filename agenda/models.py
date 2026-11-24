@@ -157,6 +157,18 @@ class Consulta(ModeloDaOrganizacao):
     def __str__(self):
         return f"{self.paciente} com {self.profissional} em {self.data_hora:%d/%m/%Y %H:%M}"
 
+    def pagamento_vinculado(self):
+        """
+        O lançamento financeiro desta consulta — numa cadeia de remarcações,
+        o pagamento sempre fica preso na consulta raiz (reagendar não duplica
+        a cobrança, ver sincronizar_receita_prevista em signals.py), então
+        sobe a cadeia até achar.
+        """
+        raiz = self
+        while raiz.reagendada_de_id:
+            raiz = raiz.reagendada_de
+        return raiz.pagamentos.first()
+
     def save(self, *args, **kwargs):
         # Ao criar sem valor explícito, usa o valor padrão do tipo de consulta.
         # Numa edição posterior, um valor deixado em branco é respeitado como
