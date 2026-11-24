@@ -325,7 +325,8 @@
                     <details style="margin-top:.5rem;">
                         <summary style="cursor:pointer; font-size:.85rem; color:var(--text-muted);">
                             Ver os {{ grupo.total }} leads que {{ grupo.pessoa }} agendou este mês
-                            ({{ grupo.total_pagos }} pagos — é esse o número que conta pra comissão dela)
+                            ({{ grupo.total_pagos }} pagos — é esse o número que conta pra comissão dela;
+                            {{ grupo.total_hoje }} hoje)
                         </summary>
                         <table style="margin-top:.5rem;">
                             <thead>
@@ -333,8 +334,8 @@
                             </thead>
                             <tbody>
                                 {% for l in grupo.leads %}
-                                    <tr>
-                                        <td>{{ l.historico.data_hora|date:"d/m/Y H:i" }}</td>
+                                    <tr{% if l.historico.data_hora.date == hoje %} style="background:#6366f111;"{% endif %}>
+                                        <td>{{ l.historico.data_hora|date:"d/m/Y H:i" }}{% if l.historico.data_hora.date == hoje %} <span class="badge">Hoje</span>{% endif %}</td>
                                         <td><a href="{% url 'leads:detalhe' l.lead.pk %}">{{ l.lead.nome }}</a></td>
                                         <td>
                                             {% if l.lead.paciente %}

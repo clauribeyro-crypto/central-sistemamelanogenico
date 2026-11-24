@@ -185,6 +185,7 @@ def home(request):
 
     contexto = {
         "org": org,
+        "hoje": hoje,
         "organizacoes_acesso_vencendo": organizacoes_acesso_vencendo,
         "usuario_e_administrador": usuario_e_administrador(request),
         "novos_hoje": leads_ativos.filter(etapa=Lead.Etapa.NOVO, entrou_em__date=hoje).count(),
@@ -325,6 +326,10 @@ def home(request):
                         "leads": linhas_pessoa,
                         "total": len(linhas_pessoa),
                         "total_pagos": sum(1 for l in linhas_pessoa if l["pago"]),
+                        # Pra conferir rápido contra o extrato/maquininha do dia,
+                        # sem precisar abrir a lista do mês inteiro e procurar
+                        # a mão a data de hoje entre todos os leads.
+                        "total_hoje": sum(1 for l in linhas_pessoa if l["historico"].data_hora.date() == hoje),
                     })
             contexto["meta_mes"]["detalhe_agendamentos_por_pessoa"] = detalhe_agendamentos_por_pessoa
 
